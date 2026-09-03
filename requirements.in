@@ -1,0 +1,54 @@
+# Sorgente delle dipendenze. NON è il file che viene installato.
+#
+#   requirements.in   (questo file, vincoli larghi, scritto a mano)
+#        │
+#        │  uv pip compile requirements.in -o requirements.txt
+#        ▼
+#   requirements.txt  (pin esatti di TUTTO l'albero, generato)
+#
+# La SPEC (regola 6) chiede pin esatti: un aggiornamento automatico che rompe
+# la demo il 6 ottobre è uno scenario da evitare per costruzione. Quindi si
+# installa sempre da requirements.txt, mai da questo file.
+
+# --- Deep learning ----------------------------------------------------------
+# torch: ruota Linux x86_64 da PyPI, che include già il runtime CUDA 12.x.
+# Verificato contro driver 595.84 (CUDA 13.2) su RTX 4050 Laptop 6 GB.
+torch==2.8.0
+torchvision==0.23.0
+
+# --- Dati scientifici -------------------------------------------------------
+numpy<2.0                 # pyresample e alcune ruote scientifiche sono ancora su ABI numpy 1.x
+scipy
+xarray
+netCDF4
+h5netcdf                  # backend alternativo: alcune scene AI4Arctic sono HDF5 travestite
+scikit-image
+scikit-learn              # matrice di confusione, metriche, soglia baseline su HV
+
+# --- Geospaziale ------------------------------------------------------------
+pyproj                    # trasformazioni CRS + Geod per il test di distanza geodetica
+pyresample                # ricampionamento su griglia EPSG:3413, nearest neighbour
+shapely                   # semplificazione rotta, geometrie
+rasterio                  # scrittura GeoTIFF dei raster RIO/mask
+
+# --- Inferenza e quantizzazione --------------------------------------------
+onnx
+onnxruntime               # CPU: è il punto — si dimostra INT8 senza GPU
+
+# --- Demo -------------------------------------------------------------------
+streamlit
+pydeck                    # mappa; regge la proiezione polare meglio di folium
+folium                    # fallback se pydeck dà problemi sul portatile
+matplotlib
+pillow
+
+# --- Config e utility -------------------------------------------------------
+pyyaml
+tqdm
+requests                  # download del dataset da Figshare
+psutil                    # RAM di picco durante l'inferenza (metrica §7.5)
+
+# --- Test e qualità ---------------------------------------------------------
+pytest
+pytest-cov
+ruff

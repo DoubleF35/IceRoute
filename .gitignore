@@ -1,0 +1,39 @@
+# --- Environments -----------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Data (large, reproducible via `make download`) --------------------------
+data/raw/
+data/processed/
+
+# Demo bundle: gitignored because it is large, but it is the single most
+# important artifact to BACK UP before 7 October. See README "Backup".
+data/demo/
+
+# --- Exploration ------------------------------------------------------------
+# SPEC rule 4: no notebooks on the main branch.
+notebooks/scratch/
+
+# --- Generated artifacts ----------------------------------------------------
+artifacts/models/
+artifacts/figures/
+artifacts/video/
+artifacts/logs/
+artifacts/metrics.json
+artifacts/data_stats.json
+
+# Downloaded reference PDFs (dataset manual, IMO circulars). Not redistributable.
+docs/reference/*.pdf
+
+
+# --- OS / editor ------------------------------------------------------------
+.DS_Store
+*.swp
+.vscode/
+.idea/

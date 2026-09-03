@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iceroute"
+version = "0.1.0"
+description = "On-board sea ice segmentation and POLARIS-constrained Arctic route optimisation for CubeSat edge computing"
+requires-python = ">=3.11,<3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Federico Fassio" }, { name = "Space Eagle" }]
+
+# Le dipendenze reali stanno in requirements.txt (pin esatti, generati da
+# requirements.in). Qui si dichiara solo il pacchetto, e si installa con
+# `pip install -e . --no-deps`, perché il risolutore di pip non deve avere
+# occasione di cambiare idea su una versione a due giorni dal pitch.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "slow: test che richiede dati scaricati o training (deselezionabile con -m 'not slow')",
+    "needs_data: richiede scene in data/raw/",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",  # la lunghezza riga la gestisce il formatter
+    "B008",  # default mutabili in firma: usati apposta in alcune dataclass di config
+]
