@@ -23,9 +23,9 @@ import hashlib
 import logging
 import shutil
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import requests
 
