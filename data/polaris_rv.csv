@@ -1,0 +1,35 @@
+# POLARIS Risk Index Values (RIV) — IMO MSC.1/Circ.1519, Annex, Table 1.3
+#
+# "Guidance on Methodologies for Assessing Operational Capabilities and
+# Limitations in Ice", International Maritime Organization, 6 June 2016.
+# Source document: https://edocs.imo.org/Final Documents/English/MSC.1-CIRC.1519 (E).docx
+# Transcribed 2026-09-03 from the text of the circular itself, Annex page 7-8.
+#
+# Every value below comes from the primary normative document. NONE is
+# PROVVISORIO. See DECISIONS.md D-006.
+#
+# Columns are the twelve WMO ice types of Table 1.3, in the order the circular
+# prints them. Two types are split by the circular into a thickness-qualified
+# pair (medium FYI </>= 1 m; multi-year light/heavy). Per section 1.1.2, the
+# qualified column may be used only when the operator can confidently determine
+# the thickness; otherwise the unqualified one applies. IceRoute cannot
+# determine thickness from a SOD chart, so cost.py uses the CONSERVATIVE column
+# of each pair — see configs/routing.yaml.
+#
+# RIO = sum over ice types of (concentration_in_tenths * RIV).
+#
+# This file is versioned in git deliberately: it is a normative input, not a
+# generated artifact.
+ice_class,ice_free,new_ice,grey_ice,grey_white_ice,thin_fyi_1st_stage,thin_fyi_2nd_stage,medium_fyi_lt_1m,medium_fyi,thick_fyi,second_year_ice,light_multi_year_ice,heavy_multi_year_ice,source
+PC1,3,3,3,3,2,2,2,2,2,2,1,1,MSC.1/Circ.1519 Table 1.3
+PC2,3,3,3,3,2,2,2,2,2,1,1,0,MSC.1/Circ.1519 Table 1.3
+PC3,3,3,3,3,2,2,2,2,2,1,0,-1,MSC.1/Circ.1519 Table 1.3
+PC4,3,3,3,3,2,2,2,2,1,0,-1,-2,MSC.1/Circ.1519 Table 1.3
+PC5,3,3,3,3,2,2,1,1,0,-1,-2,-2,MSC.1/Circ.1519 Table 1.3
+PC6,3,2,2,2,2,1,1,0,-1,-2,-3,-3,MSC.1/Circ.1519 Table 1.3
+PC7,3,2,2,2,1,1,0,-1,-2,-3,-3,-3,MSC.1/Circ.1519 Table 1.3
+IA Super,3,2,2,2,2,1,0,-1,-2,-3,-4,-4,MSC.1/Circ.1519 Table 1.3
+IA,3,2,2,2,1,0,-1,-2,-3,-4,-5,-5,MSC.1/Circ.1519 Table 1.3
+IB,3,2,2,1,0,-1,-2,-3,-4,-5,-6,-6,MSC.1/Circ.1519 Table 1.3
+IC,3,2,1,0,-1,-2,-3,-4,-5,-6,-7,-8,MSC.1/Circ.1519 Table 1.3
+Not Ice Strengthened,3,1,0,-1,-2,-3,-4,-5,-6,-7,-8,-8,MSC.1/Circ.1519 Table 1.3
