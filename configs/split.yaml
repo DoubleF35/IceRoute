@@ -1,0 +1,79 @@
+# Split CONGELATO — generato da scripts/download_subset.py, NON modificare a mano.
+#
+# SPEC §5.3: split per scena, mai per patch. Patch della stessa scena in train e
+# val causano leakage e producono metriche gonfie che crollano in demo.
+#
+# Una volta congelato non si rigenera: se cambiasse, il mIoU di oggi non sarebbe
+# più confrontabile con quello di ieri.
+#
+# Le 5 scene demo sono un'estrazione casuale: vanno RIVISTE A MANO dopo il
+# download, scegliendo quelle visivamente convincenti (margine di ghiaccio netto,
+# canali navigabili plausibili, nessun artefatto grosso).
+split:
+  frozen: true
+  seed: 20260903
+  note: 'Congelato da scripts/download_subset.py. Non rigenerare: le metriche di validazione non sarebbero
+    più confrontabili. Le 5 scene demo vanno riviste a mano (SPEC §5.3: devono essere visivamente convincenti).'
+  train:
+  - 20180327T103959_dmi_prep.nc
+  - 20180821T151146_cis_prep.nc
+  - 20180824T130831_cis_prep.nc
+  - 20180909T123451_cis_prep.nc
+  - 20180922T113859_cis_prep.nc
+  - 20190119T101218_cis_prep.nc
+  - 20190129T205430_dmi_prep.nc
+  - 20190306T102625_cis_prep.nc
+  - 20190419T203541_dmi_prep.nc
+  - 20190505T102627_cis_prep.nc
+  - 20190507T101218_cis_prep.nc
+  - 20190619T185115_dmi_prep.nc
+  - 20190704T205616_dmi_prep.nc
+  - 20190726T130736_cis_prep.nc
+  - 20190731T131647_cis_prep.nc
+  - 20190809T214629_cis_prep.nc
+  - 20190826T152918_cis_prep.nc
+  - 20190914T205220_dmi_prep.nc
+  - 20190924T121820_cis_prep.nc
+  - 20191012T081214_dmi_prep.nc
+  - 20200127T212003_dmi_prep.nc
+  - 20200131T101805_cis_prep.nc
+  - 20200203T104354_cis_prep.nc
+  - 20200223T205225_dmi_prep.nc
+  - 20200412T110426_dmi_prep.nc
+  - 20200703T210448_dmi_prep.nc
+  - 20200706T203552_dmi_prep.nc
+  - 20200712T123900_cis_prep.nc
+  - 20200910T194821_dmi_prep.nc
+  - 20201007T210352_dmi_prep.nc
+  - 20201119T093058_dmi_prep.nc
+  - 20201119T120712_cis_prep.nc
+  - 20210116T193208_dmi_prep.nc
+  - 20210116T210919_dmi_prep.nc
+  - 20210127T081803_dmi_prep.nc
+  - 20210127T212142_dmi_prep.nc
+  - 20210407T101941_cis_prep.nc
+  - 20210521T082226_dmi_prep.nc
+  - 20210531T074627_dmi_prep.nc
+  - 20210615T211138_dmi_prep.nc
+  - 20210816T205443_dmi_prep.nc
+  - 20210818T082542_dmi_prep.nc
+  - 20211014T080213_dmi_prep.nc
+  - 20211021T102443_dmi_prep.nc
+  - 20211029T203602_dmi_prep.nc
+  val:
+  - 20180428T093937_cis_prep.nc
+  - 20180903T155253_cis_prep.nc
+  - 20190409T211011_dmi_prep.nc
+  - 20190808T120918_cis_prep.nc
+  - 20210113T110732_cis_prep.nc
+  - 20210314T110731_cis_prep.nc
+  - 20210426T114547_dmi_prep.nc
+  - 20210429T080105_dmi_prep.nc
+  - 20210825T180347_dmi_prep.nc
+  - 20210921T120121_dmi_prep.nc
+  demo:
+  - 20180108T184332_dmi_prep.nc
+  - 20180806T184330_dmi_prep.nc
+  - 20200919T161650_cis_prep.nc
+  - 20210118T075356_dmi_prep.nc
+  - 20210408T082835_dmi_prep.nc
