@@ -1,0 +1,179 @@
+# Configurazione dati AI4Arctic.
+#
+# I nomi di variabile qui sotto sono VERIFICATI su una scena reale
+# (20201016T082722_dmi_prep.nc) con `make inspect`, e riscontrati con il file
+# utils.py del toolkit ufficiale astokholm/AI4ArcticSeaIceChallenge.
+# Non sono copiati dalla SPEC: la SPEC li dava per indicativi e infatti due
+# differiscono (vedi `geometry` sotto).
+#
+# Regola: se un nome cambia, si aggiorna QUESTO file, non il codice.
+#
+# Lo split congelato sta in configs/split.yaml, che è GENERATO. Questo file è
+# scritto a mano e i suoi commenti sono documentazione: nessuno script lo
+# riscrive.
+
+# ---------------------------------------------------------------------------
+# Sorgente — Figshare (data.dtu.dk), collection DOI 10.11583/DTU.c.6244065
+# ---------------------------------------------------------------------------
+source:
+  collection_id: 6244065
+
+  articles:
+    # Ready-To-Train: già preprocessato, standard-scaled, NaN gestiti.
+    train:
+      id: 21316608
+      n_files: 512                 # + il manuale PDF
+      total_bytes: 60201065698     # 60,20 GB per l'intero articolo
+      pattern: '*_prep.nc'
+    test:
+      id: 21762830
+      n_files: 20                  # + 20 *_reference.nc + 20 *_charts.png
+      total_bytes: 2511719753
+      pattern: '*_prep.nc'
+      reference_pattern: '*_prep_reference.nc'   # le label, ~790 KB l'una
+
+    # NON scaricare: 260 GB, e il preprocessing SAR è fuori scope (SPEC regola 3).
+    raw_train_do_not_download: 21284967
+    raw_test_do_not_download: 21762848
+
+  manual_file_id: 38640908         # AI4Arctic_challenge-dataset-manual_21.12.2022.pdf
+
+  # Verificato: nessuna autenticazione. download_url è 302 verso un URL S3
+  # prefirmato con X-Amz-Expires=10, quindi il redirect va seguito subito.
+  # Le richieste Range funzionano ma SOLO con GET: una HEAD riceve 403 perché
+  # la firma S3 è valida solo per GET.
+  auth_required: false
+  supports_range: true
+  use_head_requests: false
+
+# ---------------------------------------------------------------------------
+# Selezione del sottoinsieme
+# ---------------------------------------------------------------------------
+subset:
+  n_train_scenes: 60               # SPEC §5.3
+  download_all_test: true
+
+  # Il nome file NON contiene la regione: è <YYYYMMDD>T<HHMMSS>_<service>_prep.nc
+  # e `service` vale solo {dmi, cis}. La regione sta nell'attributo HDF5
+  # `original_id` nella root del netCDF, leggibile con una GET Range di 2 KB
+  # senza scaricare la scena. La mappa completa è in data/scene_regions.json.
+  stratify_by: [region, month]
+  region_source: data/scene_regions.json
+
+  min_free_gb: 25                  # sotto questa soglia il download si ferma con errore
+
+# Lo split vive in configs/split.yaml — generato una volta e mai rigenerato.
+split_file: configs/split.yaml
+
+# ---------------------------------------------------------------------------
+# Variabili netCDF — VERIFICATE su scena reale
+# ---------------------------------------------------------------------------
+variables:
+  # SAR Sentinel-1 dual-pol, corretto per il rumore (NERSC), 80 m/px.
+  # Nota: già standard-scaled dal dataset. Sulla scena verificata i valori vanno
+  # da -1,9 a 2,7 — non sono dB. Nessuna ulteriore normalizzazione.
+  sar_hh: nersc_sar_primary
+  sar_hv: nersc_sar_secondary
+  incidence_angle: sar_incidenceangle     # anch'esso standard-scaled, non gradi
+  distance_to_land: distance_map          # canale opzionale (ablation, SPEC §7.1)
+
+  targets:
+    sic: SIC          # concentrazione, 0-10 in decimi (+ 255 = ignora)
+    sod: SOD          # stage of development — è il target del progetto
+    floe: FLOE        # non usato: fuori scope (SPEC §3)
+
+  # ATTENZIONE — qui la SPEC sbagliava il nome.
+  # La SPEC ipotizzava `sar_grid_latitude` / `sar_grid_longitude` con indici di
+  # linea/campione separati. I nomi reali sono questi, e sono griglie 2D già
+  # formate, il che semplifica la geocodifica.
+  geometry:
+    latitude: sar_grid2d_latitude         # 21×21 su una scena 4996×5246
+    longitude: sar_grid2d_longitude
+    grid_shape: [21, 21]
+    # → serve interpolazione a risoluzione piena prima di riproiettare (SPEC §8.1)
+
+  passive_amsr2:                          # non usati nel modello base
+    [btemp_6_9h, btemp_6_9v, btemp_7_3h, btemp_7_3v, btemp_10_7h, btemp_10_7v,
+     btemp_18_7h, btemp_18_7v, btemp_23_8h, btemp_23_8v, btemp_36_5h,
+     btemp_36_5v, btemp_89_0h, btemp_89_0v]
+
+  weather_era5:                           # non usate nel modello base
+    [u10m_rotated, v10m_rotated, t2m, skt, tcwv, tclw]
+
+# Attributi globali presenti in ogni scena, verificati.
+global_attrs:
+  scene_id: scene_id
+  original_id: original_id       # contiene regione e prodotto S1 di origine
+  ice_service: ice_service       # {dmi, cis}
+  pixel_spacing: pixel_spacing   # 80 (metri)
+  flip: flip                     # 1 sulla scena verificata — DA GESTIRE in geocode.py
+
+fill_value: 255                  # verificato: 'mask' in SIC/SOD/FLOE_LOOKUP del toolkit
+
+# ---------------------------------------------------------------------------
+# Classi SOD e mappatura verso POLARIS — IL GIUNTO CRITICO (SPEC §6.3)
+# ---------------------------------------------------------------------------
+# Le 6 classi SOD sono quelle prodotte da SOD_LOOKUP del toolkit ufficiale, che
+# accorpa i codici WMO dell'ice chart. Coincidono con il target di 5-6 classi
+# della SPEC: non serve accorpare ulteriormente.
+sod_classes:
+  0: {name: "Open water",  wmo_codes: [0, 80]}
+  1: {name: "New ice",     wmo_codes: [81, 82]}       # new ice, nilas/ring ice
+  2: {name: "Young ice",   wmo_codes: [83, 84, 85]}   # young, grey, grey-white
+  3: {name: "Thin FYI",    wmo_codes: [87, 88, 89]}   # thin FYI + stadi 1 e 2
+  4: {name: "Thick FYI",   wmo_codes: [86, 91, 93]}   # FYI generico, medium, thick
+  5: {name: "Old ice",     wmo_codes: [95, 96, 97]}   # old, second year, multi-year
+  255: {name: "Ignora",    wmo_codes: [98, 99]}       # glacier ice, sconosciuto
+
+n_classes: 6
+
+# Mappatura da classe SOD alla colonna di data/polaris_rv.csv.
+#
+# Ogni classe SOD copre più tipi di ghiaccio POLARIS, quindi la scelta della
+# colonna è una decisione. Regola adottata: **si sceglie sempre la colonna con
+# il RIV più basso fra quelle coperte**, cioè la più cauta. Un errore in questa
+# direzione produce una rotta più prudente del necessario; l'errore opposto
+# manda una nave in ghiaccio che non può affrontare.
+#
+# Giustificazione per riga (nomenclatura WMO):
+#   Young ice = 10-30 cm = grey (10-15) + grey-white (15-30). Si prende
+#     grey_white_ice: per IB vale 1 contro il 2 di grey_ice.
+#   Thin FYI = 30-70 cm = 1st stage (30-50) + 2nd stage (50-70). Si prende
+#     thin_fyi_2nd_stage: per IA vale 0 contro 1.
+#   Thick FYI: la classe SOD 4 accorpa anche il medium FYI (codice 91). Si
+#     prende thick_fyi: per PC6 vale -1 contro lo 0 di medium_fyi.
+#   Old ice = second year + multi-year. Si prende heavy_multi_year_ice, che è
+#     anche la colonna che la circolare §1.1.2 impone quando non si può
+#     determinare con sicurezza che il multi-year sia sotto 2,5 m — e da un
+#     chart SOD non si può.
+sod_to_polaris:
+  0: ice_free
+  1: new_ice
+  2: grey_white_ice
+  3: thin_fyi_2nd_stage
+  4: thick_fyi
+  5: heavy_multi_year_ice
+
+# ---------------------------------------------------------------------------
+# Estrazione patch (SPEC §6.2)
+# ---------------------------------------------------------------------------
+patches:
+  size: 256
+  stride: 192                      # sovrapposizione 64 px
+  max_invalid_fraction: 0.30       # scarta patch con >30% di pixel non validi
+
+  # Bilanciamento: una scena artica è per lo più acqua aperta o ghiaccio
+  # uniforme. Senza questo, il modello impara a predire una classe sola.
+  margin_fraction_target: 0.40     # almeno il 40% delle patch con un margine
+  margin_criterion:
+    min_classes: 2                 # ≥2 classi SOD nella patch...
+    min_class_fraction: 0.10       # ...ciascuna con ≥10% dei pixel validi
+
+  augmentation:
+    hflip: true
+    vflip: true
+    rot90: true
+    # VIETATI: rotazione arbitraria (interpola un target categorico) e color
+    # jitter (il backscatter è una grandezza fisica, non estetica). SPEC §6.2.
+    arbitrary_rotation: false
+    color_jitter: false

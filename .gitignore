@@ -37,3 +37,6 @@ docs/reference/*.pdf
 *.swp
 .vscode/
 .idea/
+
+# Report di ispezione generati (il PNG di Gate 0.2 si rigenera con `make inspect`)
+artifacts/inspect_*.json
