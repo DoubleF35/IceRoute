@@ -35,7 +35,7 @@ import yaml
 
 from iceroute.data.collapse import N_CLASSES, collapse, polaris_mapping
 from iceroute.data.collapse import NAMES as CLASS_NAMES
-from iceroute.data.loader import load_config, load_scene
+from iceroute.data.loader import load_config, load_scene, reference_path
 from iceroute.model.metrics import IGNORE_INDEX
 from iceroute.routing.astar import NoRouteFound, find_route
 from iceroute.routing.baseline import compare, geodesic_baseline
@@ -156,6 +156,18 @@ def predict_mask(model, scene, channels: list[str], eval_cfg: dict, device: str)
     return labels, stats
 
 
+def resolve_labels(scene_path: Path) -> Path | None:
+    """Where a scene's ice chart lives.
+
+    The official challenge test scenes carry no targets — that is what makes
+    them a test set — and their charts sit alongside in ``*_prep_reference.nc``.
+    Resolved by looking on disk rather than by a flag, so pointing precompute at
+    either directory just works and cannot be pointed at the wrong one.
+    """
+    ref = reference_path(scene_path)
+    return ref if ref != scene_path and ref.exists() else None
+
+
 def process_scene(
     scene_path: Path,
     *,
@@ -167,20 +179,32 @@ def process_scene(
     table: PolarisTable,
     device: str,
     downscale: int,
+    use_chart: bool = False,
 ) -> SceneAssets:
-    """Everything the UI needs for one scene."""
-    scene = load_scene(scene_path, data_cfg)
+    """Everything the UI needs for one scene.
+
+    ``use_chart`` routes on the analyst's chart instead of the model. That is
+    **not** a demo mode — it exists to rank candidate scenes on the ice itself,
+    independently of a model that may still be training. Runs in this mode set
+    ``generated_from_predicted_mask: false`` in the index, so a ranking pass can
+    never be mistaken for a demo build.
+    """
+    labels_from = resolve_labels(scene_path)
+    scene = load_scene(scene_path, data_cfg, labels_from=labels_from)
     stem = scene.meta.scene_id.replace(".nc", "")
     channels = list(train_cfg["data"].get("channels") or ["hh", "hv", "incidence_angle"])
     ice_classes = list(routing_cfg["vessel"]["classes"])
     v_open = float(routing_cfg["vessel"]["open_water_speed_kn"])
     astar_cfg, simp_cfg = routing_cfg["astar"], routing_cfg["simplify"]
 
-    t0 = time.monotonic()
-    pred, inf_stats = predict_mask(model, scene, channels, train_cfg.get("eval", {}), device)
-    infer_s = time.monotonic() - t0
-
     truth = collapse(np.where(scene.mask_valid, scene.sod, IGNORE_INDEX).astype("uint8"))
+
+    if use_chart:
+        pred, inf_stats, infer_s = truth, None, 0.0
+    else:
+        t0 = time.monotonic()
+        pred, inf_stats = predict_mask(model, scene, channels, train_cfg.get("eval", {}), device)
+        infer_s = time.monotonic() - t0
 
     assets = SceneAssets(
         scene_id=scene.meta.scene_id,
@@ -309,7 +333,8 @@ def process_scene(
             "sostiene il momento 'cambio classe e non si passa' (D-012)."
         )
 
-    assets.files["inference_stats"] = json.dumps(inf_stats.as_dict())
+    if inf_stats is not None:
+        assets.files["inference_stats"] = json.dumps(inf_stats.as_dict())
     return assets
 
 
@@ -325,10 +350,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--train-config", type=Path, default=Path("configs/train3.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=Path("data/demo"))
-    ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
+    ap.add_argument("--demo-config", type=Path, default=Path("configs/demo.yaml"))
+    ap.add_argument("--raw-dir", type=Path, default=None)
     ap.add_argument("--scenes", nargs="*", default=None)
     ap.add_argument("--downscale", type=int, default=4, help="fattore di riduzione dei PNG")
     ap.add_argument("--device", default=None)
+    ap.add_argument(
+        "--use-chart", action="store_true",
+        help="instrada sull'ice chart invece che sul modello: serve a CLASSIFICARE "
+             "le scene candidate, non a costruire la demo",
+    )
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -345,14 +376,40 @@ def main(argv: list[str] | None = None) -> int:
     table = PolarisTable.load()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    ckpt_path = args.checkpoint or Path(train_cfg["output"]["best_checkpoint"])
-    if not ckpt_path.exists():
-        log.error("Checkpoint assente: %s. Lancia prima 'make train'.", ckpt_path)
-        return 1
-    model, _ = load_checkpoint(ckpt_path, device)
+    model, ckpt_path = None, None
+    if args.use_chart:
+        log.warning(
+            "MODALITA' CLASSIFICA: le rotte sono calcolate sull'ice chart, non sul "
+            "modello. Serve a scegliere le scene candidate. NON usare l'output come demo."
+        )
+    else:
+        ckpt_path = args.checkpoint or Path(train_cfg["output"]["best_checkpoint"])
+        if not ckpt_path.exists():
+            log.error("Checkpoint assente: %s. Lancia prima 'make train'.", ckpt_path)
+            return 1
+        model, _ = load_checkpoint(ckpt_path, device)
+
+    # Scene source, in order of precedence: explicit --scenes, then the demo
+    # config, then whatever directory was given. The config exists so the choice
+    # of scenes is a reviewed decision in git, not a flag someone typed once.
+    demo_cfg = (
+        yaml.safe_load(args.demo_config.read_text()) if args.demo_config.exists() else {}
+    )
+    if args.raw_dir is None:
+        args.raw_dir = Path(demo_cfg.get("source_dir", "data/raw/train"))
 
     if args.scenes:
         scenes = list(args.scenes)
+    elif demo_cfg.get("scenes"):
+        scenes = [e["id"] for e in demo_cfg["scenes"]]
+        log.info("Scene demo da %s: %d", args.demo_config, len(scenes))
+    elif args.raw_dir.name == "test":
+        # Official test scenes are not in the frozen split; enumerate from disk,
+        # and only those whose reference labels are present.
+        scenes = [
+            p.name for p in sorted(args.raw_dir.glob("*_prep.nc"))
+            if resolve_labels(p) is not None
+        ]
     else:
         split = yaml.safe_load(
             Path(data_cfg.get("split_file", "configs/split.yaml")).read_text()
@@ -372,24 +429,27 @@ def main(argv: list[str] | None = None) -> int:
             results.append(process_scene(
                 args.raw_dir / sid, model=model, data_cfg=data_cfg, routing_cfg=routing_cfg,
                 train_cfg=train_cfg, out_dir=args.out, table=table, device=device,
-                downscale=args.downscale,
+                downscale=args.downscale, use_chart=args.use_chart,
             ))
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the batch
             log.exception("  fallita: %s", exc)
 
     index = {
-        "generated_from_predicted_mask": True,
+        "generated_from_predicted_mask": not args.use_chart,
         "note": (
             "Le rotte sono calcolate sulla maschera PREDETTA dal modello, non sull'ice "
             "chart. Instradare sulla carta dimostrerebbe un'analisi che non abbiamo "
             "prodotto noi."
+            if not args.use_chart else
+            "CLASSIFICA: rotte calcolate sull'ICE CHART, non sul modello. Serve solo a "
+            "scegliere le scene candidate. Non e' un output utilizzabile come demo."
         ),
         "scheme": "3 classi (ripiego SPEC §7.4)",
         "class_names": CLASS_NAMES,
         "ice_classes": routing_cfg["vessel"]["classes"],
         "open_water_speed_kn": routing_cfg["vessel"]["open_water_speed_kn"],
         "open_water_speed_is_provisional": True,
-        "checkpoint": str(ckpt_path),
+        "checkpoint": str(ckpt_path) if ckpt_path else None,
         "scenes": [
             {k: v for k, v in a.__dict__.items() if k != "files"} | {"files": a.files}
             for a in results

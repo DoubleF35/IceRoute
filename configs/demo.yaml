@@ -1,0 +1,72 @@
+# Scene della demo. Vedi DECISIONS.md D-022.
+#
+# NON vengono dal split congelato: vengono dal **test set ufficiale AI4Arctic**,
+# 20 scene che il modello non ha mai visto e che non sono state usate per
+# selezionarlo. È una posizione più solida di quella prevista dalla SPEC §5.3,
+# non più debole: mostrare a un investitore una scena su cui il modello si è
+# addestrato è la prima cosa che un tecnico in sala chiede di escludere.
+#
+# Le etichette di queste scene stanno in file `_prep_reference.nc` affiancati;
+# `precompute` li risolve da solo guardando su disco.
+
+source_dir: data/raw/test
+
+# Criteri di selezione, applicati ai numeri e non a occhio (D-021):
+#   1. la rotta diretta deve essere vietata DAL GHIACCIO per tutte e tre le
+#      classi di nave — non fuori copertura, che è un'altra cosa (D-011);
+#   2. copertura dell'ice chart alta, altrimenti il confronto con la baseline
+#      non è difendibile;
+#   3. dove possibile, la rotta deve CAMBIARE con la classe di nave.
+#
+# Classifica calcolata sull'ice chart (`precompute --use-chart`), quindi sulle
+# proprietà del ghiaccio e non su un modello ancora in addestramento.
+
+scenes:
+  # --- la scena di apertura -------------------------------------------------
+  - id: 20180707T113313_cis_prep.nc
+    coverage: 0.57
+    routes_differ: true
+    n_no_go_cells: 352
+    why: >-
+      La più forte del lotto: 352 celle vietate dal ghiaccio e la rotta cambia
+      con la classe di nave. Entrambi i momenti della demo su una scena sola.
+
+  - id: 20180917T121813_cis_prep.nc
+    coverage: 0.66
+    routes_differ: true
+    n_no_go_cells: 128
+    why: Copertura alta e rotta che cambia con la classe.
+
+  - id: 20200701T114012_cis_prep.nc
+    coverage: 0.52
+    routes_differ: true
+    n_no_go_cells: 81
+    why: Terza scena in cui il selettore di classe fa qualcosa di reale.
+
+  # --- le due con copertura molto alta -------------------------------------
+  - id: 20180623T114935_cis_prep.nc
+    coverage: 0.95
+    routes_differ: false
+    n_no_go_cells: 100
+    why: >-
+      Copertura al 95%: la scena che toglie di mezzo l'obiezione "quanto della
+      carta avete davvero". La rotta non cambia con la classe.
+
+  - id: 20210506T075557_dmi_prep.nc
+    coverage: 0.81
+    routes_differ: false
+    n_no_go_cells: 344
+    why: >-
+      344 celle vietate su una copertura dell'81%. La scena in cui il ghiaccio
+      è visibilmente il protagonista.
+
+# Le 5 scene demo del split congelato NON si usano più. Motivo, da D-021:
+# una sola faceva cambiare la rotta (e per 3 celle, su copertura al 12%), e
+# `20180108T184332` era inutilizzabile perché la geodetica usciva dalla carta
+# per tutte le classi. Restano nel split: il file non si rigenera (SPEC §5.3).
+superseded:
+  - 20180108T184332_dmi_prep.nc   # inutilizzabile: geodetica fuori copertura
+  - 20180806T184330_dmi_prep.nc
+  - 20200919T161650_cis_prep.nc
+  - 20210118T075356_dmi_prep.nc
+  - 20210408T082835_dmi_prep.nc

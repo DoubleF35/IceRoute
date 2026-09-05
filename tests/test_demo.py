@@ -231,6 +231,38 @@ def test_fmt_never_prints_a_number_it_was_not_given():
 # ---------------------------------------------------------------------------
 
 
+def test_labels_resolve_to_the_reference_file_when_one_exists(tmp_path):
+    """Official test scenes carry no targets; their charts sit alongside."""
+    from iceroute.demo.precompute import resolve_labels
+
+    scene = tmp_path / "s_prep.nc"
+    scene.touch()
+    assert resolve_labels(scene) is None       # no reference yet
+
+    ref = tmp_path / "s_prep_reference.nc"
+    ref.touch()
+    assert resolve_labels(scene) == ref
+
+
+def test_labels_resolution_never_points_a_scene_at_itself(tmp_path):
+    """A reference file passed in by mistake must not become its own label
+    source — that would score a chart against itself."""
+    from iceroute.demo.precompute import resolve_labels
+
+    ref = tmp_path / "s_prep_reference.nc"
+    ref.touch()
+    assert resolve_labels(ref) != ref
+
+
+def test_a_training_scene_needs_no_external_labels(tmp_path):
+    """Scenes from the frozen split carry their own targets."""
+    from iceroute.demo.precompute import resolve_labels
+
+    scene = tmp_path / "20180101T000000_dmi_prep.nc"
+    scene.touch()
+    assert resolve_labels(scene) is None
+
+
 def test_index_declares_it_routed_on_the_prediction():
     """Routing on the analyst's chart would demo an analysis we did not produce.
     If that ever changes, the index must stop claiming otherwise."""
