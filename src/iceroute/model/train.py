@@ -115,7 +115,27 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
 
         log.warning("%s", describe())
 
-    train_ds = PatchDataset(cache, split["train"], channels=channels, augment=True,
+    train_scenes = list(split["train"])
+    if train_cfg["data"].get("use_split_extra", False):
+        # Extra scenes extend TRAIN only. Val and demo stay bit-for-bit the
+        # frozen split (SPEC §5.3), which is the whole reason the before/after
+        # comparison means anything: if the yardstick moved too, it would not.
+        extra_path = Path("configs/split_extra.yaml")
+        if extra_path.exists():
+            extra = yaml.safe_load(extra_path.read_text()).get("extra_train", [])
+            new = [s for s in extra if s not in set(train_scenes)]
+            train_scenes += new
+            log.info(
+                "Split esteso: %d scene di training (%d dal congelato + %d aggiuntive). "
+                "Val e demo invariate.", len(train_scenes), len(split["train"]), len(new),
+            )
+        else:
+            log.warning(
+                "use_split_extra attivo ma %s non esiste: uso il solo split congelato.",
+                extra_path,
+            )
+
+    train_ds = PatchDataset(cache, train_scenes, channels=channels, augment=True,
                             seed=train_cfg["seed"], collapse_classes=collapse)
     val_ds = PatchDataset(cache, split["val"], channels=channels, augment=False,
                           collapse_classes=collapse)
