@@ -154,11 +154,23 @@ def _invalid_mask(raw: np.ndarray) -> np.ndarray:
     return invalid
 
 
+def reference_path(path: str | Path) -> Path:
+    """Where the AI4Arctic challenge test set keeps a scene's labels.
+
+    The official test scenes ship without targets — that is what makes them a
+    test set — and the charts live alongside in ``*_prep_reference.nc``.
+    Verified on disk rather than taken from documentation, per SPEC §5.4.
+    """
+    path = Path(path)
+    return path.with_name(path.name.replace("_prep.nc", "_prep_reference.nc"))
+
+
 def load_scene(
     path: str | Path,
     config: dict,
     *,
     load_extras: bool = False,
+    labels_from: str | Path | None = None,
 ) -> Scene:
     """Load a scene using the variable names in ``configs/data.yaml``.
 
@@ -172,6 +184,11 @@ def load_scene(
     load_extras
         Also load the AMSR2 and ERA5 blocks into ``Scene.extras``. Off by
         default: the base model does not use them and they are 28 more arrays.
+    labels_from
+        Read SIC and SOD from this file instead of from ``path``. Needed for the
+        official challenge test set, whose scenes carry no targets. The
+        reference file uses the same variable names and full resolution, so
+        nothing else changes.
     """
     import netCDF4
 
@@ -182,8 +199,24 @@ def load_scene(
 
     with netCDF4.Dataset(path, "r") as ds:
         # --- targets first: they define validity -------------------------
-        sod_raw = _read(ds, tgt["sod"], "float64")
-        sic_raw = _read(ds, tgt["sic"], "float64")
+        if labels_from is not None:
+            ref = Path(labels_from)
+            if not ref.exists():
+                raise FileNotFoundError(
+                    f"Etichette assenti: {ref}. Le scene di test ufficiali non le "
+                    f"contengono, stanno nel file _prep_reference.nc affiancato."
+                )
+            with netCDF4.Dataset(ref, "r") as rds:
+                sod_raw = _read(rds, tgt["sod"], "float64")
+                sic_raw = _read(rds, tgt["sic"], "float64")
+            if sod_raw.shape != _read(ds, var["sar_hh"], "float32").shape:
+                raise ValueError(
+                    f"La griglia delle etichette {sod_raw.shape} non coincide con "
+                    f"quella del SAR in {path.name}: sono due scene diverse."
+                )
+        else:
+            sod_raw = _read(ds, tgt["sod"], "float64")
+            sic_raw = _read(ds, tgt["sic"], "float64")
 
         invalid = _invalid_mask(sod_raw)
         mask_valid = ~invalid

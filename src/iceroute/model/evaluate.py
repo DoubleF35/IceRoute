@@ -37,7 +37,7 @@ import numpy as np
 import torch
 import yaml
 
-from iceroute.data.loader import load_config, load_scene
+from iceroute.data.loader import load_config, load_scene, reference_path
 from iceroute.data.patches import CHANNELS, PatchDataset
 from iceroute.model.inference import predict_scene
 from iceroute.model.metrics import IGNORE_INDEX, ConfusionMatrix
@@ -268,6 +268,7 @@ def evaluate_scene(
     batch_size: int = 8,
     device: str = "cpu",
     ice_classes: list[str] | None = None,
+    labels_from: Path | None = None,
 ) -> tuple[ConfusionMatrix, dict]:
     """Tiled inference over a whole scene, scored against its ice chart.
 
@@ -275,7 +276,7 @@ def evaluate_scene(
     POLARIS input (RIO error, what the route actually depends on). Neither
     replaces the other — see ``rio_error``.
     """
-    scene = load_scene(scene_path, data_cfg)
+    scene = load_scene(scene_path, data_cfg, labels_from=labels_from)
     x = scene.channels(channels)
 
     labels, _, stats = predict_scene(
@@ -418,16 +419,19 @@ def report_bias(split: str) -> str:
       bias. But the scenes were hand-picked to be visually convincing, which is
       its own bias and pushes in the same direction.
 
-    Quote the val number, with this caveat attached.
+    * ``test_ufficiale`` — the AI4Arctic challenge's own held-out set, 20 scenes
+      whose labels ship in separate ``_prep_reference.nc`` files. Never touched
+      by training, model selection or scene curation. **This is the unbiased
+      estimate and the one the pitch should quote.**
 
-    The real fix is already downloading: the AI4Arctic challenge ships an
-    official held-out test set (20 scenes plus 20 ``_prep_reference.nc`` label
-    files, 2.53 GB) into ``data/raw/test/``. That is an unbiased estimate and it
-    is what the pitch should quote. It is not wired up here yet on purpose —
-    the labels live in a separate reference file whose variable names have not
-    been verified on disk, and SPEC §5.4 is explicit about not trusting
-    documented names. Run ``inspect.py`` on a reference file first.
+    Prefer the official test set; fall back to val with the caveat attached.
     """
+    if split == "test_ufficiale":
+        return (
+            "Stima NON DISTORTA: set di test ufficiale AI4Arctic, mai usato per "
+            "training, selezione del modello o scelta delle scene. È il numero "
+            "da citare nel pitch."
+        )
     if split == "val":
         return (
             "Stima OTTIMISTICA: l'early stopping ha scelto il checkpoint che massimizza "
@@ -468,10 +472,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
-    # SPEC §5.3 freezes three splits: train, val, demo. There is no test split,
-    # so `val` is the only non-training data available for metrics — and it is
-    # the split early stopping selected the checkpoint on. See report_bias().
-    ap.add_argument("--split", default="val", choices=["val", "demo"])
+    # SPEC §5.3 freezes train/val/demo. `test_ufficiale` is not one of them: it
+    # is the AI4Arctic challenge's own held-out set, downloaded separately into
+    # data/raw/test/, and it is the only unbiased option. See report_bias().
+    ap.add_argument(
+        "--split", default="test_ufficiale", choices=["test_ufficiale", "val", "demo"]
+    )
+    ap.add_argument("--test-dir", type=Path, default=Path("data/raw/test"))
     ap.add_argument("--out", type=Path, default=Path("artifacts"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
     ap.add_argument("--scenes", type=int, default=3, help="quante scene intere valutare")
@@ -520,22 +527,36 @@ def main(argv: list[str] | None = None) -> int:
     }
     log.warning("%s", report["split_bias"])
 
-    # -- patches ------------------------------------------------------------
-    log.info("Valutazione su patch (%s)…", args.split)
-    ds = PatchDataset(cache_dir, split[args.split], channels=channels, augment=False)
-    cm = evaluate_patches(
-        model, ds, n_classes=n_classes, batch_size=int(eval_cfg.get("batch_size", 8)),
-        device=device,
-    )
-    log.info("\n%s", cm.format_table(class_names))
-    report["patches"] = cm.as_dict(class_names)
-    report["patches"]["n_patches"] = len(ds)
+    # The official test set has no patch cache — patches are only extracted for
+    # the frozen splits — so it is evaluated whole-scene only. That is the
+    # better test anyway: whole scenes are what the payload actually processes.
+    official = args.split == "test_ufficiale"
+    cm = ConfusionMatrix(n_classes)
+    ds = None
 
-    write_confusion_csv(cm, args.out / "figures" / f"confusion_{args.split}.csv", class_names)
-    plot_confusion(cm, args.out / "figures" / f"confusion_{args.split}.png", class_names)
+    # -- patches ------------------------------------------------------------
+    if not official:
+        log.info("Valutazione su patch (%s)…", args.split)
+        ds = PatchDataset(cache_dir, split[args.split], channels=channels, augment=False)
+        cm = evaluate_patches(
+            model, ds, n_classes=n_classes, batch_size=int(eval_cfg.get("batch_size", 8)),
+            device=device,
+        )
+        log.info("\n%s", cm.format_table(class_names))
+        report["patches"] = cm.as_dict(class_names)
+        report["patches"]["n_patches"] = len(ds)
+
+        write_confusion_csv(cm, args.out / "figures" / f"confusion_{args.split}.csv", class_names)
+        plot_confusion(cm, args.out / "figures" / f"confusion_{args.split}.png", class_names)
+    else:
+        log.info(
+            "Set di test ufficiale: nessuna cache di patch, valutazione solo a "
+            "scena intera. È anche il test più pertinente — le scene intere sono "
+            "ciò che il payload elabora davvero."
+        )
 
     # -- HV threshold baseline ---------------------------------------------
-    if not args.skip_baseline:
+    if not args.skip_baseline and ds is not None:
         log.info("Baseline a soglia su HV…")
         try:
             hv_tr, sod_tr = collect_patch_pixels(
@@ -569,19 +590,35 @@ def main(argv: list[str] | None = None) -> int:
             report["baseline_hv_threshold"] = {"error": str(exc)}
 
     # -- whole scenes -------------------------------------------------------
-    scene_ids = [s for s in split[args.split] if (args.raw_dir / s).exists()][: args.scenes]
-    if scene_ids:
-        log.info("Inferenza a scena intera su %d scene…", len(scene_ids))
+    if official:
+        # Enumerated from disk: the official set is not in the frozen split.
+        # Only scenes whose reference labels are present can be scored.
+        scene_dir = args.test_dir
+        scene_paths = [
+            p for p in sorted(scene_dir.glob("*_prep.nc")) if reference_path(p).exists()
+        ]
+        missing = len(list(scene_dir.glob("*_prep.nc"))) - len(scene_paths)
+        if missing:
+            log.warning("%d scene di test senza file di etichette: saltate.", missing)
+    else:
+        scene_dir = args.raw_dir
+        scene_paths = [scene_dir / s for s in split[args.split] if (scene_dir / s).exists()]
+    scene_paths = scene_paths[: args.scenes]
+
+    if scene_paths:
+        log.info("Inferenza a scena intera su %d scene…", len(scene_paths))
         scene_cm = ConfusionMatrix(n_classes)
         per_scene = []
         ice_classes = list(args.ice_classes)
-        for sid in scene_ids:
+        for path in scene_paths:
+            sid = path.name
             one, info = evaluate_scene(
-                model, args.raw_dir / sid, data_cfg, n_classes=n_classes, channels=channels,
+                model, path, data_cfg, n_classes=n_classes, channels=channels,
                 tile_size=int(eval_cfg.get("tile_size", 256)),
                 overlap=int(eval_cfg.get("tile_overlap", 32)),
                 batch_size=int(eval_cfg.get("batch_size", 8)), device=device,
                 ice_classes=ice_classes,
+                labels_from=reference_path(path) if official else None,
             )
             scene_cm.matrix += one.matrix
             info["miou"] = one.miou()
@@ -612,7 +649,7 @@ def main(argv: list[str] | None = None) -> int:
         report["scenes"] = {
             "aggregate": scene_cm.as_dict(class_names),
             "per_scene": per_scene,
-            "n_scenes": len(scene_ids),
+            "n_scenes": len(scene_paths),
             "worst_unsafe_fraction": round(max(unsafe), 5) if unsafe else None,
         }
         if unsafe:
@@ -626,10 +663,14 @@ def main(argv: list[str] | None = None) -> int:
         plot_confusion(scene_cm, args.out / "figures" / "confusion_scenes.png", class_names)
         log.info("Scene intere:\n%s", scene_cm.format_table(class_names))
     else:
-        log.warning("Nessuna scena dello split '%s' presente in %s.", args.split, args.raw_dir)
+        log.warning("Nessuna scena dello split '%s' presente in %s.", args.split, scene_dir)
 
     # -- gate ---------------------------------------------------------------
-    warnings = check_thresholds(cm, eval_cfg)
+    # Gate against whole-scene numbers when that is all we have: on the official
+    # test set there is no patch cache, and an empty confusion matrix would
+    # report mIoU as NaN and quietly pass every threshold.
+    gate_cm = cm if not official else scene_cm if scene_paths else cm
+    warnings = check_thresholds(gate_cm, eval_cfg)
     report["warnings"] = warnings
     report["gate_2_metrics_pass"] = not warnings
     for w in warnings:

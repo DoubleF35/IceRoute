@@ -8,6 +8,8 @@ for free.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
@@ -177,11 +179,69 @@ def test_frozen_split_has_no_test_key():
 
 
 def test_reported_bias_is_never_silent():
-    """Both available splits are biased; the report must say which way."""
+    """Every split is biased or not, and the report must say which and how."""
     from iceroute.model.evaluate import report_bias
 
     assert "OTTIMISTICA" in report_bias("val")
     assert "scelte a mano" in report_bias("demo")
+    assert "NON DISTORTA" in report_bias("test_ufficiale")
+
+
+def test_reference_path_maps_a_scene_to_its_labels():
+    """The official test scenes ship without targets; the charts sit alongside."""
+    from pathlib import Path
+
+    from iceroute.data.loader import reference_path
+
+    p = Path("data/raw/test/20180124T194759_dmi_prep.nc")
+    assert reference_path(p).name == "20180124T194759_dmi_prep_reference.nc"
+    assert reference_path(p).parent == p.parent
+
+
+def test_reference_path_is_idempotent_on_a_reference():
+    """Applying it twice must not produce _reference_reference."""
+    from pathlib import Path
+
+    from iceroute.data.loader import reference_path
+
+    ref = reference_path(Path("a/s_prep.nc"))
+    assert reference_path(ref) == ref
+
+
+def test_missing_reference_file_raises_a_useful_error(tmp_path):
+    """Silently scoring against absent labels would report a fabricated mIoU."""
+    from iceroute.data.loader import load_config, load_scene
+
+    scene = tmp_path / "s_prep.nc"
+    scene.touch()
+    with pytest.raises((FileNotFoundError, OSError)) as exc:
+        load_scene(scene, load_config("configs/data.yaml"),
+                   labels_from=tmp_path / "s_prep_reference.nc")
+    assert exc.value is not None
+
+
+@pytest.mark.skipif(
+    not Path("data/raw/test").exists()
+    or not any(Path("data/raw/test").glob("*_prep_reference.nc")),
+    reason="set di test ufficiale non scaricato",
+)
+def test_official_test_scene_loads_with_external_labels():
+    """End-to-end on the real files: scene from one, labels from another.
+
+    SPEC §5.4 — the variable names in the reference file were read off disk,
+    not taken from documentation. This is what keeps that true.
+    """
+    from iceroute.data.loader import load_config, load_scene
+
+    ref = sorted(Path("data/raw/test").glob("*_prep_reference.nc"))[0]
+    scene_path = ref.with_name(ref.name.replace("_prep_reference.nc", "_prep.nc"))
+    if not scene_path.exists():
+        pytest.skip("scena corrispondente non scaricata")
+
+    scene = load_scene(scene_path, load_config("configs/data.yaml"), labels_from=ref)
+    assert scene.sod.shape == scene.hh.shape
+    assert scene.mask_valid.any(), "nessun pixel annotato nel file di riferimento"
+    assert set(np.unique(scene.sod[scene.mask_valid]).tolist()) <= set(range(6))
 
 
 def test_gate_warns_below_the_spec_thresholds():
