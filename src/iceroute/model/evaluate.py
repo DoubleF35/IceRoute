@@ -41,6 +41,7 @@ from iceroute.data.loader import load_config, load_scene
 from iceroute.data.patches import CHANNELS, PatchDataset
 from iceroute.model.inference import predict_scene
 from iceroute.model.metrics import IGNORE_INDEX, ConfusionMatrix
+from iceroute.model.rio_error import evaluate_all_classes
 from iceroute.model.unet import build_model
 
 log = logging.getLogger("evaluate")
@@ -266,8 +267,14 @@ def evaluate_scene(
     overlap: int = 32,
     batch_size: int = 8,
     device: str = "cpu",
+    ice_classes: list[str] | None = None,
 ) -> tuple[ConfusionMatrix, dict]:
-    """Tiled inference over a whole scene, scored against its ice chart."""
+    """Tiled inference over a whole scene, scored against its ice chart.
+
+    Scores it twice: as a classification (mIoU, the SPEC §7.4 gate) and as a
+    POLARIS input (RIO error, what the route actually depends on). Neither
+    replaces the other — see ``rio_error``.
+    """
     scene = load_scene(scene_path, data_cfg)
     x = scene.channels(channels)
 
@@ -285,6 +292,18 @@ def evaluate_scene(
     info["scene_id"] = scene.meta.scene_id
     info["region"] = scene.meta.region
     info["valid_fraction"] = round(scene.valid_fraction, 4)
+
+    if ice_classes:
+        try:
+            info["rio"] = evaluate_all_classes(
+                truth, labels, ice_classes,
+                {int(k): v for k, v in data_cfg["sod_to_polaris"].items()},
+                sic=scene.sic, mask_valid=scene.mask_valid, n_classes=n_classes,
+            )
+        except (ValueError, KeyError) as exc:
+            log.warning("  errore RIO non calcolabile: %s", exc)
+            info["rio"] = {"error": str(exc)}
+
     return cm, info
 
 
@@ -458,6 +477,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scenes", type=int, default=3, help="quante scene intere valutare")
     ap.add_argument("--device", default=None)
     ap.add_argument("--skip-baseline", action="store_true")
+    ap.add_argument(
+        "--ice-classes", nargs="*", default=["PC6", "PC7", "IA"],
+        help="classi di nave per cui misurare l'errore su RIO",
+    )
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -551,12 +574,14 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Inferenza a scena intera su %d scene…", len(scene_ids))
         scene_cm = ConfusionMatrix(n_classes)
         per_scene = []
+        ice_classes = list(args.ice_classes)
         for sid in scene_ids:
             one, info = evaluate_scene(
                 model, args.raw_dir / sid, data_cfg, n_classes=n_classes, channels=channels,
                 tile_size=int(eval_cfg.get("tile_size", 256)),
                 overlap=int(eval_cfg.get("tile_overlap", 32)),
                 batch_size=int(eval_cfg.get("batch_size", 8)), device=device,
+                ice_classes=ice_classes,
             )
             scene_cm.matrix += one.matrix
             info["miou"] = one.miou()
@@ -564,11 +589,39 @@ def main(argv: list[str] | None = None) -> int:
             per_scene.append(info)
             log.info("  %s: mIoU %.4f, %.1fs", sid, one.miou(), info["seconds"])
 
+            rio = info.get("rio", {})
+            for ic, r in (rio.get("per_ice_class") or {}).items():
+                if "error" not in r:
+                    log.info(
+                        "    %s  RIO MAE %.2f · decisione corretta %.1f%% · "
+                        "PERMISSIVA %.2f%%",
+                        ic, r["rio_mae"], 100 * r["operational_agreement"],
+                        100 * r["unsafe_fraction"],
+                    )
+
+        # The worst unsafe fraction across scenes and vessel classes. This is
+        # the safety number: pixels the model calls navigable that POLARIS
+        # forbids. It is a maximum, not a mean — averaging away the worst scene
+        # is how a fleet ends up trusting a chart that fails in one region.
+        unsafe = [
+            r["unsafe_fraction"]
+            for s in per_scene
+            for r in (s.get("rio", {}).get("per_ice_class") or {}).values()
+            if "error" not in r
+        ]
         report["scenes"] = {
             "aggregate": scene_cm.as_dict(class_names),
             "per_scene": per_scene,
             "n_scenes": len(scene_ids),
+            "worst_unsafe_fraction": round(max(unsafe), 5) if unsafe else None,
         }
+        if unsafe:
+            log.warning(
+                "Frazione PERMISSIVA peggiore su tutte le scene e classi di nave: "
+                "%.2f%%. Sono i pixel dove una rotta passerebbe in ghiaccio che "
+                "POLARIS vieta.",
+                100 * max(unsafe),
+            )
         write_confusion_csv(scene_cm, args.out / "figures" / "confusion_scenes.csv", class_names)
         plot_confusion(scene_cm, args.out / "figures" / "confusion_scenes.png", class_names)
         log.info("Scene intere:\n%s", scene_cm.format_table(class_names))

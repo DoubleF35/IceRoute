@@ -215,7 +215,14 @@ def test_confusion_csv_round_trips_the_counts(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _tiny_model():
+def _tiny_model(seed: int = 0):
+    """A small UNet with deterministic weights.
+
+    Seeded so the parity assertions test the exporter and not the draw. An
+    unseeded model makes the test's outcome depend on where random init happens
+    to put the decision boundaries.
+    """
+    torch.manual_seed(seed)
     return UNet(UNetConfig(in_channels=2, n_classes=3, encoder_channels=[8, 16],
                            bottleneck_channels=16, groups=4))
 
@@ -231,13 +238,32 @@ def test_onnx_export_is_faithful(tmp_path):
 
 def test_parity_check_is_not_fooled_by_a_different_model(tmp_path):
     """Exporting model A and comparing against model B must fail loudly."""
-    exported = _tiny_model()
+    exported = _tiny_model(seed=0)
     path = export_onnx(exported, tmp_path / "m.onnx", in_channels=2, tile_size=64)
 
-    other = _tiny_model()          # same shape, different random init
+    other = _tiny_model(seed=1)    # same shape, different weights
     report = check_parity(other, path, in_channels=2, tile_size=64, n_samples=2)
     assert not report.passed
     assert "NON fedele" in report.note
+
+
+def test_parity_is_reproducible_under_load(tmp_path):
+    """The gate must not depend on how busy the machine is.
+
+    Multi-threaded convolution sums partial results in completion order, so a
+    logit's low bits move with CPU contention and an argmax tie can flip. This
+    was observed once: the parity check failed during a training run and passed
+    three times in a row afterwards. check_parity now pins one thread; repeated
+    calls must agree exactly.
+    """
+    model = _tiny_model()
+    path = export_onnx(model, tmp_path / "m.onnx", in_channels=2, tile_size=64)
+    runs = [
+        check_parity(model, path, in_channels=2, tile_size=64, n_samples=2, seed=7)
+        for _ in range(3)
+    ]
+    assert len({r.max_abs_logit_diff for r in runs}) == 1
+    assert all(r.argmax_disagreement == runs[0].argmax_disagreement for r in runs)
 
 
 def test_exported_graph_accepts_a_batch(tmp_path):

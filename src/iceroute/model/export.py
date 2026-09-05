@@ -91,17 +91,25 @@ def export_onnx(
     return path
 
 
-def onnx_session(path: Path, providers: list[str] | None = None):
+def onnx_session(path: Path, providers: list[str] | None = None, *, threads: int | None = None):
     """An ONNX Runtime session pinned to CPU unless told otherwise.
 
     CPU is the honest default here: the CubeSat has no CUDA device, so a latency
     measured on the laptop's GPU would describe hardware the payload does not
     have.
+
+    ``threads=1`` makes the result bit-reproducible. Multi-threaded convolution
+    reduces partial sums in whatever order the threads finish, so the low bits
+    of a logit depend on machine load — which is fine for throughput and not
+    fine for a gate.
     """
     import onnxruntime as ort
 
     opts = ort.SessionOptions()
     opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    if threads is not None:
+        opts.intra_op_num_threads = threads
+        opts.inter_op_num_threads = 1
     return ort.InferenceSession(
         str(path), sess_options=opts, providers=providers or ["CPUExecutionProvider"]
     )
@@ -132,7 +140,11 @@ def check_parity(
     with torch.no_grad():
         ref = model(torch.from_numpy(x)).numpy()
 
-    sess = onnx_session(onnx_path)
+    # Single-threaded: this is a correctness gate, and it must give the same
+    # answer on a busy laptop as on an idle one. Observed once in practice —
+    # the parity check failed while a training run saturated the CPU, then
+    # passed three times in a row once the machine was quiet.
+    sess = onnx_session(onnx_path, threads=1)
     got = sess.run([sess.get_outputs()[0].name], {sess.get_inputs()[0].name: x})[0]
 
     if ref.shape != got.shape:
