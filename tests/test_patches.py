@@ -105,7 +105,7 @@ def test_global_quota_hits_the_target_ratio():
     had, dragging the realised margin fraction from 40% down to 7%.
     """
     scans = [_scan("no-margin", 0, 235), _scan("some", 20, 164), _scan("more", 30, 185)]
-    quota = allocate_uniform_quota(scans, target_margin=0.40)
+    quota = allocate_uniform_quota(scans, target_margin=0.40, balance="discard")
 
     total_margin = sum(len(s.margin) for s in scans)
     total_uniform = sum(quota.values())
@@ -118,7 +118,7 @@ def test_global_quota_hits_the_target_ratio():
 
 def test_quota_never_exceeds_availability():
     scans = [_scan("a", 100, 5), _scan("b", 100, 3)]
-    quota = allocate_uniform_quota(scans, target_margin=0.40)
+    quota = allocate_uniform_quota(scans, target_margin=0.40, balance="discard")
     assert quota["a"] <= 5
     assert quota["b"] <= 3
 
@@ -126,8 +126,32 @@ def test_quota_never_exceeds_availability():
 def test_quota_without_margins_keeps_everything():
     """Degenerate case must not divide by zero or silently drop all data."""
     scans = [_scan("a", 0, 10), _scan("b", 0, 20)]
-    quota = allocate_uniform_quota(scans, target_margin=0.40)
+    quota = allocate_uniform_quota(scans, target_margin=0.40, balance="discard")
     assert quota == {"a": 10, "b": 20}
+
+
+def test_sampler_mode_keeps_every_patch():
+    """D-017: discarding to hit the ratio threw away 85% of the data.
+
+    In sampler mode the cache keeps everything and the ratio is a training-time
+    concern. This is the assertion that the data actually survives.
+    """
+    scans = [_scan("no-margin", 0, 235), _scan("some", 20, 164), _scan("more", 30, 185)]
+    discard = allocate_uniform_quota(scans, target_margin=0.40, balance="discard")
+    sampler = allocate_uniform_quota(scans, target_margin=0.40, balance="sampler")
+
+    assert sampler == {"no-margin": 235, "some": 164, "more": 185}
+    assert sum(sampler.values()) > 5 * sum(discard.values())
+
+
+def test_sampler_is_the_default():
+    scans = [_scan("a", 10, 100)]
+    assert allocate_uniform_quota(scans, target_margin=0.40) == {"a": 100}
+
+
+def test_unknown_balance_mode_is_rejected():
+    with pytest.raises(ValueError, match="balance"):
+        allocate_uniform_quota([_scan("a", 1, 1)], target_margin=0.4, balance="magic")
 
 
 # ---------------------------------------------------------------------------
@@ -260,3 +284,99 @@ def test_dataset_channel_selection():
     ds = PatchDataset(CACHE, [stem + ".nc"], channels=["hv"], augment=False)
     x, _, _ = ds[0]
     assert x.shape[0] == 1
+
+
+# ---------------------------------------------------------------------------
+# Sampler weights — the balancing that replaced discarding data (D-017)
+# ---------------------------------------------------------------------------
+
+
+def _fake_cache(tmp_path, n_margin: int, n_uniform: int, size: int = 8):
+    """A minimal cache bundle with known margin flags."""
+    n = n_margin + n_uniform
+    stem = "20200101T000000_fake_prep"
+    np.save(tmp_path / f"{stem}_x.npy", np.zeros((n, len(CHANNELS), size, size), "float32"))
+    np.save(tmp_path / f"{stem}_y.npy", np.zeros((n, size, size), "uint8"))
+    np.save(tmp_path / f"{stem}_m.npy", np.ones((n, size, size), bool))
+    flags = np.zeros(n, dtype="bool")
+    flags[:n_margin] = True
+    np.save(tmp_path / f"{stem}_f.npy", flags)
+    return stem + ".nc"
+
+
+def test_sampler_weights_hit_the_target_in_expectation(tmp_path):
+    """The whole point: a draw contains a margin with probability `target`.
+
+    Checked as an exact sum over the weights rather than by sampling, so the
+    test cannot pass by luck.
+    """
+    sid = _fake_cache(tmp_path, n_margin=10, n_uniform=190)
+    ds = PatchDataset(tmp_path, [sid], augment=False)
+
+    w = ds.sampler_weights(0.40)
+    assert w is not None
+    assert w.sum() == pytest.approx(1.0)
+    assert w[ds.is_margin].sum() == pytest.approx(0.40)
+    assert w[~ds.is_margin].sum() == pytest.approx(0.60)
+
+
+def test_scarce_margins_are_upweighted_not_duplicated(tmp_path):
+    """10 margin patches among 200 must each be drawn far more often."""
+    sid = _fake_cache(tmp_path, n_margin=10, n_uniform=190)
+    ds = PatchDataset(tmp_path, [sid], augment=False)
+    w = ds.sampler_weights(0.40)
+
+    assert len(ds) == 200, "nessuna patch deve essere stata scartata"
+    assert w[0] / w[-1] == pytest.approx((0.40 / 10) / (0.60 / 190))
+
+
+def test_sampler_weights_decline_when_a_group_is_empty(tmp_path):
+    """No margins at all: weighting is undefined, so fall back rather than
+    divide by zero or silently upweight nothing."""
+    sid = _fake_cache(tmp_path, n_margin=0, n_uniform=50)
+    assert PatchDataset(tmp_path, [sid], augment=False).sampler_weights(0.40) is None
+
+    sid2 = _fake_cache(tmp_path, n_margin=50, n_uniform=0)
+    assert PatchDataset(tmp_path, [sid2], augment=False).sampler_weights(0.40) is None
+
+
+def test_sampler_weights_reject_a_degenerate_target(tmp_path):
+    sid = _fake_cache(tmp_path, n_margin=10, n_uniform=90)
+    ds = PatchDataset(tmp_path, [sid], augment=False)
+    assert ds.sampler_weights(0.0) is None
+    assert ds.sampler_weights(1.0) is None
+
+
+def test_cache_without_flags_falls_back_safely(tmp_path):
+    """An older cache has no _f.npy. It must read as 'no margins' and disable
+    weighting, not mislabel arbitrary patches as margins."""
+    sid = _fake_cache(tmp_path, n_margin=10, n_uniform=90)
+    (tmp_path / sid.replace(".nc", "_f.npy")).unlink()
+
+    ds = PatchDataset(tmp_path, [sid], augment=False)
+    assert len(ds) == 100
+    assert not ds.is_margin.any()
+    assert ds.sampler_weights(0.40) is None
+
+
+def test_margin_flags_line_up_across_several_scenes(tmp_path):
+    """Flags are concatenated per bundle; a misalignment would upweight the
+    wrong patches in every scene after the first."""
+    for i, (nm, nu) in enumerate([(3, 7), (5, 5)]):
+        n = nm + nu
+        stem = f"2020010{i}T000000_fake_prep"
+        np.save(tmp_path / f"{stem}_x.npy", np.zeros((n, len(CHANNELS), 8, 8), "float32"))
+        np.save(tmp_path / f"{stem}_y.npy", np.zeros((n, 8, 8), "uint8"))
+        np.save(tmp_path / f"{stem}_m.npy", np.ones((n, 8, 8), bool))
+        f = np.zeros(n, bool)
+        f[:nm] = True
+        np.save(tmp_path / f"{stem}_f.npy", f)
+
+    ds = PatchDataset(
+        tmp_path, ["20200100T000000_fake_prep.nc", "20200101T000000_fake_prep.nc"],
+        augment=False,
+    )
+    assert len(ds) == 20
+    assert ds.is_margin.size == 20
+    assert int(ds.is_margin.sum()) == 8
+    assert ds.margin_fraction() == pytest.approx(0.4)

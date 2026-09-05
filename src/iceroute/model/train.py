@@ -120,8 +120,41 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
         "collate_fn": collate,
         "persistent_workers": nw > 0,
     }
+
+    # Ice-margin balancing happens here rather than in the cache (D-017): the
+    # cache keeps every valid patch, and the target fraction is reached by
+    # weighting the draw. Validation is never weighted — its job is to measure
+    # the real class distribution, not a rebalanced one.
+    target = float(data_cfg["patches"].get("margin_fraction_target", 0.40))
+    weights = train_ds.sampler_weights(target)
+    if weights is None:
+        log.warning(
+            "Nessun peso di campionamento (cache senza flag di margine, o un gruppo "
+            "vuoto): uso lo shuffle semplice. Il %.0f%% di margine NON è garantito.",
+            100 * target,
+        )
+        train_loader = DataLoader(
+            train_ds, batch_size=bs, shuffle=True, drop_last=True, **common
+        )
+    else:
+        from torch.utils.data import WeightedRandomSampler
+
+        log.info(
+            "Campionamento pesato: %d patch in cache, %.1f%% con margine → "
+            "target %.0f%% per batch",
+            len(train_ds), 100 * train_ds.margin_fraction(), 100 * target,
+        )
+        sampler = WeightedRandomSampler(
+            weights=torch.as_tensor(weights, dtype=torch.double),
+            num_samples=len(train_ds),
+            replacement=True,
+        )
+        train_loader = DataLoader(
+            train_ds, batch_size=bs, sampler=sampler, drop_last=True, **common
+        )
+
     return (
-        DataLoader(train_ds, batch_size=bs, shuffle=True, drop_last=True, **common),
+        train_loader,
         DataLoader(val_ds, batch_size=int(train_cfg["eval"].get("batch_size", bs)), shuffle=False, **common),
     )
 

@@ -169,14 +169,27 @@ def scan_scene(path: Path, cfg: dict) -> SceneScan:
     )
 
 
-def allocate_uniform_quota(scans: list[SceneScan], target_margin: float) -> dict[str, int]:
+def allocate_uniform_quota(
+    scans: list[SceneScan], target_margin: float, *, balance: str = "sampler"
+) -> dict[str, int]:
     """How many uniform patches each scene may contribute.
 
-    Every margin patch is kept — they are the scarce, informative ones. The
-    global uniform budget that satisfies the target ratio is then split across
-    scenes in proportion to how many uniform patches each one offers, so a
-    margin-free scene still contributes variety without dominating.
+    With ``balance="sampler"`` the answer is "all of them": the target margin
+    fraction is achieved at training time by weighting the sampler instead of by
+    throwing data away. See DECISIONS.md D-017 — the discard route kept 14.7% of
+    the available patches and the model overfitted for lack of data while the
+    ratio it was starved for was perfectly correct.
+
+    With ``balance="discard"`` every margin patch is kept — they are the scarce,
+    informative ones — and the global uniform budget that satisfies the ratio is
+    split across scenes in proportion to how many uniform patches each offers,
+    so a margin-free scene still contributes variety without dominating.
     """
+    if balance == "sampler":
+        return {s.scene_id: len(s.uniform) for s in scans}
+    if balance != "discard":
+        raise ValueError(f"balance deve essere 'sampler' o 'discard', non {balance!r}")
+
     total_margin = sum(len(s.margin) for s in scans)
     total_uniform = sum(len(s.uniform) for s in scans)
 
@@ -291,6 +304,14 @@ def cache_scene(
     np.save(out_dir / f"{stem}_x.npy", x)
     np.save(out_dir / f"{stem}_y.npy", y)
     np.save(out_dir / f"{stem}_m.npy", m)
+
+    # Which patches contain an ice margin. extract_from_scene() writes the
+    # margin ones first, so this could be inferred from n_margin — but an
+    # ordering convention is exactly the kind of thing a later refactor breaks
+    # silently, and the sampler weights depend on it being right.
+    flags = np.zeros(stats.n_kept, dtype="bool")
+    flags[: stats.n_margin] = True
+    np.save(out_dir / f"{stem}_f.npy", flags)
     return stats
 
 
@@ -325,6 +346,7 @@ class PatchDataset:
         self._y: list[np.ndarray] = []
         self._m: list[np.ndarray] = []
         self._index: list[tuple[int, int]] = []  # (bundle, row)
+        margin: list[np.ndarray] = []
 
         missing = []
         for sid in scene_ids:
@@ -339,8 +361,19 @@ class PatchDataset:
             self._m.append(np.load(self.cache_dir / f"{stem}_m.npy", mmap_mode="r"))
             self._index.extend((b, i) for i in range(len(self._x[b])))
 
+            fp = self.cache_dir / f"{stem}_f.npy"
+            n = len(self._x[b])
+            # A cache written before flags existed reads as "no margins", which
+            # makes the sampler fall back to uniform weights rather than
+            # silently upweighting the wrong patches.
+            margin.append(np.load(fp) if fp.exists() else np.zeros(n, dtype="bool"))
+
         if missing:
             log.warning("%d scene senza cache: %s", len(missing), ", ".join(missing[:5]))
+
+        self.is_margin = (
+            np.concatenate(margin) if margin else np.zeros(0, dtype="bool")
+        )
         if not self._index:
             raise RuntimeError(
                 f"Nessuna patch in {self.cache_dir} per le {len(scene_ids)} scene richieste. "
@@ -349,6 +382,35 @@ class PatchDataset:
 
     def __len__(self) -> int:
         return len(self._index)
+
+    def margin_fraction(self) -> float:
+        """Fraction of cached patches that contain an ice margin."""
+        return float(self.is_margin.mean()) if self.is_margin.size else 0.0
+
+    def sampler_weights(self, target_margin: float = 0.40) -> np.ndarray | None:
+        """Per-patch weights that make a draw hit ``target_margin`` in expectation.
+
+        This is the half of the balancing that used to be done by deleting
+        patches (D-017). With ``M`` margin and ``U`` uniform patches, weighting
+        each margin patch ``target/M`` and each uniform one ``(1-target)/U``
+        makes any single draw contain a margin with probability ``target``,
+        while every patch stays reachable.
+
+        Returns ``None`` when weighting is unnecessary or impossible — no flags,
+        or one of the two groups empty — so the caller falls back to plain
+        shuffling rather than dividing by zero.
+        """
+        if self.is_margin.size != len(self._index) or not len(self._index):
+            return None
+        n_margin = int(self.is_margin.sum())
+        n_uniform = len(self._index) - n_margin
+        if n_margin == 0 or n_uniform == 0 or not 0.0 < target_margin < 1.0:
+            return None
+
+        w = np.empty(len(self._index), dtype="float64")
+        w[self.is_margin] = target_margin / n_margin
+        w[~self.is_margin] = (1.0 - target_margin) / n_uniform
+        return w
 
     def __getitem__(self, i: int):
         b, r = self._index[i]
@@ -433,8 +495,17 @@ def main(argv: list[str] | None = None) -> int:
             len(sc.uniform),
         )
 
-    quota = allocate_uniform_quota(scans, target_margin)
+    balance = str(cfg["patches"].get("balance", "sampler"))
+    quota = allocate_uniform_quota(scans, target_margin, balance=balance)
     tm, tu = sum(len(s.margin) for s in scans), sum(quota.values())
+    if balance == "sampler":
+        log.info(
+            "Bilanciamento 'sampler': tengo tutte le %d patch valide. Il %.0f%% di "
+            "margine si ottiene pesando il campionamento in training, non buttando "
+            "dati (D-017).",
+            tm + tu,
+            100 * target_margin,
+        )
     log.info(
         "Budget globale: %d con margine + %d uniformi = %d patch (%.0f%% margine, obiettivo %.0f%%)",
         tm,

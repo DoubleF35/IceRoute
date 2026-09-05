@@ -169,6 +169,19 @@ patches:
     min_classes: 2                 # ≥2 classi SOD nella patch...
     min_class_fraction: 0.10       # ...ciascuna con ≥10% dei pixel validi
 
+  # COME si ottiene quel 40%. Vedi DECISIONS.md D-017.
+  #
+  #   discard — si buttano le patch uniformi in eccesso. Semplice, ma alla prima
+  #             misura reale teneva 1.850 patch su 12.594 valide: il 14,7%. Il
+  #             modello andava in overfitting a mIoU 0,26 con la loss di training
+  #             ancora in discesa. Il rapporto era giusto e i dati non c'erano.
+  #   sampler — si tiene TUTTO nella cache e il 40% si ottiene pesando il
+  #             campionamento durante il training. Stesso bilanciamento, 6,8×
+  #             i dati. Costa spazio su disco (~15 GB contro 2,2 GB).
+  #
+  # 'discard' resta disponibile per rigenerare la cache piccola di un confronto.
+  balance: sampler
+
   augmentation:
     hflip: true
     vflip: true
