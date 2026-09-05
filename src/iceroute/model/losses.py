@@ -127,6 +127,70 @@ class DiceLoss(nn.Module):
         return 1.0 - dice[present].mean()
 
 
+def lovasz_grad(gt_sorted: torch.Tensor) -> torch.Tensor:
+    """Gradient of the Lovász extension of the Jaccard loss.
+
+    From Berman, Triki & Blaschko (CVPR 2018). ``gt_sorted`` is the ground-truth
+    indicator permuted by decreasing prediction error. The cumulative sums give
+    the Jaccard index at each prefix; differencing turns it into the per-element
+    gradient, which is what makes the surrogate exactly equal to the IoU loss on
+    the vertices of the hypercube.
+    """
+    p = gt_sorted.numel()
+    gts = gt_sorted.sum()
+    intersection = gts - gt_sorted.float().cumsum(0)
+    union = gts + (1 - gt_sorted).float().cumsum(0)
+    jaccard = 1.0 - intersection / union
+    if p > 1:
+        jaccard[1:p] = jaccard[1:p] - jaccard[0 : p - 1]
+    return jaccard
+
+
+class LovaszSoftmaxLoss(nn.Module):
+    """A convex surrogate for the IoU loss, optimised directly.
+
+    Cross-entropy optimises per-pixel likelihood; Dice optimises a smooth
+    approximation of overlap. Neither is the metric we are judged on. Lovász is:
+    it is the tight convex surrogate of the Jaccard index, so lowering it lowers
+    IoU rather than something correlated with it.
+
+    Only classes **present in the batch** are scored. A class absent from both
+    target and prediction has an undefined IoU, and counting it as a perfect 1.0
+    would make the loss improve precisely when a rare class goes missing — which
+    is the failure mode this project has (D-018).
+    """
+
+    def __init__(self, n_classes: int, *, ignore_index: int = IGNORE_INDEX):
+        super().__init__()
+        self.n_classes = n_classes
+        self.ignore_index = ignore_index
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        probs = F.softmax(logits, dim=1)
+        # (B, C, H, W) -> (N, C), dropping ignored pixels once rather than
+        # masking inside the per-class loop.
+        probs = probs.permute(0, 2, 3, 1).reshape(-1, probs.shape[1])
+        labels = target.reshape(-1)
+
+        valid = labels != self.ignore_index
+        if not valid.any():
+            return logits.sum() * 0.0        # keeps the graph connected
+        probs, labels = probs[valid], labels[valid]
+
+        losses = []
+        for cls in range(self.n_classes):
+            fg = (labels == cls).float()
+            if fg.sum() == 0:
+                continue
+            errors = (fg - probs[:, cls]).abs()
+            errors_sorted, perm = torch.sort(errors, dim=0, descending=True)
+            losses.append(torch.dot(errors_sorted, lovasz_grad(fg[perm])))
+
+        if not losses:
+            return logits.sum() * 0.0
+        return torch.stack(losses).mean()
+
+
 class CombinedLoss(nn.Module):
     """``ce_weight * CrossEntropy + dice_weight * Dice``.
 
@@ -150,10 +214,12 @@ class CombinedLoss(nn.Module):
         class_weights: torch.Tensor | None = None,
         ignore_index: int = IGNORE_INDEX,
         label_smoothing: float = 0.0,
+        lovasz_weight: float = 0.0,
     ):
         super().__init__()
         self.ce_weight = ce_weight
         self.dice_weight = dice_weight
+        self.lovasz_weight = lovasz_weight
         self.ignore_index = ignore_index
         # Registered as a buffer so .to(device) moves it with the module; a bare
         # tensor attribute would stay on CPU and raise mid-training.
@@ -162,6 +228,10 @@ class CombinedLoss(nn.Module):
         )
         self.label_smoothing = label_smoothing
         self.dice = DiceLoss(n_classes, ignore_index=ignore_index)
+        self.lovasz = (
+            LovaszSoftmaxLoss(n_classes, ignore_index=ignore_index)
+            if lovasz_weight else None
+        )
 
     def forward(self, logits: torch.Tensor, target: torch.Tensor) -> dict[str, torch.Tensor]:
         w = self.class_weights if self.class_weights.numel() else None
@@ -178,7 +248,13 @@ class CombinedLoss(nn.Module):
 
         dice = self.dice(logits, target) if self.dice_weight else logits.sum() * 0.0
         total = self.ce_weight * ce + self.dice_weight * dice
-        return {"loss": total, "ce": ce.detach(), "dice": dice.detach()}
+
+        out = {"loss": total, "ce": ce.detach(), "dice": dice.detach()}
+        if self.lovasz is not None:
+            lov = self.lovasz(logits, target)
+            out["loss"] = total + self.lovasz_weight * lov
+            out["lovasz"] = lov.detach()
+        return out
 
 
 def build_loss(cfg: dict, n_classes: int, stats_path: str | Path) -> CombinedLoss:
@@ -200,4 +276,5 @@ def build_loss(cfg: dict, n_classes: int, stats_path: str | Path) -> CombinedLos
         dice_weight=float(lc.get("dice_weight", 0.5)),
         class_weights=weights,
         ignore_index=int(lc.get("ignore_index", IGNORE_INDEX)),
+        lovasz_weight=float(lc.get("lovasz_weight", 0.0)),
     )

@@ -212,6 +212,40 @@ def test_class_weights_use_the_collapsed_frequencies(tmp_path):
     assert w[2] == pytest.approx(1 / 0.24, rel=1e-3)
 
 
+def test_confusion_matrix_silently_drops_out_of_range_truth():
+    """The mechanism behind a bug that produced a flattering, plausible mIoU.
+
+    Scoring six-class truth against three-class predictions does not raise: it
+    discards every pixel whose label is >= n_classes, so classes 3, 4 and 5
+    vanish and the survivors are compared under different semantics. Pinning the
+    behaviour here is what makes the requirement to collapse the truth explicit.
+    """
+    from iceroute.model.metrics import ConfusionMatrix
+
+    cm = ConfusionMatrix(N_CLASSES)
+    truth = np.array([0, 1, 2, 3, 4, 5])
+    cm.update(truth, np.zeros(6, dtype="int64"))
+    assert cm.matrix.sum() == 3, "i pixel 3, 4 e 5 vengono scartati senza errore"
+
+
+def test_collapsed_mapping_separates_thin_from_thick():
+    """The second half of the same bug.
+
+    Pricing collapsed class 1 with the six-class SOD mapping makes it "New ice"
+    and class 2 "Young ice" — which carry identical risk values, so every RIO
+    error cancels and the report shows 0.00 MAE with 0% permissive. The most
+    flattering possible wrong answer.
+    """
+    six = MAPPING
+    three = polaris_mapping(MAPPING, VESSELS, table=TABLE)
+
+    for vessel in VESSELS:
+        wrong = TABLE.riv(vessel, six[1]) - TABLE.riv(vessel, six[2])
+        right = TABLE.riv(vessel, three[1]) - TABLE.riv(vessel, three[2])
+        assert wrong == 0, "presupposto del bug: New ice e Young ice hanno lo stesso RIV"
+        assert right != 0, f"{vessel}: ghiaccio sottile e spesso devono differire"
+
+
 def test_collapsed_weights_still_respect_the_clip(tmp_path):
     """The ceiling that stops a rare class dominating every gradient applies
     after merging too, not only to the six-class frequencies."""

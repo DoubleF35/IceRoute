@@ -37,6 +37,7 @@ import numpy as np
 import torch
 import yaml
 
+from iceroute.data.collapse import collapse, polaris_mapping
 from iceroute.data.loader import load_config, load_scene, reference_path
 from iceroute.data.patches import CHANNELS, PatchDataset
 from iceroute.model.inference import predict_scene
@@ -269,6 +270,7 @@ def evaluate_scene(
     device: str = "cpu",
     ice_classes: list[str] | None = None,
     labels_from: Path | None = None,
+    collapse_classes: bool = False,
 ) -> tuple[ConfusionMatrix, dict]:
     """Tiled inference over a whole scene, scored against its ice chart.
 
@@ -284,8 +286,24 @@ def evaluate_scene(
         batch_size=batch_size, device=device,
     )
 
-    truth = scene.sod.astype("int64").copy()
+    # The chart is always six-class on disk. If the model emits the collapsed
+    # scheme, the truth has to be collapsed too — otherwise ConfusionMatrix
+    # silently DROPS every pixel whose label is >= n_classes (so classes 3, 4
+    # and 5 vanish) and scores the survivors against completely different
+    # semantics. That failure is invisible: it produces a plausible mIoU.
+    mapping = {int(k): v for k, v in data_cfg["sod_to_polaris"].items()}
+    truth = scene.sod.astype("uint8").copy()
+    if collapse_classes:
+        truth = collapse(truth)
+        # And the risk values must come from the collapsed mapping. Pricing
+        # collapsed class 1 as SOD "New ice" and class 2 as "Young ice" gives
+        # them identical RIV, which makes every RIO error cancel and reports a
+        # flawless 0.00 MAE with 0% permissive — the most flattering possible
+        # wrong answer.
+        mapping = polaris_mapping(mapping, list(ice_classes or ["PC6"]))
+    truth = truth.astype("int64")
     truth[~scene.mask_valid] = IGNORE_INDEX
+
     cm = ConfusionMatrix(n_classes)
     cm.update(truth, labels)
 
@@ -297,8 +315,7 @@ def evaluate_scene(
     if ice_classes:
         try:
             info["rio"] = evaluate_all_classes(
-                truth, labels, ice_classes,
-                {int(k): v for k, v in data_cfg["sod_to_polaris"].items()},
+                truth, labels, ice_classes, mapping,
                 sic=scene.sic, mask_valid=scene.mask_valid, n_classes=n_classes,
             )
         except (ValueError, KeyError) as exc:
@@ -445,11 +462,23 @@ def report_bias(split: str) -> str:
     )
 
 
-def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict) -> list[str]:
+def check_thresholds(
+    cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = False
+) -> list[str]:
     """Compare against the SPEC §7.4 acceptance thresholds."""
     warns = []
     miou, binacc = cm.miou(), cm.binary_accuracy(WATER_CLASS)
-    if np.isfinite(miou) and miou < float(eval_cfg.get("min_miou", 0.60)):
+    if collapsed:
+        # The 0.60 gate is a SIX-class threshold. Comparing a three-class score
+        # against it — in either direction — compares two different problems,
+        # and recommending a fallback we are already inside is worse than
+        # useless: it reads as if the option were still open.
+        warns.append(
+            f"mIoU {miou:.3f} sullo schema RIDOTTO a 3 classi. Non confrontabile con "
+            f"la soglia §7.4 di {eval_cfg.get('min_miou', 0.60)}, che vale per le 6 "
+            f"classi SOD. Il ripiego §7.4 è già attivo."
+        )
+    elif np.isfinite(miou) and miou < float(eval_cfg.get("min_miou", 0.60)):
         warns.append(
             f"mIoU {miou:.3f} sotto la soglia SPEC §7.4 di "
             f"{eval_cfg['min_miou']}: valutare il ripiego al problema binario."
@@ -497,6 +526,7 @@ def main(argv: list[str] | None = None) -> int:
     cfg = yaml.safe_load(args.config.read_text())
     data_cfg = load_config(args.data_config)
     n_classes = int(cfg["model"]["n_classes"])
+    collapsed = bool(cfg["data"].get("collapse_classes", False))
     eval_cfg = cfg.get("eval", {})
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -537,7 +567,8 @@ def main(argv: list[str] | None = None) -> int:
     # -- patches ------------------------------------------------------------
     if not official:
         log.info("Valutazione su patch (%s)…", args.split)
-        ds = PatchDataset(cache_dir, split[args.split], channels=channels, augment=False)
+        ds = PatchDataset(cache_dir, split[args.split], channels=channels, augment=False,
+                          collapse_classes=collapsed)
         cm = evaluate_patches(
             model, ds, n_classes=n_classes, batch_size=int(eval_cfg.get("batch_size", 8)),
             device=device,
@@ -560,7 +591,8 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Baseline a soglia su HV…")
         try:
             hv_tr, sod_tr = collect_patch_pixels(
-                PatchDataset(cache_dir, split["train"], channels=channels, augment=False)
+                PatchDataset(cache_dir, split["train"], channels=channels, augment=False,
+                             collapse_classes=collapsed)
             )
             thr_fit, _ = fit_hv_threshold(hv_tr, sod_tr)
             del hv_tr, sod_tr
@@ -619,6 +651,7 @@ def main(argv: list[str] | None = None) -> int:
                 batch_size=int(eval_cfg.get("batch_size", 8)), device=device,
                 ice_classes=ice_classes,
                 labels_from=reference_path(path) if official else None,
+                collapse_classes=collapsed,
             )
             scene_cm.matrix += one.matrix
             info["miou"] = one.miou()
@@ -670,7 +703,7 @@ def main(argv: list[str] | None = None) -> int:
     # test set there is no patch cache, and an empty confusion matrix would
     # report mIoU as NaN and quietly pass every threshold.
     gate_cm = cm if not official else scene_cm if scene_paths else cm
-    warnings = check_thresholds(gate_cm, eval_cfg)
+    warnings = check_thresholds(gate_cm, eval_cfg, collapsed=collapsed)
     report["warnings"] = warnings
     report["gate_2_metrics_pass"] = not warnings
     for w in warnings:

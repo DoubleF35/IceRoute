@@ -252,12 +252,89 @@ def download_many(
     return ok, failed
 
 
+def extend_train(args, cfg, scenes, regions, split_path, seed, min_free, avail) -> int:
+    """Download extra TRAINING scenes without regenerating the frozen split.
+
+    SPEC §5.3 freezes the split and forbids regenerating it: if val or demo
+    changed, today's mIoU would not be comparable with yesterday's. So the extra
+    scenes go into a separate ``configs/split_extra.yaml`` and extend **train
+    only**. Validation and demo stay bit-for-bit identical, which is exactly
+    what makes the before/after comparison mean anything.
+
+    Scenes already in any split are excluded, so a rerun adds new ones rather
+    than redownloading.
+    """
+    frozen = (yaml.safe_load(split_path.read_text()) or {}).get("split", {})
+    used = {
+        name
+        for key in ("train", "val", "demo")
+        for name in frozen.get(key, [])
+    }
+
+    extra_path = REPO / "configs" / "split_extra.yaml"
+    if extra_path.exists():
+        prev = (yaml.safe_load(extra_path.read_text()) or {}).get("extra_train", [])
+        used |= set(prev)
+    else:
+        prev = []
+
+    pool = [f for f in scenes if f.name not in used]
+    log.info(
+        "Scene gia' allocate: %d · disponibili per l'estensione: %d", len(used), len(pool)
+    )
+    if not pool:
+        log.error("Nessuna scena nuova disponibile.")
+        return 1
+
+    # A different seed from the frozen split, or stratified_select would return
+    # the same regional ordering and cluster the extension in the same places.
+    picked = stratified_select(pool, regions, min(args.extend_train, len(pool)), seed + 1)
+    report_coverage(picked, regions)
+
+    planned = sum(f.size for f in picked)
+    log.info("Da scaricare: %d scene, %.1f GB", len(picked), planned / 1e9)
+    if avail - planned < min_free:
+        log.error(
+            "Spazio insufficiente: servono %.1f GB, liberi %.1f GB, soglia %.0f GB. "
+            "Riduci --extend-train.",
+            planned / 1e9, avail / 1e9, min_free / 1e9,
+        )
+        return 1
+    if args.dry_run:
+        for f in picked:
+            log.info("  %s  %s", f.name, regions[f.name]["region"])
+        return 0
+
+    names = sorted(prev + [f.name for f in picked])
+    extra_path.write_text(
+        "# Scene AGGIUNTIVE di training. Vedi DECISIONS.md D-023.\n"
+        "#\n"
+        "# Generato da: scripts/download_subset.py --extend-train\n"
+        "# NON tocca configs/split.yaml, che resta congelato (SPEC §5.3): val e demo\n"
+        "# sono identiche, quindi il mIoU prima/dopo resta confrontabile. Se cambiassero\n"
+        "# anche quelle, il confronto non direbbe piu' niente.\n"
+        + yaml.safe_dump({"extra_train": names}, sort_keys=False, width=100)
+    )
+    log.info("Elenco in %s (%d scene in totale)", extra_path, len(names))
+
+    ok, failed = download_many(picked, REPO / "data" / "raw" / "train", min_free, "extra")
+    log.info("=" * 60)
+    log.info("Estensione: %d scaricate, %d fallite", ok, failed)
+    log.info("Ora: make data && make train")
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--config", type=Path, default=REPO / "configs" / "data.yaml")
     ap.add_argument("--n-train", type=int, default=None, help="override del numero di scene")
     ap.add_argument("--dry-run", action="store_true", help="mostra la selezione senza scaricare")
     ap.add_argument("--skip-test", action="store_true")
+    ap.add_argument(
+        "--extend-train", type=int, default=None,
+        help="scarica N scene AGGIUNTIVE per il training, senza toccare lo split "
+             "congelato. Le nuove finiscono in configs/split_extra.yaml.",
+    )
     args = ap.parse_args(argv)
 
     setup_logging()
@@ -284,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
         if split_path.exists()
         else 20260903
     )
+
+    if args.extend_train:
+        return extend_train(
+            args, cfg, scenes, regions, split_path, seed, min_free, avail
+        )
 
     n_train = args.n_train or subset["n_train_scenes"]
     selected = stratified_select(scenes, regions, n_train, seed)

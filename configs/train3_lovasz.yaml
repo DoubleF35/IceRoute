@@ -1,0 +1,139 @@
+# Esperimento: 3 classi + Lovász-Softmax. Baseline: configs/train3.yaml.
+#
+# Unica differenza dal baseline: lovasz_weight. Tutto il resto — seed, dati,
+# scheduler, augmentation — è identico, altrimenti il confronto non isolerebbe
+# l'effetto della loss.
+#
+# Perché Lovász: CE ottimizza la verosimiglianza per pixel, Dice una
+# approssimazione liscia della sovrapposizione. Nessuna delle due è la metrica
+# su cui siamo giudicati. Lovász sì: è il surrogato convesso stretto dell'indice
+# di Jaccard, quindi abbassarlo abbassa l'IoU invece di qualcosa che vi
+# correla.
+#
+# SCHEMA RIDOTTO A 3 CLASSI (ripiego SPEC §7.4).
+#
+# Il modello a 6 classi si è fermato a mIoU 0,272 sul test ufficiale, contro
+# una soglia di 0,60, sbagliando con sicurezza (D-018). Questo file addestra
+# lo schema ridotto: acqua libera / ghiaccio sottile / ghiaccio spesso.
+#
+# I numeri prodotti qui NON sono confrontabili con quelli a 6 classi.
+#
+# Nessun valore qui è "a occhio": ognuno o viene dalla SPEC, o è imposto dai
+# 6 GB di VRAM della 4050. Dove ho scelto io, c'è il perché.
+
+seed: 1337                      # fissato e loggato: due run devono coincidere
+
+# ---------------------------------------------------------------------------
+# Modello — le chiavi corrispondono a UNetConfig in model/unet.py
+# ---------------------------------------------------------------------------
+model:
+  in_channels: 3                # hv, hh, incidence_angle
+  n_classes: 3                  # ripiego SPEC §7.4, vedi DECISIONS.md D-020
+  encoder_channels: [16, 32, 64, 128]
+  bottleneck_channels: 256
+  groups: 8
+  # Conteggio misurato con questa configurazione: 1.964.182 parametri.
+  # Budget SPEC §7.1: < 2.000.000. Margine: 35.818. Vedi DECISIONS.md D-005.
+  # Se aggiungi il canale distance_to_land (in_channels: 4) il conto sale di
+  # sole 144 unità: il budget regge.
+
+# ---------------------------------------------------------------------------
+# Dati
+# ---------------------------------------------------------------------------
+data:
+  patch_size: 256
+  cache_dir: data/processed
+
+  # Le patch su disco restano a 6 classi: il collasso avviene in lettura, così
+  # cambiare schema non costa una nuova estrazione da 15 GB.
+  collapse_classes: true
+  num_workers: 8                # 22 core disponibili; 8 satura già l'I/O su NVMe
+  pin_memory: true
+
+# ---------------------------------------------------------------------------
+# Ottimizzazione
+# ---------------------------------------------------------------------------
+train:
+  batch_size: 16                # SPEC §7.2. Se va in OOM scendere a 8 E LOGGARLO
+  epochs: 60
+  amp: true                     # obbligatoria: senza, 6 GB non bastano
+  amp_dtype: fp16
+
+  optimizer:
+    name: adamw
+    lr: 3.0e-4
+    weight_decay: 1.0e-4
+
+  scheduler:
+    name: cosine
+    warmup_steps: 500
+
+  early_stopping:
+    monitor: val_miou
+    mode: max
+    patience: 10
+
+  grad_clip_norm: 1.0           # non nella SPEC: rete piccola + AMP fp16, il clip
+                                # costa nulla ed evita che un singolo batch
+                                # degenere mandi a NaN un training di ore
+
+# ---------------------------------------------------------------------------
+# Loss — SPEC §7.2: CrossEntropy con ignore_index + Dice sulle classi valide
+# ---------------------------------------------------------------------------
+loss:
+  ce_weight: 1.0
+  dice_weight: 0.5
+
+  # Il peso della Lovász. 1.0 la mette alla pari con la CE: è il punto di
+  # partenza dell'articolo originale (Berman et al., CVPR 2018), non una scelta
+  # nostra. Se l'esperimento funziona, si tara; se non funziona, non c'è niente
+  # da tarare.
+  lovasz_weight: 1.0
+  ignore_index: 255             # convenzione AI4Arctic: 255 = pixel da ignorare
+                                # DA VERIFICARE con inspect.py (P-01)
+
+  # Pesi di classe inversamente proporzionali alla frequenza. Le classi di old
+  # ice sono rare ed è esattamente su quelle che il routing prende le decisioni:
+  # senza pesi il modello impara a non predirle mai e il mIoU resta comunque alto.
+  class_weights:
+    mode: inverse_frequency
+    # Calcolati da artifacts/data_stats.json, non scritti a mano.
+    normalize: true
+    clip_max: 10.0              # senza tetto, una classe allo 0,01% otterrebbe
+                                # peso 10.000 e dominerebbe il gradiente
+
+# ---------------------------------------------------------------------------
+# Checkpoint e logging
+# ---------------------------------------------------------------------------
+output:
+  checkpoint_dir: artifacts/models
+  best_checkpoint: artifacts/models/unet3lov_fp32.pt
+  log_csv: artifacts/logs/train3lov_log.csv    # CSV, non wandb: la demo deve
+                                           # funzionare senza rete
+  onnx_fp32: artifacts/models/unet3lov_fp32.onnx
+  onnx_int8: artifacts/models/unet3lov_int8.onnx
+
+# ---------------------------------------------------------------------------
+# Valutazione — SPEC §7.3 e §7.5
+# ---------------------------------------------------------------------------
+eval:
+  tile_size: 256
+  tile_overlap: 32              # SPEC §7.3: inferenza a scena intera con blending
+  batch_size: 8
+
+  # Soglie minime accettabili per la demo (SPEC §7.4). Sotto queste si riduce
+  # il problema a binario, non si aggiusta il numero.
+  # ATTENZIONE: 0,60 è la soglia SPEC §7.4 per le SEI classi SOD. Qui il
+  # problema è a TRE classi ed è più facile: un mIoU sopra 0,60 con questo
+  # schema NON dimostra di aver superato quella soglia. Vedi D-020.
+  min_miou: 0.60
+  min_binary_accuracy: 0.90
+
+quantize:
+  calibration_patches: 200      # SPEC §7.5
+  method: minmax
+  per_channel: true
+  # Se il degrado supera 3 punti di mIoU, la SPEC prevede QAT con Brevitas come
+  # opzionale fuori percorso critico. Prima si misura, poi si decide.
+  max_acceptable_miou_drop: 0.03
+  latency_runs: 10
