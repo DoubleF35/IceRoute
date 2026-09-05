@@ -62,6 +62,7 @@ help:
 	@echo ""
 	@echo "  Qualità"
 	@echo "    make test         pytest"
+	@echo "    make dashboard    rigenera index.html: stato del progetto nel browser"
 	@echo "    make status       a che punto siamo (file presenti, gate superati)"
 	@echo "    make all          data -> train -> eval -> quantize -> route -> precompute -> report"
 	@echo ""
@@ -162,11 +163,18 @@ precompute:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.demo.precompute --config configs/routing.yaml
 
+.PHONY: dashboard
+dashboard:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.pitch.dashboard
+	@echo "  Apri index.html nel browser."
+
 .PHONY: report
 report:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.pitch.metrics
 	$(PY) -m iceroute.pitch.figures
+	$(PY) -m iceroute.pitch.dashboard
 
 .PHONY: demo
 demo:
