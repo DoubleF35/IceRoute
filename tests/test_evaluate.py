@@ -158,6 +158,32 @@ def test_verdict_is_honest_when_the_threshold_wins_on_binary():
 # ---------------------------------------------------------------------------
 
 
+def test_frozen_split_has_no_test_key():
+    """Pins the contract that made evaluate.py crash on its own default.
+
+    SPEC §5.3 freezes train/val/demo only. Code that reaches for ``split["test"]``
+    raises KeyError the first time it runs against the real config — which is
+    after training, i.e. hours in.
+    """
+    from pathlib import Path
+
+    import yaml
+
+    cfg = Path("configs/split.yaml")
+    if not cfg.exists():
+        pytest.skip("split non ancora congelato")
+    split = yaml.safe_load(cfg.read_text())["split"]
+    assert set(split) - {"frozen", "seed", "note"} == {"train", "val", "demo"}
+
+
+def test_reported_bias_is_never_silent():
+    """Both available splits are biased; the report must say which way."""
+    from iceroute.model.evaluate import report_bias
+
+    assert "OTTIMISTICA" in report_bias("val")
+    assert "scelte a mano" in report_bias("demo")
+
+
 def test_gate_warns_below_the_spec_thresholds():
     cm = ConfusionMatrix(3)
     cm.update(np.array([0, 1, 2, 0, 1, 2]), np.array([0, 0, 0, 0, 0, 0]))

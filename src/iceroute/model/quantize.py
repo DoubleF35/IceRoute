@@ -463,7 +463,11 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # -- accuracy -----------------------------------------------------------
-    scene_ids = [s for s in split["test"] if (args.raw_dir / s).exists()][: args.scenes]
+    # No test split exists (SPEC §5.3); val is the non-training data we have.
+    # For this particular comparison the selection bias does not matter: both
+    # graphs are scored on identical pixels, so the *difference* is unaffected
+    # even though each absolute mIoU is optimistic.
+    scene_ids = [s for s in split["val"] if (args.raw_dir / s).exists()][: args.scenes]
     if args.skip_accuracy or not scene_ids:
         if not scene_ids and not args.skip_accuracy:
             log.warning("Nessuna scena di test scaricata: salto il confronto di accuratezza.")

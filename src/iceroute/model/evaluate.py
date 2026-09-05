@@ -385,6 +385,43 @@ def threshold_verdict(model_cm: ConfusionMatrix, oracle: ThresholdBaseline) -> d
     }
 
 
+def report_bias(split: str) -> str:
+    """State plainly how the reported number is biased. SPEC rule 2.
+
+    The frozen split (SPEC §5.3) has no held-out test set, so there is no
+    unbiased estimate available and pretending otherwise would be the exact
+    failure mode rule 2 exists to prevent. Both options have a named defect:
+
+    * ``val`` — early stopping picked the checkpoint that maximises val mIoU, so
+      this number is the *best epoch as judged by this very split*. Optimistic
+      by an unknown amount, typically a point or two.
+    * ``demo`` — never used for training or model selection, so no selection
+      bias. But the scenes were hand-picked to be visually convincing, which is
+      its own bias and pushes in the same direction.
+
+    Quote the val number, with this caveat attached.
+
+    The real fix is already downloading: the AI4Arctic challenge ships an
+    official held-out test set (20 scenes plus 20 ``_prep_reference.nc`` label
+    files, 2.53 GB) into ``data/raw/test/``. That is an unbiased estimate and it
+    is what the pitch should quote. It is not wired up here yet on purpose —
+    the labels live in a separate reference file whose variable names have not
+    been verified on disk, and SPEC §5.4 is explicit about not trusting
+    documented names. Run ``inspect.py`` on a reference file first.
+    """
+    if split == "val":
+        return (
+            "Stima OTTIMISTICA: l'early stopping ha scelto il checkpoint che massimizza "
+            "il mIoU su questo stesso split (SPEC §5.3 non prevede un test set). "
+            "Non è una stima out-of-sample."
+        )
+    return (
+        "Split demo: mai usato per training né per selezione del modello, quindi nessun "
+        "bias di selezione — ma le scene sono state scelte a mano perché visivamente "
+        "convincenti, che è un bias nella stessa direzione."
+    )
+
+
 def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict) -> list[str]:
     """Compare against the SPEC §7.4 acceptance thresholds."""
     warns = []
@@ -412,7 +449,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
-    ap.add_argument("--split", default="test", choices=["val", "test"])
+    # SPEC §5.3 freezes three splits: train, val, demo. There is no test split,
+    # so `val` is the only non-training data available for metrics — and it is
+    # the split early stopping selected the checkpoint on. See report_bias().
+    ap.add_argument("--split", default="val", choices=["val", "demo"])
     ap.add_argument("--out", type=Path, default=Path("artifacts"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
     ap.add_argument("--scenes", type=int, default=3, help="quante scene intere valutare")
@@ -450,10 +490,12 @@ def main(argv: list[str] | None = None) -> int:
         "checkpoint": str(ckpt_path),
         "checkpoint_epoch": ckpt.get("epoch"),
         "split": args.split,
+        "split_bias": report_bias(args.split),
         "device": device,
         "n_parameters": model.param_count(),
         "channels": channels,
     }
+    log.warning("%s", report["split_bias"])
 
     # -- patches ------------------------------------------------------------
     log.info("Valutazione su patch (%s)…", args.split)
