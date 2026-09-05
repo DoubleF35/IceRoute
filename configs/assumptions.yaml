@@ -1,0 +1,166 @@
+# Assunzioni dietro ogni numero mostrato nella demo. SPEC §10.1 — file obbligatorio.
+#
+# REGOLA: nessun valore inventato. Ogni voce ha `source:`. Dove la fonte non c'è,
+# `provisional: true` e il numero NON può comparire in una affermazione economica.
+# La SPEC §10.1 è esplicita: se un dato non si trova, si mostra il risparmio in ORE
+# DI TRANSITO — che deriva dal modello di velocità e si difende — non in dollari.
+#
+# Il footer della demo apre questo file. È deliberato: mostra il rigore e disinnesca
+# in anticipo la domanda "su cosa si basano questi numeri".
+
+meta:
+  updated: 2026-09-05
+  spec_section: "10.1"
+
+# ---------------------------------------------------------------------------
+# Nave di riferimento
+# ---------------------------------------------------------------------------
+vessel:
+  reference_class: PC6
+  classes_shown: [PC6, PC7, IA]
+
+  open_water_speed_kn: 12.0
+  open_water_speed_source: null
+  open_water_speed_provisional: true
+  # P-05. Nessuna fonte citabile trovata per la velocità di crociera di una PC6
+  # generica in acqua libera. 12 nodi è plausibile per una cargo rinforzata ma
+  # NON è documentato.
+  #
+  # Cosa ne dipende e cosa no:
+  #   - le ORE ASSOLUTE di transito scalano con 1/v_open: se il valore vero è 14
+  #     nodi, tutti i tempi calano del 14%;
+  #   - il RISPARMIO PERCENTUALE è robusto, perché numeratore e denominatore
+  #     scalano insieme;
+  #   - il fatto che una rotta sia percorribile o no non dipende affatto da questo:
+  #     dipende dal RIO, cioè da POLARIS.
+  # Nella demo il tempo assoluto va etichettato come dipendente da questa assunzione.
+
+  # Limiti di velocità in regime di rischio elevato: questi SÌ hanno fonte.
+  elevated_speed_limits_kn:
+    PC1: 11
+    PC2: 8
+    PC3: 5
+    PC4: 5
+    PC5: 5
+    PC6: 3
+    PC7: 3
+  elevated_speed_limits_source: "IMO MSC.1/Circ.1519, Tabella 1.2"
+
+  fuel_consumption_t_per_day: null
+  fuel_consumption_source: null
+  fuel_consumption_provisional: true
+  # Senza questo e senza il prezzo, NON si mostrano dollari. Vedi `economics`.
+
+# ---------------------------------------------------------------------------
+# Carburante — P-09
+# ---------------------------------------------------------------------------
+fuel:
+  price_usd_per_t: null
+  price_source: null
+  price_date: null
+  provisional: true
+
+economics:
+  # L'interruttore che impedisce a un numero non fondato di finire su una slide.
+  # La UI legge questo, non decide da sé.
+  show_dollar_savings: false
+  reason: >-
+    Né il consumo giornaliero né il prezzo del carburante hanno una fonte citabile
+    (P-09). SPEC §10.1: senza fonte si mostrano ORE risparmiate, non dollari. Ore
+    risparmiate deriva dal modello di velocità ed è difendibile; dollari senza
+    fonte è un numero che un investitore smonta in una domanda.
+  show_hours_saved: true
+
+# ---------------------------------------------------------------------------
+# POLARIS — tutto con fonte primaria
+# ---------------------------------------------------------------------------
+polaris:
+  source: "IMO MSC.1/Circ.1519, Tabelle 1.1, 1.2, 1.3"
+  risk_values_file: data/polaris_rv.csv
+  thresholds:
+    normal_operation: "RIO >= 0"
+    elevated_risk: "-10 <= RIO < 0"
+    special_consideration: "RIO < -10"
+  thresholds_source: "IMO MSC.1/Circ.1519, Tabella 1.1"
+  open_water_rio: 30.0
+  note: >-
+    Il RIO include sempre il resto di acqua libera: RIO = SIC*RIV + (10-SIC)*RIV_open.
+    Ometterlo è l'errore classico e produce rotte più pessimistiche del vero.
+
+# ---------------------------------------------------------------------------
+# Classi di ghiaccio mostrate — ripiego SPEC §7.4, vedi D-020
+# ---------------------------------------------------------------------------
+segmentation:
+  scheme: "3 classi (ripiego SPEC §7.4)"
+  classes:
+    0: {name: "Acqua libera",     polaris_type: ice_free}
+    1: {name: "Ghiaccio sottile", polaris_type: thin_fyi_2nd_stage}
+    2: {name: "Ghiaccio spesso",  polaris_type: heavy_multi_year_ice}
+  mapping_rule: >-
+    Ogni classe raggruppata eredita il risk value del membro PIÙ PERICOLOSO. Verificato
+    che il membro peggiore sia lo stesso per PC6, PC7 e IA, altrimenti un solo tipo
+    POLARIS non rappresenterebbe il gruppo. L'arrotondamento va verso il pericolo,
+    quindi la riduzione non può produrre errori permissivi.
+  reduced_from: "6 classi SOD AI4Arctic"
+  reduction_reason: >-
+    Il modello a 6 classi si è fermato a mIoU 0,272 sul test ufficiale contro una
+    soglia di 0,60, sbagliando con sicurezza (D-018). Il ripiego è previsto dalla
+    SPEC §7.4.
+  # ATTENZIONE: i numeri prodotti con 3 classi non sono confrontabili con la soglia
+  # 0,60, che si riferisce alle 6 classi SOD. È un problema diverso e più facile.
+
+# ---------------------------------------------------------------------------
+# Griglia e geodesia
+# ---------------------------------------------------------------------------
+grid:
+  crs: "EPSG:3413"
+  crs_name: "WGS 84 / NSIDC Sea Ice Polar Stereographic North"
+  resolution_m: 500
+  true_scale_lat: 70.0
+  scale_correction: true
+  scale_correction_note: >-
+    Le distanze planari in EPSG:3413 sono divise per il fattore di scala puntuale
+    calcolato da PROJ. Senza correzione l'errore è -1,94% a 78°N e -2,83% a 85°N,
+    sistematico e sempre nello stesso verso. Vedi D-010.
+
+# ---------------------------------------------------------------------------
+# Dati
+# ---------------------------------------------------------------------------
+dataset:
+  name: "AI4Arctic Sea Ice Challenge Dataset"
+  doi: "10.11583/DTU.c.6244065"
+  sensor: "Sentinel-1 EW dual-pol (HH/HV)"
+  pixel_spacing_m: 80
+  scenes_train: 45
+  scenes_val: 10
+  scenes_demo: 5
+  scenes_test_official: 20
+  test_set_note: >-
+    Le 20 scene di test sono il set ufficiale della challenge, mai usate per training,
+    selezione del modello o scelta delle scene demo. È l'unica stima non distorta.
+
+# ---------------------------------------------------------------------------
+# Misure — riempite da metrics.json, MAI a mano
+# ---------------------------------------------------------------------------
+downlink:
+  raw_scene_bytes: null        # MISURATO da pitch/compression.py
+  payload_bytes: null          # MISURATO da pitch/compression.py
+  ratio: null                  # MISURATO
+  numerator_definition: >-
+    Canali SAR compressi senza perdita. Non i byte grezzi: un payload reale comprime
+    prima di trasmettere, e dal 7% al 58% di una scena è padding di swath a 0.0.
+    Confrontarsi con dati non compressi significa battere una baseline che nessuno
+    manderebbe in orbita.
+  provisional: true
+  provisional_reason: >-
+    P-06. Finora misurato sull'ice chart, che è disegnata a poligoni e si comprime
+    molto meglio dell'uscita di una rete. Va rimisurato sulla maschera predetta.
+
+model:
+  parameters: 1964182
+  onnx_int8_bytes: null        # MISURATO da model/quantize.py
+  latency_ms_per_tile: null    # MISURATO, CPU 1 thread
+  latency_note: >-
+    Misurata a 1 thread. Il portatile ha 22 core, il payload no: citare il numero
+    a 22 thread per un target FPGA non vorrebbe dire niente.
+  int8_degradation: null       # MISURATO
