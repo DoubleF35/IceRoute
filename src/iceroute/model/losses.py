@@ -56,8 +56,16 @@ def load_class_weights(
     *,
     clip_max: float = 10.0,
     normalize: bool = True,
+    collapse: bool = False,
 ) -> torch.Tensor | None:
-    """Read the measured class distribution and turn it into weights."""
+    """Read the measured class distribution and turn it into weights.
+
+    ``collapse`` folds the six SOD frequencies into the three-class scheme
+    first. The cache still stores six-class labels, so without this the weights
+    would be indexed by the wrong scheme — silently, since three of six entries
+    would simply go unused and the remaining three would carry the frequencies
+    of open water, new ice and young ice.
+    """
     p = Path(stats_path)
     if not p.exists():
         return None
@@ -65,6 +73,16 @@ def load_class_weights(
     freq = stats.get("class_frequency")
     if not freq:
         return None
+
+    if collapse:
+        from iceroute.data.collapse import GROUPS
+
+        merged = {
+            new: sum(float(freq.get(str(o), freq.get(o, 0.0))) for o in olds)
+            for new, olds in GROUPS.items()
+        }
+        freq = merged
+
     return inverse_frequency_weights(freq, n_classes, clip_max=clip_max, normalize=normalize)
 
 
@@ -174,6 +192,7 @@ def build_loss(cfg: dict, n_classes: int, stats_path: str | Path) -> CombinedLos
             n_classes,
             clip_max=float(cw_cfg.get("clip_max", 10.0)),
             normalize=bool(cw_cfg.get("normalize", True)),
+            collapse=bool(cfg.get("data", {}).get("collapse_classes", False)),
         )
     return CombinedLoss(
         n_classes,

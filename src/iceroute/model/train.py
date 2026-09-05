@@ -109,8 +109,16 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
     bs = int(train_cfg["train"]["batch_size"])
     nw = int(train_cfg["data"].get("num_workers", 4))
 
-    train_ds = PatchDataset(cache, split["train"], channels=channels, augment=True, seed=train_cfg["seed"])
-    val_ds = PatchDataset(cache, split["val"], channels=channels, augment=False)
+    collapse = bool(train_cfg["data"].get("collapse_classes", False))
+    if collapse:
+        from iceroute.data.collapse import describe
+
+        log.warning("%s", describe())
+
+    train_ds = PatchDataset(cache, split["train"], channels=channels, augment=True,
+                            seed=train_cfg["seed"], collapse_classes=collapse)
+    val_ds = PatchDataset(cache, split["val"], channels=channels, augment=False,
+                          collapse_classes=collapse)
 
     log.info("Patch: %d train, %d val — canali %s", len(train_ds), len(val_ds), channels)
 
@@ -276,7 +284,12 @@ def main(argv: list[str] | None = None) -> int:
     es = tc.get("early_stopping", {})
     patience = int(es.get("patience", 10))
     best_miou, best_epoch, since_best = -1.0, -1, 0
-    class_names = {int(k): v["name"] for k, v in data_cfg["sod_classes"].items() if int(k) != 255}
+    if cfg["data"].get("collapse_classes", False):
+        from iceroute.data.collapse import NAMES as class_names
+    else:
+        class_names = {
+            int(k): v["name"] for k, v in data_cfg["sod_classes"].items() if int(k) != 255
+        }
 
     log.info("Inizio: %d epoche, %d step/epoca, batch %d, AMP %s",
              epochs, steps_per_epoch, tc["batch_size"], "on" if scaler.is_enabled() else "off")
@@ -358,7 +371,20 @@ def main(argv: list[str] | None = None) -> int:
     thresholds = cfg.get("eval", {})
     min_miou = float(thresholds.get("min_miou", 0.60))
     min_bin = float(thresholds.get("min_binary_accuracy", 0.90))
-    if best_miou < min_miou:
+    collapsed = bool(cfg["data"].get("collapse_classes", False))
+    if collapsed:
+        # The 0.60 in SPEC §7.4 is a threshold on the SIX-class problem. Quoting
+        # it against a three-class score would compare two different tasks, and
+        # in the flattering direction. Whatever this run scores, it does not
+        # clear that gate — it replaces it.
+        log.warning(
+            "mIoU %.3f sullo schema RIDOTTO a 3 classi. Non è confrontabile con la "
+            "soglia SPEC §7.4 di %.2f, che vale per le 6 classi SOD: questo è un "
+            "problema diverso e più facile. Il ripiego §7.4 è già stato attivato, "
+            "quindi il numero da ridimensionare è quello nel pitch, non questo.",
+            best_miou, min_miou,
+        )
+    elif best_miou < min_miou:
         log.warning(
             "mIoU %.3f sotto la soglia SPEC di %.2f. SPEC §7.4: se dopo 3 giorni non si "
             "arriva, ridurre a binario ghiaccio/acqua + una classe di ghiaccio spesso, e "

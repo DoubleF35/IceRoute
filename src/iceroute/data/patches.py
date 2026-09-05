@@ -335,12 +335,23 @@ class PatchDataset:
         channels: list[str] | None = None,
         augment: bool = False,
         seed: int = 0,
+        collapse_classes: bool = False,
     ):
         self.cache_dir = Path(cache_dir)
         self.channels = channels or CHANNELS[:3]
         self.channel_idx = [CHANNELS.index(c) for c in self.channels]
         self.augment = augment
         self._rng = np.random.default_rng(seed)
+
+        # Applied on read rather than baked into the cache: the six-class labels
+        # stay on disk, so switching schemes costs nothing and the 15 GB of
+        # patches do not have to be extracted twice. See data/collapse.py.
+        self.collapse_classes = collapse_classes
+        self._collapse_lut = None
+        if collapse_classes:
+            from iceroute.data.collapse import lookup_table
+
+            self._collapse_lut = lookup_table()
 
         self._x: list[np.ndarray] = []
         self._y: list[np.ndarray] = []
@@ -415,7 +426,10 @@ class PatchDataset:
     def __getitem__(self, i: int):
         b, r = self._index[i]
         x = np.asarray(self._x[b][r][self.channel_idx], dtype="float32")
-        y = np.asarray(self._y[b][r], dtype="int64")
+        y = np.asarray(self._y[b][r], dtype="uint8")
+        if self._collapse_lut is not None:
+            y = self._collapse_lut[y]
+        y = y.astype("int64")
         m = np.asarray(self._m[b][r], dtype="bool")
 
         if self.augment:
