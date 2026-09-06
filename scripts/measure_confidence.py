@@ -174,13 +174,27 @@ def main(argv: list[str] | None = None) -> int:
     log.info("  il %.1f%% degli errori è un quasi-pareggio (margine < 0,10)",
              100 * agg["frac_near_tie"])
     log.info("")
-    if agg["frac_true_below_1pct"] > 0.5:
-        log.info("VERDETTO: il modello sbaglia con sicurezza. Le correzioni che agiscono")
-        log.info("sul margine (temperatura, soglie, riordino) non hanno su cosa lavorare:")
-        log.info("la classe giusta non è fra i candidati. Vedi D-018.")
+    # The verdict keys on frac_near_tie, and getting this wrong once already
+    # produced the opposite conclusion from the data. The first version tested
+    # frac_true_below_1pct > 0.5: at 44,6% it printed "worth trying margin
+    # fixes" while only 3,4% of errors were actually near-ties.
+    #
+    # The two are not complements. An error where the true class holds 3% is
+    # not below 1%, but it is nowhere near winning either — the winner holds
+    # 95%. Only frac_near_tie answers the question being asked, which is
+    # whether there is a margin small enough for a decision rule to close.
+    tie = agg["frac_near_tie"]
+    if tie < 0.20:
+        log.info("VERDETTO: il modello sbaglia con sicurezza. Solo il %.1f%% degli errori",
+                 100 * tie)
+        log.info("ha un margine abbastanza stretto da poter essere ribaltato. Le correzioni")
+        log.info("a tempo di inferenza (temperatura, soglie, riordino della decisione) non")
+        log.info("hanno su cosa lavorare: agiscono sul margine fra candidati, e il candidato")
+        log.info("giusto non è in gara. Vedi D-018.")
     else:
-        log.info("VERDETTO: una quota consistente di errori è vicina al pareggio.")
-        log.info("Vale la pena provare le correzioni sul margine.")
+        log.info("VERDETTO: il %.1f%% degli errori è un quasi-pareggio: una correzione sul",
+                 100 * tie)
+        log.info("margine potrebbe ribaltarne una parte. Vale la pena misurarla.")
     return 0
 
 
