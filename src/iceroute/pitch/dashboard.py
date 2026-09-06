@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+import yaml
+
 log = logging.getLogger("dashboard")
 
 FREEZE = date(2026, 10, 1)
@@ -210,16 +212,33 @@ def gates(ctx: dict) -> list[Gate]:
         Gate("Gate 3", "Routing POLARIS", bool(routes.get("scenes")),
              f"{sum(1 for s in routes.get('scenes', []) if s.get('usable'))} scene instradate"
              if routes else "non ancora eseguito"),
-        Gate("Gate 4", "Demo e materiali", False,
-             "precompute, UI Streamlit, figure e video di riserva",
-             "non iniziato"),
+        Gate("Gate 4", "Demo e materiali", False, _gate4_detail(ctx["demo"]),
+             # Deliberately never green from files alone. The gate is "three
+             # people who did not build it can use it, offline, after a
+             # reboot" — and no artefact on disk can attest to that. Marking it
+             # done because precompute ran is exactly how a demo reaches a
+             # stage untested.
+             "resta la prova in condizioni reali: rete staccata, macchina "
+             "riavviata, tre persone esterne che la usano da sole"),
     ]
+
+
+def _gate4_detail(demo: dict) -> str:
+    bits = []
+    if demo.get("n_scenes"):
+        bits.append(f"{demo['n_scenes']} scene precalcolate"
+                    + (" + caso peggiore" if demo.get("has_worst_case") else ""))
+    if demo.get("n_figures"):
+        bits.append(f"{demo['n_figures']} figure")
+    bits.append("video di riserva registrato" if demo.get("has_video")
+                else "video di riserva mancante")
+    return " · ".join(bits) if bits else "non iniziato"
 
 
 def _gate2_detail(best, quant, evaluation) -> str:
     bits = []
     if best is not None:
-        bits.append(f"mIoU {_it(best, 3)}")
+        bits.append(f"mIoU {_it(best, 3)} val")
     if quant.get("size"):
         bits.append(f"INT8 {_it(quant['size']['int8_mb'], 2)} MB")
     if evaluation:
@@ -429,10 +448,32 @@ def build_page(ctx: dict) -> str:
     g = ctx["git"]
 
     # -- headline cards ----------------------------------------------------
-    miou_tag = ""
-    if best is not None:
-        miou_tag = f'<span class="tag {"ok" if best >= 0.60 else "prov"}">' \
-                   f'{"sopra soglia" if best >= 0.60 else "sotto 0,60"}</span>'
+    # Two traps here, and the page fell into both.
+    #
+    # First, the headline must be the HELD-OUT number. Validation chose the
+    # checkpoint, so it flatters it; the official test set did not.
+    #
+    # Second, SPEC §7.4's threshold of 0,60 is about the SIX-class problem.
+    # Three classes is a strictly easier task, so tagging a three-class score
+    # "sotto 0,60" compares two different things and reads as a verdict on the
+    # model. The tag only appears when the numbers are commensurable.
+    n_cls = ctx["n_classes"]
+    headline = ctx["test_miou"] if ctx["test_miou"] is not None else best
+    if headline is not None and n_cls == 6:
+        miou_tag = (f'<span class="tag {"ok" if headline >= 0.60 else "prov"}">'
+                    f'{"sopra soglia" if headline >= 0.60 else "sotto 0,60"}</span>')
+    elif n_cls:
+        miou_tag = f'<span class="tag prov">ripiego §7.4 a {n_cls} classi</span>'
+    else:
+        miou_tag = ""
+
+    if ctx["test_miou"] is not None:
+        miou_note = (f'su {ctx["eval_split"] or "held-out"} · '
+                     f'validazione {_fmt(best)} {miou_tag}')
+        miou_label = "mIoU sul test ufficiale"
+    else:
+        miou_note = f'solo validazione, nessun held-out {miou_tag}'
+        miou_label = "mIoU di validazione"
 
     int8 = size.get("int8_mb")
     ratio = ctx["compression"]
@@ -450,8 +491,7 @@ def build_page(ctx: dict) -> str:
           "il deck dichiara 58 KB") if int8
          else "serve <span class='mono'>make quantize</span>",
          ),
-        ("mIoU migliore",
-         _fmt(best), f"soglia SPEC §7.4: 0,60 {miou_tag}"),
+        (miou_label, _fmt(headline), miou_note),
         ("Latenza per tile (1 thread)",
          f"{_it(lat.get('int8', {}).get('median_ms_per_tile', 0))} ms"
          if lat.get("int8") else "non ancora misurata",
@@ -672,20 +712,51 @@ def _md(text: str) -> str:
     return out
 
 
+def selected_training_config(repo: Path) -> tuple[str, dict]:
+    """The config of the model that is actually deployed, not the last trained.
+
+    ``scripts/pick_model.py`` writes the winner to ``artifacts/best_config.txt``.
+    Reading a fixed path instead is how this page spent days reporting the val
+    mIoU of a six-class run that had already been abandoned for the §7.4
+    fallback — every training run appends to its own CSV, so "the last log" and
+    "the deployed model" are different things the moment more than one config
+    exists.
+    """
+    picked = repo / "artifacts/best_config.txt"
+    name = picked.read_text().strip() if picked.exists() else "configs/train3.yaml"
+    path = repo / name
+    return name, (yaml.safe_load(path.read_text()) if path.exists() else {})
+
+
 def collect(repo: Path, today: date) -> dict:
     decisions_text = (repo / "DECISIONS.md").read_text() if (repo / "DECISIONS.md").exists() else ""
     metrics = _json(repo / "artifacts/metrics.json")
     stats = _json(repo / "artifacts/data_stats.json")
     summary = _json(repo / "artifacts/train_summary.json")
     routes = _json(repo / "data/demo/routes_index.json")
-    runs = read_runs(repo / "artifacts/logs/train_log.csv")
 
-    best = summary.get("best_miou")
-    if best is None and runs:
-        best = max(
-            (r["val_miou"] for r in runs[-1] if isinstance(r.get("val_miou"), float)),
-            default=None,
-        )
+    cfg_name, train_cfg = selected_training_config(repo)
+    log_csv = (train_cfg.get("output") or {}).get("log_csv") or "artifacts/logs/train_log.csv"
+    runs = read_runs(repo / log_csv)
+
+    best = max(
+        (r["val_miou"] for r in (runs[-1] if runs else []) if isinstance(r.get("val_miou"), float)),
+        default=None,
+    )
+
+    # The headline number is the held-out one. Validation picked the checkpoint,
+    # so it flatters it by an unknown amount; the official test set did not.
+    evaluation = metrics.get("evaluation") or {}
+    test_miou = ((evaluation.get("scenes") or {}).get("aggregate") or {}).get("miou")
+    n_classes = (train_cfg.get("model") or {}).get("n_classes")
+
+    demo_index = _json(repo / "data/demo/index.json")
+    demo = {
+        "n_scenes": len([s for s in demo_index.get("scenes", []) if not s.get("worst_case")]),
+        "has_worst_case": any(s.get("worst_case") for s in demo_index.get("scenes", [])),
+        "n_figures": len(list((repo / "artifacts/figures").glob("*.png"))),
+        "has_video": any((repo / "artifacts/video").glob("*.mp4")),
+    }
 
     comp = metrics.get("compression") or {}
     ratio = None
@@ -699,6 +770,11 @@ def collect(repo: Path, today: date) -> dict:
         "routes": routes,
         "runs": runs,
         "best_miou": best,
+        "test_miou": test_miou,
+        "n_classes": n_classes,
+        "selected_config": cfg_name,
+        "eval_split": evaluation.get("split"),
+        "demo": demo,
         "compression": ratio,
         "download": download_status(repo),
         "git": git_info(repo),
@@ -708,10 +784,11 @@ def collect(repo: Path, today: date) -> dict:
         "claims": parse_table(decisions_text, "A"),
         "provisional": parse_table(decisions_text, "P"),
         "decisions": parse_decisions(decisions_text),
+        # No literal fallback: a hardcoded parameter count is a number that
+        # keeps being displayed after the architecture changes under it.
         "n_params": (
             metrics.get("export", {}).get("fp32", {}).get("n_parameters")
-            or (summary.get("n_parameters"))
-            or 1_964_182
+            or summary.get("n_parameters")
         ),
     }
     ctx["gates"] = gates(ctx)

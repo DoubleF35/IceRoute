@@ -26,11 +26,29 @@ STATUS="$LOG/overnight_status.txt"
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$STATUS"; }
 step() { say ""; say "=== $* ==="; }
 
-# Aspetta che un processo sparisca, con un tetto: se qualcosa si impianta, la
-# catena prosegue invece di restare appesa fino al mattino.
+# Un job e' vivo solo se esiste un processo PYTHON che matcha. Un guscio di
+# shell che il pattern lo *nomina* soltanto -- un wrapper, un tail, un editor
+# aperto sul file -- non e' il job.
+#
+# Questa distinzione e' costata quattro ore la notte del 5 settembre. Il
+# training Lovasz era stato lanciato da un `bash -c` che, per aspettare la GPU,
+# girava su `pgrep -f "iceroute.model"`: la propria riga di comando conteneva
+# "iceroute.model.train", quindi matchava se stesso e non usciva mai. Il
+# training non parti'. Questa catena poi aspetto' `train3_lovasz`, trovo' quel
+# guscio bloccato, e resto' ferma fino al tetto delle 4 ore.
+#
+# `pgrep -af` stampa "PID riga-di-comando": il secondo campo e' l'eseguibile.
+running() {
+  pgrep -af "$1" 2>/dev/null | awk '$2 ~ /python/ {found = 1} END {exit !found}'
+}
+
+# Aspetta che un job sparisca, con un tetto: se qualcosa si impianta, la catena
+# prosegue invece di restare appesa fino al mattino.
 wait_for() {
   local pattern="$1" limit="${2:-21600}" waited=0
-  while pgrep -f "$pattern" >/dev/null; do
+  running "$pattern" || { say "Nessun processo python per '$pattern': non aspetto."; return 0; }
+  say "In attesa di: $(pgrep -af "$pattern" | awk '$2 ~ /python/ {print $1}' | tr '\n' ' ')"
+  while running "$pattern"; do
     sleep 60
     waited=$((waited + 60))
     if [ "$waited" -ge "$limit" ]; then

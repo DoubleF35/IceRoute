@@ -219,6 +219,109 @@ def test_markdown_escapes_html():
 # ---------------------------------------------------------------------------
 
 
+CSV_HEADER = ("epoch,train_loss,train_ce,train_dice,val_loss,val_miou,"
+              "val_accuracy,val_binary_accuracy,lr,seconds,peak_vram_gb\n")
+
+
+def _repo(tmp_path, *, n_classes=3, log_csv="artifacts/logs/mine.csv",
+          val_miou=0.62, test_miou=None, picked="configs/mine.yaml"):
+    """A repo skeleton with one training config and its own log."""
+    for d in ("tests", "src", "scripts", "configs", "artifacts/logs"):
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
+    (tmp_path / picked).write_text(
+        f"model:\n  n_classes: {n_classes}\noutput:\n  log_csv: {log_csv}\n"
+    )
+    (tmp_path / "artifacts/best_config.txt").write_text(picked + "\n")
+    (tmp_path / log_csv).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / log_csv).write_text(CSV_HEADER + f"1,1,1,1,1,{val_miou},0.9,0.9,1e-4,10,1\n")
+    if test_miou is not None:
+        import json
+
+        (tmp_path / "artifacts/metrics.json").write_text(json.dumps({
+            "evaluation": {"split": "test_ufficiale",
+                           "scenes": {"aggregate": {"miou": test_miou}}}
+        }))
+    return tmp_path
+
+
+def test_dashboard_reads_the_log_of_the_deployed_model_not_the_last_trained(tmp_path):
+    """The bug this page shipped with.
+
+    Every config appends to its own CSV. Reading a fixed path meant that once
+    the §7.4 fallback moved training to a new config, the page kept reporting a
+    six-class run that had already been abandoned — for days, with no error.
+    """
+    repo = _repo(tmp_path, val_miou=0.62)
+    # A stale log from an abandoned config, at the path the page used to read.
+    (repo / "artifacts/logs/train_log.csv").write_text(
+        CSV_HEADER + "1,1,1,1,1,0.375,0.9,0.9,1e-4,10,1\n")
+
+    ctx = collect(repo, TODAY)
+    assert ctx["best_miou"] == pytest.approx(0.62)
+    assert ctx["selected_config"] == "configs/mine.yaml"
+
+
+def test_the_six_class_threshold_is_not_applied_to_a_three_class_score(tmp_path):
+    """SPEC §7.4's 0,60 is about six classes; three is a strictly easier task.
+
+    Tagging a three-class score "sotto 0,60" compares two different problems
+    and reads as a verdict on the model.
+    """
+    page = build_page(collect(_repo(tmp_path, n_classes=3, test_miou=0.535), TODAY))
+    assert "sotto 0,60" not in page
+    assert "ripiego §7.4 a 3 classi" in page
+
+
+def test_the_threshold_still_applies_when_the_scheme_is_six_class(tmp_path):
+    """The tag is suppressed because the schemes differ, not because it is
+    inconvenient. On six classes it must come back."""
+    page = build_page(collect(_repo(tmp_path, n_classes=6, test_miou=0.535), TODAY))
+    assert "sotto 0,60" in page
+
+
+def test_headline_is_the_held_out_score_not_validation(tmp_path):
+    """Validation picked the checkpoint, so it flatters it by an unknown
+    amount. The number a human reads first has to be the one that did not."""
+    ctx = collect(_repo(tmp_path, val_miou=0.62, test_miou=0.535), TODAY)
+    page = build_page(ctx)
+    assert "mIoU sul test ufficiale" in page
+    assert _it(0.535, 3) in page
+
+
+def test_headline_says_so_when_there_is_no_held_out_score(tmp_path):
+    """Without an evaluation it falls back to validation — but must label it,
+    not pass a validation number off as a held-out one."""
+    page = build_page(collect(_repo(tmp_path, val_miou=0.62), TODAY))
+    assert "mIoU di validazione" in page
+    assert "nessun held-out" in page
+
+
+def test_gate_4_is_never_green_from_artefacts_alone(tmp_path):
+    """Its real criterion is three uninvolved people using it offline after a
+    reboot. No file on disk can attest to that, so files must not turn it
+    green."""
+    import json
+
+    repo = _repo(tmp_path, test_miou=0.535)
+    (repo / "data/demo").mkdir(parents=True)
+    (repo / "data/demo/index.json").write_text(json.dumps(
+        {"scenes": [{"scene_id": f"s{i}.nc"} for i in range(5)]}))
+    (repo / "artifacts/figures").mkdir(parents=True)
+    for i in range(4):
+        (repo / f"artifacts/figures/f{i}.png").touch()
+
+    gate4 = next(g for g in collect(repo, TODAY)["gates"] if g.name == "Gate 4")
+    assert gate4.done is False
+    assert "5 scene precalcolate" in gate4.detail
+    assert "video di riserva mancante" in gate4.detail
+
+
+def test_parameter_count_is_never_invented(tmp_path):
+    """It used to fall back to a literal, which keeps being displayed after the
+    architecture changes under it."""
+    assert collect(_repo(tmp_path), TODAY)["n_params"] is None
+
+
 def test_page_builds_from_an_empty_repo(tmp_path):
     """With no artifacts at all the page must still render, saying so."""
     (tmp_path / "artifacts").mkdir()
