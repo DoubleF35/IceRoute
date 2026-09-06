@@ -91,6 +91,23 @@ def fmt(v, spec="{:.1f}", missing="non misurato"):
     return spec.format(v) if isinstance(v, int | float) else missing
 
 
+def scene_scores(metrics: dict, scene_id: str) -> tuple[float | None, float | None]:
+    """mIoU and worst permissive fraction for one scene, from the evaluation.
+
+    Read from ``metrics.json`` rather than carried in the demo index on purpose:
+    these are the numbers the warning banner shows, and a number copied into a
+    second file is a number that will still say 0.25 after the next training
+    run. If the evaluation has not been run, this returns ``None`` and the
+    banner says so instead of inventing a figure.
+    """
+    per = ((metrics.get("evaluation") or {}).get("scenes") or {}).get("per_scene") or []
+    for row in per:
+        if row.get("scene_id") == scene_id:
+            unsafe = (row.get("rio") or {}).get("worst_unsafe_fraction")
+            return row.get("miou"), unsafe
+    return None, None
+
+
 def kpi(label: str, value: str, sub: str = "") -> str:
     return (f'<div class="kpi"><div class="lab">{label}</div>'
             f'<div class="val">{value}</div><div class="sub">{sub}</div></div>')
@@ -199,6 +216,9 @@ def main() -> None:
         return
 
     scenes = [s for s in index["scenes"] if s.get("classes")]
+    # The worst case goes last, always. Left in the normal rotation it would
+    # read as a representative scene, which is the opposite of why it is here.
+    scenes.sort(key=lambda s: bool(s.get("worst_case")))
     if not scenes:
         st.title("IceRoute")
         st.error("Nessuna scena utilizzabile: tutte prive di rotte.")
@@ -212,7 +232,9 @@ def main() -> None:
     with st.sidebar:
         st.markdown("### Scena")
         labels = {
-            f"{s['scene_id'][:8]} · {s.get('region', '?')[:22]}": s for s in scenes
+            f"{'⚠ ' if s.get('worst_case') else ''}{s['scene_id'][:8]}"
+            f" · {s.get('region', '?')[:22]}": s
+            for s in scenes
         }
         chosen = st.radio("Scena", list(labels), label_visibility="collapsed")
         scene = labels[chosen]
@@ -244,6 +266,22 @@ def main() -> None:
         f"copertura carta {100 * scene.get('coverage', 0):.0f}%</span>",
         unsafe_allow_html=True,
     )
+
+    if scene.get("worst_case"):
+        miou, unsafe = scene_scores(metrics, scene["scene_id"])
+        agg = (((metrics.get("evaluation") or {}).get("scenes") or {})
+               .get("aggregate") or {}).get("miou")
+        unsafe_pct = 100 * unsafe if isinstance(unsafe, int | float) else None
+        st.warning(
+            "**Questa è la scena su cui il modello sbaglia di più**, fra le 20 del "
+            "test ufficiale. È qui apposta: serve a rispondere a «e quando "
+            "sbaglia?» invece di far finta che non succeda.\n\n"
+            f"mIoU **{fmt(miou, '{:.2f}')}** contro **{fmt(agg, '{:.2f}')}** di media. "
+            f"Frazione permissiva **{fmt(unsafe_pct, '{:.0f}%')}**: "
+            "su questa quota di pixel il modello dichiara percorribile del ghiaccio "
+            "che POLARIS vieta a quella classe di nave. La rotta qui sotto **non è "
+            "affidabile** ed è mostrata per questo."
+        )
 
     cols = st.columns(4, gap="small")
     for col, html_ in zip(

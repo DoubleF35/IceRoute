@@ -276,6 +276,83 @@ def test_index_declares_it_routed_on_the_prediction():
     assert "maschera PREDETTA" in index.get("note", "")
 
 
+def test_scene_scores_reads_the_evaluation_not_the_demo_index():
+    """The warning banner's numbers must come from the last evaluation.
+
+    Copying them into the demo index would leave the banner saying 0.25 after a
+    retrain moved the scene to 0.60.
+    """
+    from iceroute.demo.app import scene_scores
+
+    metrics = {"evaluation": {"scenes": {"per_scene": [
+        {"scene_id": "a.nc", "miou": 0.25, "rio": {"worst_unsafe_fraction": 0.52}},
+        {"scene_id": "b.nc", "miou": 0.77, "rio": {"worst_unsafe_fraction": 0.01}},
+    ]}}}
+    assert scene_scores(metrics, "a.nc") == (0.25, 0.52)
+    assert scene_scores(metrics, "b.nc") == (0.77, 0.01)
+
+
+def test_scene_scores_returns_nothing_when_the_scene_was_not_evaluated():
+    """So the banner says 'non misurato' rather than showing another scene's
+    numbers under this scene's name."""
+    from iceroute.demo.app import scene_scores
+
+    assert scene_scores({}, "a.nc") == (None, None)
+    assert scene_scores(
+        {"evaluation": {"scenes": {"per_scene": [{"scene_id": "z.nc", "miou": 0.9}]}}},
+        "a.nc",
+    ) == (None, None)
+
+
+def test_the_worst_case_scene_is_not_also_in_the_carousel():
+    """It is kept to answer "and when does it fail?", not to be shown as typical."""
+    from pathlib import Path
+
+    import yaml
+
+    cfg = yaml.safe_load(Path("configs/demo.yaml").read_text())
+    worst = (cfg.get("worst_case") or {}).get("id")
+    assert worst, "configs/demo.yaml deve dichiarare un caso peggiore"
+    assert worst not in [s["id"] for s in cfg["scenes"]]
+
+
+def test_the_designated_worst_case_really_is_the_worst(tmp_path):
+    """D-024: the carousel is chosen partly on model performance, so that claim
+    has to keep being true.
+
+    The original selection used only ice-chart structure and put the single
+    worst scene of the twenty into the demo. Nothing failed — the routes were
+    drawn, the UI worked, and half the pixels sent a ship into ice POLARIS
+    forbids. This test fails if a retrain ever reorders the ranking and leaves
+    the config behind.
+    """
+    from pathlib import Path
+
+    import yaml
+
+    metrics_path = Path("artifacts/metrics.json")
+    if not metrics_path.exists():
+        pytest.skip("valutazione non ancora eseguita")
+    per = ((json.loads(metrics_path.read_text()).get("evaluation") or {})
+           .get("scenes") or {}).get("per_scene") or []
+    scored = {r["scene_id"]: (r.get("rio") or {}).get("worst_unsafe_fraction")
+              for r in per}
+
+    cfg = yaml.safe_load(Path("configs/demo.yaml").read_text())
+    worst_id = cfg["worst_case"]["id"]
+    if not isinstance(scored.get(worst_id), float):
+        pytest.skip("il caso peggiore non compare nella valutazione corrente")
+
+    for entry in cfg["scenes"]:
+        got = scored.get(entry["id"])
+        if isinstance(got, float):
+            assert got < scored[worst_id], (
+                f"{entry['id']} è più permissiva ({got:.1%}) del caso peggiore "
+                f"dichiarato {worst_id} ({scored[worst_id]:.1%}): "
+                "aggiorna configs/demo.yaml"
+            )
+
+
 def test_index_records_whether_routes_differ_by_vessel_class():
     """D-012: the demo's strongest moment needs this, so it is recorded per
     scene and decided on evidence rather than hope."""

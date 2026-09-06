@@ -80,6 +80,10 @@ class SceneAssets:
     waypoints: dict = field(default_factory=dict)
     inference_seconds: float = 0.0
     routes_differ: bool = False
+    # A scene kept in the build precisely *because* the model does badly on it.
+    # It is not part of the carousel: it exists so "show me where it fails" has
+    # an answer ready. The UI must label it, or it becomes an accidental claim.
+    worst_case: bool = False
     warnings: list[str] = field(default_factory=list)
 
 
@@ -180,6 +184,7 @@ def process_scene(
     device: str,
     downscale: int,
     use_chart: bool = False,
+    worst_case: bool = False,
 ) -> SceneAssets:
     """Everything the UI needs for one scene.
 
@@ -213,6 +218,7 @@ def process_scene(
         shape=list(scene.shape),
         coverage=round(float(scene.mask_valid.mean()), 4),
         inference_seconds=round(infer_s, 2),
+        worst_case=worst_case,
     )
 
     # -- rasters ------------------------------------------------------------
@@ -398,11 +404,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.raw_dir is None:
         args.raw_dir = Path(demo_cfg.get("source_dir", "data/raw/train"))
 
+    # Each entry is (scene_id, is_worst_case). The worst case is built alongside
+    # the carousel rather than in a separate run: a scene that only gets
+    # regenerated when someone remembers to is a scene that will be stale on
+    # stage, and this one exists to be shown under questioning.
+    worst_id = ((demo_cfg.get("worst_case") or {}).get("id")) if demo_cfg else None
+
     if args.scenes:
         scenes = list(args.scenes)
     elif demo_cfg.get("scenes"):
         scenes = [e["id"] for e in demo_cfg["scenes"]]
-        log.info("Scene demo da %s: %d", args.demo_config, len(scenes))
+        if worst_id and worst_id not in scenes:
+            scenes.append(worst_id)
+        log.info(
+            "Scene demo da %s: %d%s",
+            args.demo_config, len(scenes),
+            f" (di cui 1 caso peggiore: {worst_id[:18]})" if worst_id else "",
+        )
     elif args.raw_dir.name == "test":
         # Official test scenes are not in the frozen split; enumerate from disk,
         # and only those whose reference labels are present.
@@ -424,12 +442,13 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     results = []
     for i, sid in enumerate(present, 1):
-        log.info("[%d/%d] %s", i, len(present), sid)
+        is_worst = sid == worst_id
+        log.info("[%d/%d] %s%s", i, len(present), sid, "  [CASO PEGGIORE]" if is_worst else "")
         try:
             results.append(process_scene(
                 args.raw_dir / sid, model=model, data_cfg=data_cfg, routing_cfg=routing_cfg,
                 train_cfg=train_cfg, out_dir=args.out, table=table, device=device,
-                downscale=args.downscale, use_chart=args.use_chart,
+                downscale=args.downscale, use_chart=args.use_chart, worst_case=is_worst,
             ))
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the batch
             log.exception("  fallita: %s", exc)
@@ -457,12 +476,18 @@ def main(argv: list[str] | None = None) -> int:
     }
     (args.out / "index.json").write_text(json.dumps(index, indent=2))
 
-    differing = [a.scene_id for a in results if a.routes_differ]
+    # The worst case is not part of the carousel, so it must not dilute (or
+    # flatter) the count of scenes that carry the vessel-class moment.
+    carousel = [a for a in results if not a.worst_case]
+    differing = [a.scene_id for a in carousel if a.routes_differ]
     log.info("=" * 66)
-    log.info("Scene generate: %d", len(results))
+    log.info(
+        "Scene generate: %d (%d nel carosello + %d caso peggiore)",
+        len(results), len(carousel), len(results) - len(carousel),
+    )
     log.info(
         "Scene in cui la rotta CAMBIA con la classe di nave: %d/%d%s",
-        len(differing), len(results),
+        len(differing), len(carousel),
         f" — {', '.join(s[:15] for s in differing)}" if differing else "",
     )
     if not differing:

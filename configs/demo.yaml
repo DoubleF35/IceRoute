@@ -16,10 +16,16 @@ source_dir: data/raw/test
 #      classi di nave — non fuori copertura, che è un'altra cosa (D-011);
 #   2. copertura dell'ice chart alta, altrimenti il confronto con la baseline
 #      non è difendibile;
-#   3. dove possibile, la rotta deve CAMBIARE con la classe di nave.
+#   3. dove possibile, la rotta deve CAMBIARE con la classe di nave;
+#   4. il modello non deve andare male sulla scena — aggiunto il 06/09, vedi
+#      D-024. I criteri 1-3 guardano il GHIACCIO, e da soli avevano fatto
+#      entrare nel carosello la scena su cui il modello sbaglia di più fra
+#      tutte e venti. Il numero che decide è la frazione permissiva, non il
+#      mIoU: è la frazione di pixel che manderebbe la nave in ghiaccio vietato.
 #
-# Classifica calcolata sull'ice chart (`precompute --use-chart`), quindi sulle
-# proprietà del ghiaccio e non su un modello ancora in addestramento.
+# I criteri 1-3 sono calcolati sull'ice chart (`precompute --use-chart`), quindi
+# sulle proprietà del ghiaccio e non su un modello ancora in addestramento. Il
+# criterio 4 viene da `artifacts/metrics.json`, sul test ufficiale.
 
 scenes:
   # --- la scena di apertura -------------------------------------------------
@@ -44,13 +50,21 @@ scenes:
     why: Terza scena in cui il selettore di classe fa qualcosa di reale.
 
   # --- le due con copertura molto alta -------------------------------------
-  - id: 20180623T114935_cis_prep.nc
-    coverage: 0.95
-    routes_differ: false
-    n_no_go_cells: 100
+  - id: 20201013T080448_dmi_prep.nc
+    coverage: 0.8124
+    routes_differ: true
+    n_no_go_cells: 14
+    miou: 0.5723
+    worst_unsafe_fraction: 0.0238
     why: >-
-      Copertura al 95%: la scena che toglie di mezzo l'obiezione "quanto della
-      carta avete davvero". La rotta non cambia con la classe.
+      Sostituisce 20180623 (D-024). Tiene il ruolo di scena ad alta copertura —
+      81%, la più alta fra le candidate — e in più fa cambiare la rotta con la
+      classe di nave, cosa che l'uscente non faceva.
+      LIMITE, dichiarato: qui il criterio 1 vale solo in parte. La rotta diretta
+      è percorribile da PC6 e PC7 (0 celle vietate, IceRoute costa +1%), ed è
+      vietata solo per IA, 14 celle. Il momento "la linea retta non si può fare"
+      lo portano le prime tre scene; questa porta il momento "cambio classe e la
+      risposta cambia", su una carta coperta all'81%.
 
   - id: 20210506T075557_dmi_prep.nc
     coverage: 0.81
@@ -59,6 +73,25 @@ scenes:
     why: >-
       344 celle vietate su una copertura dell'81%. La scena in cui il ghiaccio
       è visibilmente il protagonista.
+
+# La scena che il modello sbaglia di più, tenuta APPOSTA e etichettata come
+# tale. Non è nel carosello: `precompute` la genera insieme alle altre e la UI
+# la mostra in fondo con un avviso. Esiste perché "e quando sbaglia?" è la
+# domanda che un tecnico in sala fa sempre, e avere la risposta già pronta vale
+# più che sperare che non la faccia. Vedi D-024.
+worst_case:
+  id: 20180623T114935_cis_prep.nc
+  coverage: 0.9477
+  routes_differ: false
+  n_no_go_cells: 100
+  miou: 0.2527
+  worst_unsafe_fraction: 0.5172
+  why: >-
+    Peggiore delle 20 scene del test ufficiale per mIoU (0,25 contro 0,54 di
+    aggregato) e per frazione permissiva (51,7%: su più di metà dei pixel il
+    modello dichiara percorribile del ghiaccio che POLARIS vieta a quella
+    classe). Nel caso peggiore sovrastima il RIO di 80 punti.
+    Era nel carosello fino al 06/09 perché scelta sui soli criteri 1-3.
 
 # Le 5 scene demo del split congelato NON si usano più. Motivo, da D-021:
 # una sola faceva cambiare la rotta (e per 3 celle, su copertura al 12%), e
