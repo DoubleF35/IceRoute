@@ -363,3 +363,105 @@ def test_index_records_whether_routes_differ_by_vessel_class():
         pytest.skip("precompute non ancora eseguito")
     for s in json.loads(path.read_text())["scenes"]:
         assert "routes_differ" in s
+
+
+# ---------------------------------------------------------------------------
+# "But your route goes through the thick ice"
+# ---------------------------------------------------------------------------
+
+
+def test_conditions_along_separates_ice_type_from_concentration():
+    """The objection the demo used to invite and could not answer.
+
+    A class map shows ice *type*. POLARIS scores type times *concentration*.
+    Heavy ice at 3/10 is normal operation; the same ice at 8/10 is forbidden.
+    Identical colour on screen, opposite verdict.
+    """
+    import numpy as np
+
+    from iceroute.routing.polaris import conditions_along
+
+    names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
+    sod = np.full((4, 4), 2, dtype="uint8")          # all thick ice
+    sic = np.full((4, 4), 3.0)                       # ...at 3/10
+    # RIO = 3(-3) + 7(+3) = +12 for a PC6
+    rio = np.full((4, 4), 12.0)
+    cells = [(0, i) for i in range(4)]
+
+    c = conditions_along(cells, sod, sic, rio, "PC6", names)
+    assert c["by_class"] == {"Ghiaccio spesso": 4}
+    assert c["worst_class_cells"] == 4
+    assert c["worst_class_sic_median"] == 3.0
+    assert c["fraction_normal"] == 1.0
+    assert c["fraction_no_go"] == 0.0
+
+
+def test_the_same_ice_type_at_high_concentration_is_reported_as_forbidden():
+    import numpy as np
+
+    from iceroute.routing.polaris import conditions_along
+
+    names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
+    sod = np.full((4, 4), 2, dtype="uint8")
+    sic = np.full((4, 4), 8.0)
+    rio = np.full((4, 4), -18.0)                     # 8(-3) + 2(+3)
+    c = conditions_along([(0, i) for i in range(4)], sod, sic, rio, "PC6", names)
+
+    assert c["by_class"] == {"Ghiaccio spesso": 4}   # same class as above
+    assert c["worst_class_sic_median"] == 8.0        # different concentration
+    assert c["fraction_no_go"] == 1.0                # opposite verdict
+
+
+def test_conditions_of_an_empty_route_are_empty():
+    import numpy as np
+
+    from iceroute.routing.polaris import conditions_along
+
+    assert conditions_along([], np.zeros((2, 2)), None, np.zeros((2, 2)),
+                            "PC6", ["a", "b"]) == {}
+
+
+def test_every_demo_route_stays_in_normal_operation():
+    """The claim the UI now makes out loud, checked against the real build.
+
+    If a route ever does cross a forbidden cell, the banner saying "attraversa
+    il bianco, ed è regolare" becomes a false statement on a projector.
+    """
+    from pathlib import Path
+
+    path = Path("data/demo/index.json")
+    if not path.exists():
+        pytest.skip("precompute non ancora eseguito")
+
+    checked = 0
+    for scene in json.loads(path.read_text()).get("scenes", []):
+        for ice_class, entry in (scene.get("classes") or {}).items():
+            if not entry.get("route_exists"):
+                continue
+            c = entry.get("conditions") or {}
+            assert c, f"{scene['scene_id']}/{ice_class}: condizioni non misurate"
+            assert c["fraction_no_go"] == 0.0, (
+                f"{scene['scene_id']}/{ice_class}: la rotta attraversa "
+                f"{100 * c['fraction_no_go']:.0f}% di celle vietate")
+            assert c["rio_min"] is not None and c["rio_min"] >= 0, (
+                f"{scene['scene_id']}/{ice_class}: RIO minimo {c['rio_min']}")
+            checked += 1
+    assert checked, "nessuna rotta verificata"
+
+
+def test_the_layer_that_decides_is_the_one_shown_first():
+    """RIO leads. The class map cannot show passability, and leading with it is
+    what made the route look illegal to the first person who looked."""
+    from iceroute.demo.app import LAYERS
+
+    first = next(iter(LAYERS))
+    assert first.startswith("RIO"), f"il primo livello è {first!r}, non RIO"
+    assert LAYERS[first][1], "il livello RIO deve poter mostrare le rotte"
+
+
+def test_concentration_is_available_as_its_own_layer():
+    """Without it the demo can assert why the route is legal but not show it."""
+    from iceroute.demo.app import LAYERS
+
+    assert "Concentrazione" in LAYERS
+    assert LAYERS["Concentrazione"] == ("sic", True)

@@ -249,6 +249,67 @@ def speed_limit_kn(ice_class: str, operation: Operation) -> float | None:
     return None
 
 
+def conditions_along(
+    cells: list,
+    sod: np.ndarray,
+    sic: np.ndarray | None,
+    rio: np.ndarray,
+    ice_class: str,
+    class_names: list[str],
+) -> dict:
+    """What the ice is actually like under a route, cell by cell.
+
+    This exists because of an objection the demo invites and cannot answer from
+    what is on screen: *your route goes straight through the white, and the
+    legend says the white is thick ice.*
+
+    It does, and the route is still legal, because the class raster carries only
+    half of the POLARIS decision. RIO is ``C x RIV(type) + (10 - C) x
+    RIV(ice free)`` — ice **type** and ice **concentration**. A cell whose
+    dominant type is heavy multi-year ice at 3/10 concentration scores
+    ``3(-3) + 7(+3) = +12`` and is normal operation; the same type at 8/10
+    scores ``8(-3) + 2(+3) = -18`` and is forbidden. Identical colour on a class
+    map, opposite verdict.
+
+    So the numbers that settle it are measured here, where the rasters are in
+    hand, and shown next to the map. On 20180707/PC6 two thirds of our route
+    crosses thick ice at a median 3/10, RIO +12, every cell at RIO >= 0 — while
+    the forbidden cells of the direct track are the same ice type at 8/10.
+    """
+    if not cells:
+        return {}
+    rr = np.array([c[0] for c in cells])
+    cc = np.array([c[1] for c in cells])
+    s, r = np.asarray(sod)[rr, cc], np.asarray(rio)[rr, cc]
+    codes = classify_rio(r, ice_class)
+    finite = np.isfinite(r)
+
+    counts = {name: int((s == i).sum()) for i, name in enumerate(class_names)}
+    out = {
+        "n_cells": len(cells),
+        "by_class": {k: v for k, v in counts.items() if v},
+        "rio_min": float(r[finite].min()) if finite.any() else None,
+        "rio_median": float(np.median(r[finite])) if finite.any() else None,
+        "fraction_normal": float((codes == 0).mean()),
+        "fraction_elevated": float((codes == 1).mean()),
+        "fraction_no_go": float((codes == 2).mean()),
+    }
+
+    # Concentration on the cells whose ice *type* looks alarming: the single
+    # number that answers the objection.
+    worst = len(class_names) - 1
+    thick = s == worst
+    if sic is not None and thick.any():
+        conc = np.clip(np.asarray(sic, dtype="float64")[rr, cc][thick], 0.0, 10.0)
+        out["worst_class"] = class_names[worst]
+        out["worst_class_cells"] = int(thick.sum())
+        out["worst_class_sic_median"] = float(np.median(conc))
+        out["worst_class_sic_max"] = float(conc.max())
+        if finite[thick].any():
+            out["worst_class_rio_median"] = float(np.median(r[thick][finite[thick]]))
+    return out
+
+
 def summarise(rio: np.ndarray, ice_class: str) -> dict:
     """Summary of a RIO raster, for the demo KPI card and metrics.json."""
     codes = classify_rio(rio, ice_class)

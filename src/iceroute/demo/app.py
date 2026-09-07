@@ -81,11 +81,24 @@ RIO_LEVELS = [("Navigazione normale", "#2ecc71"), ("Rischio elevato", "#f1c40f")
 # mean nothing there. Rather than quietly not drawing — the failure this whole
 # feature exists to fix — the UI says why the tracks are unavailable.
 LAYERS = {
+    "RIO — dove si può andare": ("rio_{ice_class}", True),
+    "Tipo di ghiaccio": ("mask_geo", True),
+    "Concentrazione": ("sic", True),
     "SAR": ("sar", False),
-    "Maschera del ghiaccio": ("mask_geo", True),
-    "RIO": ("rio_{ice_class}", True),
     "Carta di riferimento": ("mask_truth", False),
 }
+# RIO leads, and the class map is no longer called "the ice mask".
+#
+# Both changes come from watching someone read the old default and reach the
+# wrong conclusion out loud: the route crosses a lot of white, the legend said
+# "ghiaccio spesso", so the route looked illegal. It is not — those cells are
+# thick ice at 3/10 concentration, RIO +12 — but the class map cannot show that,
+# because POLARIS decides on type *times* concentration and the class map is
+# only the type. Leading with the layer that carries the actual decision, and
+# naming the other two for what they each are, stops the demo from inviting an
+# objection it then has to talk its way out of.
+SIC_LEGEND = [("0/10 — acqua libera", "#181626"), ("3/10", "#7c2a68"),
+              ("6/10", "#de5c42"), ("10/10 — copertura totale", "#fff078")]
 ROUTE_MODES = {"Rotta diretta": "baseline", "IceRoute": "iceroute",
                "Entrambe": "both", "Nessuna": "none"}
 ROUTE_LEGEND = {
@@ -407,7 +420,7 @@ def main() -> None:
                           for group in shown for n, c in group)
                 + "</div>", unsafe_allow_html=True)
 
-        if layer == "Maschera del ghiaccio":
+        if layer == "Tipo di ghiaccio":
             st.markdown(
                 '<div class="legend">'
                 + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
@@ -415,16 +428,32 @@ def main() -> None:
                 + "</div>", unsafe_allow_html=True)
             st.caption(
                 "Maschera **predetta dal modello**, non la carta dell'analista, "
-                "riproiettata in EPSG:3413 a 500 m. È su questa che è calcolata "
-                "la rotta, ed è per questo che le rotte si disegnano qui."
+                "riproiettata in EPSG:3413 a 500 m."
             )
-        elif layer == "RIO":
+            conditions_note(entry, ice_class)
+        elif layer.startswith("RIO"):
             st.markdown(
                 '<div class="legend">'
                 + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
                           for n, c in RIO_LEVELS)
                 + "</div>", unsafe_allow_html=True)
-            st.caption(f"Risk Index Outcome per una nave {ice_class}, soglie IMO.")
+            st.caption(
+                f"Risk Index Outcome per una nave {ice_class}, soglie IMO "
+                f"MSC.1/Circ.1519. **È questo il livello che decide** dove la nave "
+                f"può andare, ed è su questo che A\\* calcola la rotta."
+            )
+        elif layer == "Concentrazione":
+            st.markdown(
+                '<div class="legend">'
+                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
+                          for n, c in SIC_LEGEND)
+                + "</div>", unsafe_allow_html=True)
+            st.caption(
+                "Frazione di mare coperta da ghiaccio, in decimi. È **l'altra metà** "
+                "della decisione POLARIS: `RIO = C × RIV(tipo) + (10−C) × RIV(acqua "
+                "libera)`. Lo stesso tipo di ghiaccio a 3/10 e a 8/10 dà due verdetti "
+                "opposti."
+            )
         elif layer == "Carta di riferimento":
             st.caption(
                 "La carta del ghiaccio disegnata dall'analista, mostrata solo per "
@@ -488,6 +517,37 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 # What the satellite sends
 # ---------------------------------------------------------------------------
+
+
+def conditions_note(entry: dict, ice_class: str) -> None:
+    """Answer "but your route goes through the thick ice" before it is asked.
+
+    On the class map the route crosses a great deal of white, the legend calls
+    the white thick ice, and the obvious conclusion is that the route is
+    illegal. It is not, and the reason is not visible on this layer: POLARIS
+    scores type *times* concentration, and the same ice at 3/10 and at 8/10
+    gives opposite verdicts. The numbers below are measured along the route in
+    precompute, not restated here, so the rebuttal is evidence rather than
+    reassurance.
+    """
+    c = entry.get("conditions") or {}
+    if not c.get("worst_class_cells"):
+        return
+
+    pct = 100 * c["worst_class_cells"] / c["n_cells"]
+    normal = 100 * (c.get("fraction_normal") or 0.0)
+    st.info(
+        f"**La rotta attraversa il bianco, ed è regolare.** {pct:.0f}% delle sue celle "
+        f"sono classificate «{c['worst_class'].lower()}» — ma a una concentrazione "
+        f"mediana di **{c['worst_class_sic_median']:.0f}/10**, che dà "
+        f"RIO **{fmt(c.get('worst_class_rio_median'), '{:+.0f}')}**: navigazione normale.\n\n"
+        f"POLARIS non decide sul tipo di ghiaccio ma su "
+        f"`RIO = C × RIV(tipo) + (10−C) × RIV(acqua libera)`. Questo livello mostra "
+        f"solo il tipo: apri **Concentrazione** per l'altra metà, o **RIO** per il "
+        f"verdetto.\n\n"
+        f"Sull'intera rotta: **{normal:.0f}% delle celle in navigazione normale**, "
+        f"RIO minimo {fmt(c.get('rio_min'), '{:+.0f}')} per una nave {ice_class}."
+    )
 
 
 def downlink_panel(scene: dict, entry: dict) -> None:

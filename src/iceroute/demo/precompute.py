@@ -43,7 +43,13 @@ from iceroute.routing.astar import NoRouteFound, find_route
 from iceroute.routing.baseline import compare, geodesic_baseline
 from iceroute.routing.cost import build_cost_grid, build_land_mask, speed_model_from_config
 from iceroute.routing.geocode import geocode_scene
-from iceroute.routing.polaris import PolarisTable, classify_rio, compute_rio, summarise
+from iceroute.routing.polaris import (
+    PolarisTable,
+    classify_rio,
+    compute_rio,
+    conditions_along,
+    summarise,
+)
 from iceroute.routing.simplify import simplify_route
 from iceroute.routing.waypoints import choose_waypoints, waypoints_from_config
 
@@ -57,6 +63,22 @@ CLASS_COLOURS = {
     2: (255, 255, 255),   # ghiaccio spesso — bianco
 }
 NODATA_COLOUR = (26, 26, 26)
+
+# Sea ice concentration, in tenths. A separate hue family on purpose: it must
+# not be mistaken for either the ice-class palette (blue/cyan/white) or the RIO
+# one (green/yellow/red), because its whole job is to be the *third* thing —
+# the half of the POLARIS decision that neither of those shows.
+#
+# This layer exists because of a real failure. The demo drew routes over the
+# class mask, the mask calls a whole third of the scene "thick ice", and the
+# route crosses it — which reads as a bug and is not one: those cells are at
+# 3/10 concentration, RIO +12. Without a concentration layer the demo could not
+# show why, only assert it.
+SIC_COLOURS = {
+    0: (24, 22, 38), 1: (52, 30, 74), 2: (86, 36, 98), 3: (124, 42, 104),
+    4: (160, 52, 98), 5: (194, 68, 84), 6: (222, 92, 66), 7: (240, 124, 48),
+    8: (250, 162, 36), 9: (252, 202, 48), 10: (255, 240, 120),
+}
 
 # RIO is rendered around the two POLARIS decision boundaries, not on a smooth
 # ramp: the eye should read "may I go here", not "what number is this".
@@ -132,6 +154,16 @@ def colour_mask(labels: np.ndarray, valid: np.ndarray) -> np.ndarray:
     out[:] = NODATA_COLOUR
     for cls, rgb in CLASS_COLOURS.items():
         out[(labels == cls) & valid] = rgb
+    return out
+
+
+def colour_sic(sic: np.ndarray, valid: np.ndarray) -> np.ndarray:
+    """RGB rendering of ice concentration in tenths."""
+    conc = np.clip(np.rint(np.asarray(sic, dtype="float64")), 0, 10).astype("int64")
+    out = np.zeros((*conc.shape, 3), dtype="uint8")
+    out[:] = NODATA_COLOUR
+    for tenth, rgb in SIC_COLOURS.items():
+        out[(conc == tenth) & valid] = rgb
     return out
 
 
@@ -265,6 +297,10 @@ def process_scene(
     assets.files["mask_geo"] = save_png(
         colour_mask(geo.sod, geo.mask_valid), img_dir / f"{stem}_maskgeo.png", downscale=1
     )
+    if geo.sic is not None:
+        assets.files["sic"] = save_png(
+            colour_sic(geo.sic, geo.mask_valid), img_dir / f"{stem}_sic.png", downscale=1
+        )
 
     step("RIO POLARIS e griglia di costo")
     rios, costs = {}, {}
@@ -351,6 +387,12 @@ def process_scene(
         ov = overlay_mod.build(geo.grid, route, simple, base, wp.start, wp.goal)
         ov_path.write_text(json.dumps(ov))
         entry_out["separation"] = ov.get("separation") or {}
+        # The answer to "but your route goes through the thick ice". Measured
+        # here, where the rasters exist, so the UI states it instead of the
+        # audience inferring the opposite from a class map.
+        entry_out["conditions"] = conditions_along(
+            route.cells, geo.sod, geo.sic, rio, ic, CLASS_NAMES
+        )
 
         entry_out.update({
             "route_exists": True,
