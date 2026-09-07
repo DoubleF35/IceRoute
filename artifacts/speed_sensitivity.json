@@ -1,0 +1,749 @@
+{
+  "speeds_kn": [
+    10.0,
+    12.0,
+    14.2,
+    16.0,
+    19.5
+  ],
+  "aggregate": {
+    "n_series": 15,
+    "hours_relative_spread_median": 0.9500000000000005,
+    "hours_relative_spread_max": 0.950000000000002,
+    "saved_percent_spread_median_points": 0.0,
+    "saved_percent_spread_max_points": 0.0,
+    "n_comparable_series": 2
+  },
+  "per_scene": [
+    {
+      "scene_id": "20180707T113313_cis_prep.nc",
+      "by_class": {
+        "PC6": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 18.73596208517967,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 15.613301737649728,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 13.194339496605398,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 11.709976303237282,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 9.60818568470752,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "PC7": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 18.73596208517967,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 15.613301737649728,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 13.194339496605398,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 11.709976303237282,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 9.60818568470752,
+            "distance_km": 346.989718042134,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "IA": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 18.8284388878368,
+            "distance_km": 348.70238694771507,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 15.69036573986401,
+            "distance_km": 348.70238694771507,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 13.259464005518874,
+            "distance_km": 348.70238694771507,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 11.767774304897989,
+            "distance_km": 348.70238694771507,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 9.65560968607015,
+            "distance_km": 348.70238694771507,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "20180917T121813_cis_prep.nc",
+      "by_class": {
+        "PC6": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 30.495153795057167,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 25.4126281625476,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 21.475460419054333,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 19.059471121910722,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 15.638540407721615,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "PC7": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 30.495153795057167,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 25.4126281625476,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 21.475460419054333,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 19.059471121910722,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 15.638540407721615,
+            "distance_km": 564.7697603619973,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "IA": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 30.528923407882,
+            "distance_km": 565.3951730512003,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 25.44076950656835,
+            "distance_km": 565.3951730512003,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 21.49924183653664,
+            "distance_km": 565.3951730512003,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 19.080577129926272,
+            "distance_km": 565.3951730512003,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 15.655858157888218,
+            "distance_km": 565.3951730512003,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "20200701T114012_cis_prep.nc",
+      "by_class": {
+        "PC6": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 28.498714717526873,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 23.748928931272385,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 20.069517406709046,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 17.81169669845427,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 14.61472549616763,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "PC7": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 28.498714717526873,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 23.748928931272385,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 20.069517406709046,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 17.81169669845427,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 14.61472549616763,
+            "distance_km": 527.7957405891613,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "IA": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 29.170201073113905,
+            "distance_km": 540.2316571508518,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 24.308500894261588,
+            "distance_km": 540.2316571508518,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 20.542395121911213,
+            "distance_km": 540.2316571508518,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 18.231375670696174,
+            "distance_km": 540.2316571508518,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 14.959077473391751,
+            "distance_km": 540.2316571508518,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "20201013T080448_dmi_prep.nc",
+      "by_class": {
+        "PC6": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 26.940235118008385,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 26.681,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 22.45019593167366,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 22.235,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.97199656197773,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 18.79,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.837646948755232,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 16.676,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.815505188722238,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 13.683,
+            "saved_percent": -0.97
+          }
+        ],
+        "PC7": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 26.940235118008385,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 26.681,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 22.45019593167366,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 22.235,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.97199656197773,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 18.79,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.837646948755232,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 16.676,
+            "saved_percent": -0.97
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.815505188722238,
+            "distance_km": 498.9327233417536,
+            "baseline_feasible": true,
+            "baseline_hours": 13.683,
+            "saved_percent": -0.97
+          }
+        ],
+        "IA": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 26.968933869949836,
+            "distance_km": 499.4642237685291,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 22.474111558291547,
+            "distance_km": 499.4642237685291,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.99220695066891,
+            "distance_km": 499.4642237685291,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.855583668718634,
+            "distance_km": 499.4642237685291,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.830222497410158,
+            "distance_km": 499.4642237685291,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "20210506T075557_dmi_prep.nc",
+      "by_class": {
+        "PC6": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 25.72357523615752,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 21.436312696797927,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.115193828279946,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.07723452259845,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.191577044183347,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "PC7": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 25.72357523615752,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 21.436312696797927,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.115193828279946,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.07723452259845,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.191577044183347,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ],
+        "IA": [
+          {
+            "open_water_speed_kn": 10.0,
+            "route_exists": true,
+            "hours": 25.72357523615752,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 12.0,
+            "route_exists": true,
+            "hours": 21.436312696797927,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 14.2,
+            "route_exists": true,
+            "hours": 18.115193828279946,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 16.0,
+            "route_exists": true,
+            "hours": 16.07723452259845,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          },
+          {
+            "open_water_speed_kn": 19.5,
+            "route_exists": true,
+            "hours": 13.191577044183347,
+            "distance_km": 476.40020179643375,
+            "baseline_feasible": false,
+            "baseline_hours": null,
+            "saved_percent": null
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,1 +1,1 @@
-configs/train3.yaml
+configs/train3_lovasz.yaml

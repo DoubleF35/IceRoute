@@ -1,0 +1,3010 @@
+{
+  "evaluation": {
+    "checkpoint": "artifacts/models/unet3lov_fp32.pt",
+    "checkpoint_epoch": 19,
+    "split": "test_ufficiale",
+    "split_bias": "Stima NON DISTORTA: set di test ufficiale AI4Arctic, mai usato per training, selezione del modello o scelta delle scene. \u00c8 il numero da citare nel pitch.",
+    "device": "cuda",
+    "n_parameters": 1964131,
+    "channels": [
+      "hh",
+      "hv",
+      "incidence_angle"
+    ],
+    "scenes": {
+      "aggregate": {
+        "miou": 0.5323739194078382,
+        "n_classes_scored": 3,
+        "n_classes_predicted_absent": 0,
+        "accuracy": 0.8132723967799471,
+        "binary_accuracy": 0.9059047128567453,
+        "binary_iou": 0.8052770941859089,
+        "per_class": {
+          "Acqua libera": {
+            "iou": 0.8459647897028117,
+            "f1": 0.9165557159289117,
+            "accuracy": 0.9281036356917002,
+            "support_px": 168151799
+          },
+          "Ghiaccio sottile": {
+            "iou": 0.13646230629348297,
+            "f1": 0.24015280671920952,
+            "accuracy": 0.19988507525557014,
+            "support_px": 24779694
+          },
+          "Ghiaccio spesso": {
+            "iou": 0.61469466222722,
+            "f1": 0.761375728311809,
+            "accuracy": 0.7755917872021919,
+            "support_px": 109062176
+          }
+        },
+        "confusion_matrix": [
+          [
+            156062296,
+            1990858,
+            10098645
+          ],
+          [
+            1378082,
+            4953091,
+            18448521
+          ],
+          [
+            14948596,
+            9525852,
+            84587728
+          ]
+        ]
+      },
+      "per_scene": [
+        {
+          "scene_shape": [
+            5003,
+            5229
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.693,
+          "peak_accumulator_mb": 20.43,
+          "naive_accumulator_mb": 399.18,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180124T194759_dmi_prep.nc",
+          "region": "dmi:SouthEast",
+          "valid_fraction": 0.3463,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 9058984,
+                "rio_mae": 0.274,
+                "rio_bias": -0.2041,
+                "rio_rmse": 3.0806,
+                "operational_agreement": 0.9942,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.00581,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    9006364,
+                    0,
+                    52620,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 9058984,
+                "rio_mae": 0.274,
+                "rio_bias": -0.2041,
+                "rio_rmse": 3.0806,
+                "operational_agreement": 0.9942,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.00581,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    9006364,
+                    0,
+                    52620,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 9058984,
+                "rio_mae": 0.3512,
+                "rio_bias": -0.2464,
+                "rio_rmse": 3.8659,
+                "operational_agreement": 0.9942,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.00581,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    9006364,
+                    0,
+                    52620,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.0,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.47435545061858003,
+          "binary_accuracy": 0.9439749534826422
+        },
+        {
+          "scene_shape": [
+            4996,
+            5319
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.337,
+          "peak_accumulator_mb": 20.78,
+          "naive_accumulator_mb": 405.48,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180623T114935_cis_prep.nc",
+          "region": "cis:SGRDIFOXE",
+          "valid_fraction": 0.9477,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 25184135,
+                "rio_mae": 23.2631,
+                "rio_bias": 23.2631,
+                "rio_rmse": 36.5161,
+                "operational_agreement": 0.589,
+                "unsafe_fraction": 0.41105,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    3436847,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    10351930,
+                    0,
+                    11395358,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 25184135,
+                "rio_mae": 23.2631,
+                "rio_bias": 23.2631,
+                "rio_rmse": 36.5161,
+                "operational_agreement": 0.589,
+                "unsafe_fraction": 0.41105,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    3436847,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    10351930,
+                    0,
+                    11395358,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 25184135,
+                "rio_mae": 30.7849,
+                "rio_bias": 30.7849,
+                "rio_rmse": 48.4485,
+                "operational_agreement": 0.5871,
+                "unsafe_fraction": 0.41292,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    1462115,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    10398912,
+                    0,
+                    13323108,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.41292,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.30350580382264086,
+          "binary_accuracy": 0.6490864585978434
+        },
+        {
+          "scene_shape": [
+            4997,
+            5351
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.35,
+          "peak_accumulator_mb": 20.9,
+          "naive_accumulator_mb": 408.0,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180707T113313_cis_prep.nc",
+          "region": "cis:SGRDIFOXE",
+          "valid_fraction": 0.5731,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 15323865,
+                "rio_mae": 4.2207,
+                "rio_bias": 4.2207,
+                "rio_rmse": 14.0343,
+                "operational_agreement": 0.9254,
+                "unsafe_fraction": 0.07459,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    9661525,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1143011,
+                    0,
+                    4519329,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 15323865,
+                "rio_mae": 4.2207,
+                "rio_bias": 4.2207,
+                "rio_rmse": 14.0343,
+                "operational_agreement": 0.9254,
+                "unsafe_fraction": 0.07459,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    9661525,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1143011,
+                    0,
+                    4519329,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 15323865,
+                "rio_mae": 5.5263,
+                "rio_bias": 5.5263,
+                "rio_rmse": 18.4917,
+                "operational_agreement": 0.9204,
+                "unsafe_fraction": 0.07963,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    6632026,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1220294,
+                    0,
+                    7471545,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.07963,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.7065095400620878,
+          "binary_accuracy": 0.8836692309675137
+        },
+        {
+          "scene_shape": [
+            4999,
+            5260
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.354,
+          "peak_accumulator_mb": 20.55,
+          "naive_accumulator_mb": 401.23,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180716T110418_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.7383,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 19413593,
+                "rio_mae": 1.3641,
+                "rio_bias": 1.3641,
+                "rio_rmse": 6.8211,
+                "operational_agreement": 0.987,
+                "unsafe_fraction": 0.01301,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    6091887,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    33098,
+                    3375183,
+                    0,
+                    0
+                  ],
+                  [
+                    219387,
+                    0,
+                    9694038,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 19413593,
+                "rio_mae": 1.3641,
+                "rio_bias": 1.3641,
+                "rio_rmse": 6.8211,
+                "operational_agreement": 0.987,
+                "unsafe_fraction": 0.01301,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    6091887,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    33098,
+                    3375183,
+                    0,
+                    0
+                  ],
+                  [
+                    219387,
+                    0,
+                    9694038,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 19413593,
+                "rio_mae": 1.7889,
+                "rio_bias": 1.7889,
+                "rio_rmse": 8.9542,
+                "operational_agreement": 0.9651,
+                "unsafe_fraction": 0.03494,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    4132060,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    678380,
+                    0,
+                    14603153,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.03494,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.8164352195175723,
+          "binary_accuracy": 0.9374197244168042
+        },
+        {
+          "scene_shape": [
+            5357,
+            5291
+          ],
+          "n_tiles": 576,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.476,
+          "peak_accumulator_mb": 20.67,
+          "naive_accumulator_mb": 432.49,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180903T123331_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.2316,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 6563415,
+                "rio_mae": 0.3507,
+                "rio_bias": 0.3507,
+                "rio_rmse": 2.4403,
+                "operational_agreement": 0.9958,
+                "unsafe_fraction": 0.00424,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 42.0,
+                "level_confusion": [
+                  [
+                    4973202,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    25826,
+                    1279528,
+                    0,
+                    0
+                  ],
+                  [
+                    2006,
+                    0,
+                    282853,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 42.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 6563415,
+                "rio_mae": 0.3507,
+                "rio_bias": 0.3507,
+                "rio_rmse": 2.4403,
+                "operational_agreement": 0.9958,
+                "unsafe_fraction": 0.00424,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 42.0,
+                "level_confusion": [
+                  [
+                    4973202,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    25826,
+                    1279528,
+                    0,
+                    0
+                  ],
+                  [
+                    2006,
+                    0,
+                    282853,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 42.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 6563415,
+                "rio_mae": 0.4561,
+                "rio_bias": 0.4561,
+                "rio_rmse": 3.177,
+                "operational_agreement": 0.9958,
+                "unsafe_fraction": 0.00424,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 56.0,
+                "level_confusion": [
+                  [
+                    4680003,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    27832,
+                    0,
+                    1855580,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 56.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00424,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.7380998853945362,
+          "binary_accuracy": 0.8406462184701105
+        },
+        {
+          "scene_shape": [
+            4999,
+            5285
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.343,
+          "peak_accumulator_mb": 20.64,
+          "naive_accumulator_mb": 403.13,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20180917T121813_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.6633,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 17523516,
+                "rio_mae": 0.5438,
+                "rio_bias": 0.5438,
+                "rio_rmse": 2.6249,
+                "operational_agreement": 0.9993,
+                "unsafe_fraction": 0.00066,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    17178149,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    11627,
+                    0,
+                    333740,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 17523516,
+                "rio_mae": 0.5438,
+                "rio_bias": 0.5438,
+                "rio_rmse": 2.6249,
+                "operational_agreement": 0.9993,
+                "unsafe_fraction": 0.00066,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    17178149,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    11627,
+                    0,
+                    333740,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 17523516,
+                "rio_mae": 0.7141,
+                "rio_bias": 0.7141,
+                "rio_rmse": 3.4516,
+                "operational_agreement": 0.997,
+                "unsafe_fraction": 0.00295,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    16519359,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    51768,
+                    0,
+                    952389,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00295,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.7753783494406559,
+          "binary_accuracy": 0.9131023705516632
+        },
+        {
+          "scene_shape": [
+            2468,
+            5244
+          ],
+          "n_tiles": 264,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 1.151,
+          "peak_accumulator_mb": 20.48,
+          "naive_accumulator_mb": 197.48,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20190406T102029_cis_prep.nc",
+          "region": "cis:SGRDINFLD",
+          "valid_fraction": 0.6,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 7764703,
+                "rio_mae": 14.6648,
+                "rio_bias": -1.3696,
+                "rio_rmse": 21.363,
+                "operational_agreement": 0.5514,
+                "unsafe_fraction": 0.15556,
+                "overcautious_fraction": 0.29299,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    2824431,
+                    1009250,
+                    1265746,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1207904,
+                    0,
+                    1457372,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 7764703,
+                "rio_mae": 14.6648,
+                "rio_bias": -1.3696,
+                "rio_rmse": 21.363,
+                "operational_agreement": 0.5514,
+                "unsafe_fraction": 0.15556,
+                "overcautious_fraction": 0.29299,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    2824431,
+                    1009250,
+                    1265746,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1207904,
+                    0,
+                    1457372,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 7764703,
+                "rio_mae": 18.3756,
+                "rio_bias": -1.6674,
+                "rio_rmse": 26.7453,
+                "operational_agreement": 0.5514,
+                "unsafe_fraction": 0.15556,
+                "overcautious_fraction": 0.29299,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    2824431,
+                    0,
+                    2274996,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1207904,
+                    0,
+                    1457372,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.15556,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.44105293014074703,
+          "binary_accuracy": 0.9715082469992735
+        },
+        {
+          "scene_shape": [
+            5354,
+            5188
+          ],
+          "n_tiles": 576,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.442,
+          "peak_accumulator_mb": 20.27,
+          "naive_accumulator_mb": 423.84,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20190810T110422_dmi_prep.nc",
+          "region": "dmi:NorthWest",
+          "valid_fraction": 0.5225,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 14511881,
+                "rio_mae": 0.0,
+                "rio_bias": 0.0,
+                "rio_rmse": 0.0,
+                "operational_agreement": 1.0,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    14511881,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 14511881,
+                "rio_mae": 0.0,
+                "rio_bias": 0.0,
+                "rio_rmse": 0.0,
+                "operational_agreement": 1.0,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    14511881,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 14511881,
+                "rio_mae": 0.0,
+                "rio_bias": 0.0,
+                "rio_rmse": 0.0,
+                "operational_agreement": 1.0,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    14511881,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.0,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.9291977380465013,
+          "binary_accuracy": 0.9291977380465013
+        },
+        {
+          "scene_shape": [
+            4993,
+            5228
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.344,
+          "peak_accumulator_mb": 20.42,
+          "naive_accumulator_mb": 398.31,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20191011T131651_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.459,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 11981540,
+                "rio_mae": 2.9506,
+                "rio_bias": -2.6075,
+                "rio_rmse": 7.6811,
+                "operational_agreement": 0.9692,
+                "unsafe_fraction": 0.0005,
+                "overcautious_fraction": 0.03028,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11324009,
+                    33819,
+                    329004,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    5960,
+                    0,
+                    288748,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 11981540,
+                "rio_mae": 2.9506,
+                "rio_bias": -2.6075,
+                "rio_rmse": 7.6811,
+                "operational_agreement": 0.9692,
+                "unsafe_fraction": 0.0005,
+                "overcautious_fraction": 0.03028,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11324009,
+                    33819,
+                    329004,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    5960,
+                    0,
+                    288748,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 11981540,
+                "rio_mae": 3.7261,
+                "rio_bias": -3.2215,
+                "rio_rmse": 9.6396,
+                "operational_agreement": 0.9692,
+                "unsafe_fraction": 0.0005,
+                "overcautious_fraction": 0.03028,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    11324009,
+                    0,
+                    362823,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    5960,
+                    0,
+                    288748,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.0005,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.3707378777923845,
+          "binary_accuracy": 0.8772310571095201
+        },
+        {
+          "scene_shape": [
+            5124,
+            5236
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.405,
+          "peak_accumulator_mb": 20.45,
+          "naive_accumulator_mb": 409.38,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20200217T102731_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.6995,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 18766337,
+                "rio_mae": 10.3774,
+                "rio_bias": -8.0409,
+                "rio_rmse": 19.0896,
+                "operational_agreement": 0.7163,
+                "unsafe_fraction": 0.01583,
+                "overcautious_fraction": 0.26788,
+                "worst_unsafe_delta": 54.0,
+                "level_confusion": [
+                  [
+                    12593945,
+                    1322644,
+                    3704389,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    297087,
+                    0,
+                    848272,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 18766337,
+                "rio_mae": 10.3774,
+                "rio_bias": -8.0409,
+                "rio_rmse": 19.0896,
+                "operational_agreement": 0.7163,
+                "unsafe_fraction": 0.01583,
+                "overcautious_fraction": 0.26788,
+                "worst_unsafe_delta": 54.0,
+                "level_confusion": [
+                  [
+                    12593945,
+                    1322644,
+                    3704389,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    297087,
+                    0,
+                    848272,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 18766337,
+                "rio_mae": 13.1069,
+                "rio_bias": -9.9159,
+                "rio_rmse": 24.0099,
+                "operational_agreement": 0.7163,
+                "unsafe_fraction": 0.01583,
+                "overcautious_fraction": 0.26788,
+                "worst_unsafe_delta": 72.0,
+                "level_confusion": [
+                  [
+                    12593945,
+                    0,
+                    5027033,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    297087,
+                    0,
+                    848272,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 72.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.01583,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.43722616338999604,
+          "binary_accuracy": 0.9543731416525238
+        },
+        {
+          "scene_shape": [
+            4999,
+            5245
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.364,
+          "peak_accumulator_mb": 20.49,
+          "naive_accumulator_mb": 400.08,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20200319T101935_cis_prep.nc",
+          "region": "cis:SGRDINFLD",
+          "valid_fraction": 0.5894,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 15454537,
+                "rio_mae": 4.9185,
+                "rio_bias": 0.7562,
+                "rio_rmse": 14.4137,
+                "operational_agreement": 0.8803,
+                "unsafe_fraction": 0.06767,
+                "overcautious_fraction": 0.05203,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    10572277,
+                    0,
+                    804090,
+                    0
+                  ],
+                  [
+                    371067,
+                    786251,
+                    0,
+                    0
+                  ],
+                  [
+                    674733,
+                    0,
+                    2246119,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 15454537,
+                "rio_mae": 4.9185,
+                "rio_bias": 0.7562,
+                "rio_rmse": 14.4137,
+                "operational_agreement": 0.8803,
+                "unsafe_fraction": 0.06767,
+                "overcautious_fraction": 0.05203,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    10572277,
+                    0,
+                    804090,
+                    0
+                  ],
+                  [
+                    371067,
+                    786251,
+                    0,
+                    0
+                  ],
+                  [
+                    674733,
+                    0,
+                    2246119,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 15454537,
+                "rio_mae": 6.2772,
+                "rio_bias": 1.0742,
+                "rio_rmse": 18.4519,
+                "operational_agreement": 0.8803,
+                "unsafe_fraction": 0.06767,
+                "overcautious_fraction": 0.05203,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    10572277,
+                    0,
+                    804090,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1045800,
+                    0,
+                    3032370,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.06767,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.5356145219726048,
+          "binary_accuracy": 0.9526847682334321
+        },
+        {
+          "scene_shape": [
+            5002,
+            5277
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.352,
+          "peak_accumulator_mb": 20.61,
+          "naive_accumulator_mb": 402.76,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20200701T114012_cis_prep.nc",
+          "region": "cis:SGRDIFOXE",
+          "valid_fraction": 0.523,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 13804754,
+                "rio_mae": 3.2838,
+                "rio_bias": 3.2838,
+                "rio_rmse": 9.1199,
+                "operational_agreement": 0.982,
+                "unsafe_fraction": 0.01802,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11832317,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    248742,
+                    0,
+                    1723695,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 13804754,
+                "rio_mae": 3.2838,
+                "rio_bias": 3.2838,
+                "rio_rmse": 9.1199,
+                "operational_agreement": 0.982,
+                "unsafe_fraction": 0.01802,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11832317,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    248742,
+                    0,
+                    1723695,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 13804754,
+                "rio_mae": 4.1826,
+                "rio_bias": 4.1826,
+                "rio_rmse": 11.6689,
+                "operational_agreement": 0.8688,
+                "unsafe_fraction": 0.13116,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    7439612,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1810611,
+                    0,
+                    4554531,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.13116,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.7145564642933633,
+          "binary_accuracy": 0.8935415292442009
+        },
+        {
+          "scene_shape": [
+            3542,
+            5298
+          ],
+          "n_tiles": 384,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 1.675,
+          "peak_accumulator_mb": 20.7,
+          "naive_accumulator_mb": 286.34,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20200719T123046_cis_prep.nc",
+          "region": "cis:SGRDIFOXE",
+          "valid_fraction": 0.5118,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 9604258,
+                "rio_mae": 7.0466,
+                "rio_bias": 7.0466,
+                "rio_rmse": 16.9497,
+                "operational_agreement": 0.8693,
+                "unsafe_fraction": 0.1307,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    5910160,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1255246,
+                    0,
+                    2438852,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 9604258,
+                "rio_mae": 7.0466,
+                "rio_bias": 7.0466,
+                "rio_rmse": 16.9497,
+                "operational_agreement": 0.8693,
+                "unsafe_fraction": 0.1307,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    5910160,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1255246,
+                    0,
+                    2438852,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 9604258,
+                "rio_mae": 9.1792,
+                "rio_bias": 9.1792,
+                "rio_rmse": 22.1942,
+                "operational_agreement": 0.8607,
+                "unsafe_fraction": 0.13928,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    5202516,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    1337695,
+                    0,
+                    3064047,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.13928,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.622888891720647,
+          "binary_accuracy": 0.8240736556639774
+        },
+        {
+          "scene_shape": [
+            4996,
+            5244
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.369,
+          "peak_accumulator_mb": 20.48,
+          "naive_accumulator_mb": 399.77,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20201013T080448_dmi_prep.nc",
+          "region": "dmi:CentralEast",
+          "valid_fraction": 0.8124,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 21285313,
+                "rio_mae": 1.6818,
+                "rio_bias": -0.367,
+                "rio_rmse": 7.0513,
+                "operational_agreement": 0.9569,
+                "unsafe_fraction": 0.01256,
+                "overcautious_fraction": 0.03052,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    15344061,
+                    3242,
+                    646339,
+                    0
+                  ],
+                  [
+                    101047,
+                    937065,
+                    0,
+                    0
+                  ],
+                  [
+                    166225,
+                    0,
+                    4087334,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 21285313,
+                "rio_mae": 1.6818,
+                "rio_bias": -0.367,
+                "rio_rmse": 7.0513,
+                "operational_agreement": 0.9569,
+                "unsafe_fraction": 0.01256,
+                "overcautious_fraction": 0.03052,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    15344061,
+                    3242,
+                    646339,
+                    0
+                  ],
+                  [
+                    101047,
+                    937065,
+                    0,
+                    0
+                  ],
+                  [
+                    166225,
+                    0,
+                    4087334,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 21285313,
+                "rio_mae": 2.1632,
+                "rio_bias": -0.3978,
+                "rio_rmse": 8.9999,
+                "operational_agreement": 0.9561,
+                "unsafe_fraction": 0.01335,
+                "overcautious_fraction": 0.03052,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    15049096,
+                    0,
+                    649581,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    284154,
+                    0,
+                    5302482,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.01335,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.5872405278354675,
+          "binary_accuracy": 0.9650138572075496
+        },
+        {
+          "scene_shape": [
+            4998,
+            5297
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.395,
+          "peak_accumulator_mb": 20.69,
+          "naive_accumulator_mb": 403.97,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20210328T202742_dmi_prep.nc",
+          "region": "dmi:CapeFarewell",
+          "valid_fraction": 0.4894,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 12957661,
+                "rio_mae": 0.1496,
+                "rio_bias": 0.1429,
+                "rio_rmse": 2.4395,
+                "operational_agreement": 0.9962,
+                "unsafe_fraction": 0.00369,
+                "overcautious_fraction": 8e-05,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11065252,
+                    0,
+                    1094,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    47812,
+                    0,
+                    1843503,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 12957661,
+                "rio_mae": 0.1496,
+                "rio_bias": 0.1429,
+                "rio_rmse": 2.4395,
+                "operational_agreement": 0.9962,
+                "unsafe_fraction": 0.00369,
+                "overcautious_fraction": 8e-05,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11065252,
+                    0,
+                    1094,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    47812,
+                    0,
+                    1843503,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 12957661,
+                "rio_mae": 0.1896,
+                "rio_bias": 0.1811,
+                "rio_rmse": 3.113,
+                "operational_agreement": 0.9962,
+                "unsafe_fraction": 0.00369,
+                "overcautious_fraction": 8e-05,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    11065252,
+                    0,
+                    1094,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    47812,
+                    0,
+                    1843503,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00369,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.5352456179116339,
+          "binary_accuracy": 0.9111525606357506
+        },
+        {
+          "scene_shape": [
+            5360,
+            5187
+          ],
+          "n_tiles": 576,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.463,
+          "peak_accumulator_mb": 20.26,
+          "naive_accumulator_mb": 424.23,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20210410T201933_dmi_prep.nc",
+          "region": "dmi:CapeFarewell",
+          "valid_fraction": 0.8951,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 24885710,
+                "rio_mae": 0.5081,
+                "rio_bias": 0.5081,
+                "rio_rmse": 2.9403,
+                "operational_agreement": 0.9964,
+                "unsafe_fraction": 0.00362,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 54.0,
+                "level_confusion": [
+                  [
+                    24641897,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    90039,
+                    0,
+                    153774,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 24885710,
+                "rio_mae": 0.5081,
+                "rio_bias": 0.5081,
+                "rio_rmse": 2.9403,
+                "operational_agreement": 0.9964,
+                "unsafe_fraction": 0.00362,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 54.0,
+                "level_confusion": [
+                  [
+                    24641897,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    90039,
+                    0,
+                    153774,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 24885710,
+                "rio_mae": 0.6513,
+                "rio_bias": 0.6513,
+                "rio_rmse": 3.7455,
+                "operational_agreement": 0.9964,
+                "unsafe_fraction": 0.00362,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 72.0,
+                "level_confusion": [
+                  [
+                    24641897,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    90039,
+                    0,
+                    153774,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 72.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00362,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.7053925916482873,
+          "binary_accuracy": 0.9719498057318838
+        },
+        {
+          "scene_shape": [
+            5059,
+            5229
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.342,
+          "peak_accumulator_mb": 20.43,
+          "naive_accumulator_mb": 403.65,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20210430T205436_dmi_prep.nc",
+          "region": "dmi:SouthWest",
+          "valid_fraction": 0.4048,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 10707077,
+                "rio_mae": 0.5854,
+                "rio_bias": -0.3762,
+                "rio_rmse": 4.4976,
+                "operational_agreement": 0.9868,
+                "unsafe_fraction": 0.00161,
+                "overcautious_fraction": 0.01156,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    7586490,
+                    6213,
+                    117539,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    17227,
+                    0,
+                    2979608,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 10707077,
+                "rio_mae": 0.5854,
+                "rio_bias": -0.3762,
+                "rio_rmse": 4.4976,
+                "operational_agreement": 0.9868,
+                "unsafe_fraction": 0.00161,
+                "overcautious_fraction": 0.01156,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    7586490,
+                    6213,
+                    117539,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    17227,
+                    0,
+                    2979608,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 10707077,
+                "rio_mae": 0.7376,
+                "rio_bias": -0.4645,
+                "rio_rmse": 5.6429,
+                "operational_agreement": 0.9868,
+                "unsafe_fraction": 0.00161,
+                "overcautious_fraction": 0.01156,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    7586490,
+                    0,
+                    123752,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    17227,
+                    0,
+                    2979608,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00161,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.5275025813364256,
+          "binary_accuracy": 0.8285505932197929
+        },
+        {
+          "scene_shape": [
+            4234,
+            5222
+          ],
+          "n_tiles": 456,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 1.961,
+          "peak_accumulator_mb": 20.4,
+          "naive_accumulator_mb": 337.37,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20210506T075557_dmi_prep.nc",
+          "region": "dmi:CentralEast",
+          "valid_fraction": 0.8053,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 17806041,
+                "rio_mae": 1.2738,
+                "rio_bias": 1.2738,
+                "rio_rmse": 6.4752,
+                "operational_agreement": 0.9649,
+                "unsafe_fraction": 0.03511,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11353100,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    625222,
+                    0,
+                    5827719,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 17806041,
+                "rio_mae": 1.2738,
+                "rio_bias": 1.2738,
+                "rio_rmse": 6.4752,
+                "operational_agreement": 0.9649,
+                "unsafe_fraction": 0.03511,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    11353100,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    625222,
+                    0,
+                    5827719,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 17806041,
+                "rio_mae": 1.599,
+                "rio_bias": 1.599,
+                "rio_rmse": 8.1285,
+                "operational_agreement": 0.9649,
+                "unsafe_fraction": 0.03511,
+                "overcautious_fraction": 0.0,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    11353100,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    625222,
+                    0,
+                    5827719,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.03511,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.9011068093255317,
+          "binary_accuracy": 0.972885718953472
+        },
+        {
+          "scene_shape": [
+            5001,
+            5237
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.366,
+          "peak_accumulator_mb": 20.46,
+          "naive_accumulator_mb": 399.63,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20210512T214149_cis_prep.nc",
+          "region": "cis:SGRDIEA",
+          "valid_fraction": 0.7051,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 18465701,
+                "rio_mae": 0.4985,
+                "rio_bias": 0.2198,
+                "rio_rmse": 3.6474,
+                "operational_agreement": 0.9944,
+                "unsafe_fraction": 0.00216,
+                "overcautious_fraction": 0.00348,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    14825842,
+                    0,
+                    64333,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    39921,
+                    0,
+                    3535605,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 18465701,
+                "rio_mae": 0.4985,
+                "rio_bias": 0.2198,
+                "rio_rmse": 3.6474,
+                "operational_agreement": 0.9944,
+                "unsafe_fraction": 0.00216,
+                "overcautious_fraction": 0.00348,
+                "worst_unsafe_delta": 60.0,
+                "level_confusion": [
+                  [
+                    14825842,
+                    0,
+                    64333,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    39921,
+                    0,
+                    3535605,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 18465701,
+                "rio_mae": 0.6432,
+                "rio_bias": 0.2948,
+                "rio_rmse": 4.6823,
+                "operational_agreement": 0.9929,
+                "unsafe_fraction": 0.00358,
+                "overcautious_fraction": 0.00348,
+                "worst_unsafe_delta": 80.0,
+                "level_confusion": [
+                  [
+                    14040738,
+                    0,
+                    64333,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    66031,
+                    0,
+                    4294599,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.00358,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.6079905847592039,
+          "binary_accuracy": 0.9670645593145909
+        },
+        {
+          "scene_shape": [
+            4998,
+            5301
+          ],
+          "n_tiles": 552,
+          "tile_size": 256,
+          "overlap": 32,
+          "seconds": 2.386,
+          "peak_accumulator_mb": 20.71,
+          "naive_accumulator_mb": 404.27,
+          "device": "cuda",
+          "batch_size": 8,
+          "warnings": [],
+          "scene_id": "20211212T211242_dmi_prep.nc",
+          "region": "dmi:NorthWest",
+          "valid_fraction": 0.4126,
+          "rio": {
+            "per_ice_class": {
+              "PC6": {
+                "ice_class": "PC6",
+                "n_pixels": 10930648,
+                "rio_mae": 24.6491,
+                "rio_bias": -24.4904,
+                "rio_rmse": 30.6353,
+                "operational_agreement": 0.3557,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.64431,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    3887917,
+                    21987,
+                    7020744,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "PC7": {
+                "ice_class": "PC7",
+                "n_pixels": 10930648,
+                "rio_mae": 24.6491,
+                "rio_bias": -24.4904,
+                "rio_rmse": 30.6353,
+                "operational_agreement": 0.3557,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.64431,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    3887917,
+                    21987,
+                    7020744,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              },
+              "IA": {
+                "ice_class": "IA",
+                "n_pixels": 10930648,
+                "rio_mae": 30.8313,
+                "rio_bias": -30.5932,
+                "rio_rmse": 38.3069,
+                "operational_agreement": 0.3557,
+                "unsafe_fraction": 0.0,
+                "overcautious_fraction": 0.64431,
+                "worst_unsafe_delta": 0.0,
+                "level_confusion": [
+                  [
+                    3887917,
+                    0,
+                    7042731,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "notes": [
+                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                ]
+              }
+            },
+            "worst_unsafe_fraction": 0.0,
+            "operationally_free_confusions": [],
+            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+          },
+          "miou": 0.46731466998596277,
+          "binary_accuracy": 0.9526212901558992
+        }
+      ],
+      "n_scenes": 20,
+      "worst_unsafe_fraction": 0.41292
+    },
+    "warnings": [
+      "mIoU 0.532 sullo schema RIDOTTO a 3 classi. Non confrontabile con la soglia \u00a77.4 di 0.6, che vale per le 6 classi SOD. Il ripiego \u00a77.4 \u00e8 gi\u00e0 attivo."
+    ],
+    "gate_2_metrics_pass": false
+  }
+}
