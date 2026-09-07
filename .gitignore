@@ -40,3 +40,11 @@ docs/reference/*.pdf
 
 # Report di ispezione generati (il PNG di Gate 0.2 si rigenera con `make inspect`)
 artifacts/inspect_*.json
+
+# Copia statica della demo: 2,8 MB rigenerati da `make demo-static` a ogni
+# ricostruzione. Derivata al 100% da data/demo/ e artifacts/metrics.json, quindi
+# versionarla significherebbe un blob nuovo da 2,8 MB per ogni build.
+#
+# ATTENZIONE: è la rete di sicurezza del 7 ottobre. Non essendo in git va copiata
+# altrove a mano (chiavetta, mail a sé stessi) insieme a data/demo/.
+demo.html

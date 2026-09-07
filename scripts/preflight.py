@@ -229,6 +229,28 @@ def check_claims(repo: Path, rep: Report) -> None:
         rep.ok("verdetto sulle affermazioni", "ogni riga ha una misura")
 
 
+def check_standalone(repo: Path, rep: Report) -> None:
+    """The offline copy must exist and must not predate the build it renders.
+
+    Freshness, not existence, is the thing worth checking. A ``demo.html`` left
+    over from before the last precompute would open perfectly, look right, and
+    show the previous model's routes — and it is the file that gets used
+    precisely when nobody is in a position to notice.
+    """
+    page = repo / "demo.html"
+    index = repo / "data/demo/index.json"
+    if not page.exists():
+        rep.warn("copia statica demo.html", "assente: make demo-static")
+        return
+    mb = page.stat().st_size / 1e6
+    if index.exists() and page.stat().st_mtime < index.stat().st_mtime:
+        rep.fail("copia statica demo.html",
+                 f"più vecchia di data/demo/: mostra una build superata. Rilancia "
+                 f"make demo-static ({mb:.1f} MB)")
+    else:
+        rep.ok("copia statica demo.html", f"{mb:.1f} MB, aggiornata")
+
+
 def check_backup_video(repo: Path, rep: Report) -> None:
     vids = list((repo / "artifacts/video").glob("*.mp4")) if (repo / "artifacts/video").exists() else []
     if not vids:
@@ -260,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
         check_routes_are_drawable(args.repo, index, rep)
     check_worst_case_is_worst(args.repo, rep)
     check_claims(args.repo, rep)
+    check_standalone(args.repo, rep)
     check_backup_video(args.repo, rep)
     check_imports(rep)
 

@@ -58,6 +58,7 @@ help:
 	@echo "    make precompute   genera data/demo/"
 	@echo "    make report       artifacts/metrics.json + figure per il deck"
 	@echo "    make demo         avvia la UI  [Gate 4]"
+	@echo "    make demo-static  congela la demo in demo.html: un file, zero dipendenze"
 	@echo "    make video        registra il video di backup 90s"
 	@echo ""
 	@echo "  Qualità"
@@ -175,6 +176,14 @@ report:
 	$(PY) -m iceroute.pitch.metrics
 	$(PY) -m iceroute.pitch.figures
 	$(PY) -m iceroute.pitch.dashboard
+	@$(MAKE) --no-print-directory demo-static
+
+# La demo congelata in un solo file. Non richiede Python, server o rete: è la
+# rete di sicurezza se `make demo` non parte il 7 ottobre.
+.PHONY: demo-static
+demo-static:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.pitch.standalone
 
 .PHONY: demo
 demo:
