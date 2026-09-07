@@ -44,6 +44,7 @@ this silently starts lying.
 from __future__ import annotations
 
 import json
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -99,12 +100,16 @@ def payload(entry: dict, routes_dir: Path, metrics: dict, scene_id: str) -> Payl
     if not sent:
         return None
 
+    # The exact string that is counted is the exact string that is shown.
+    # Pretty-printing it for display would put sixty lines on screen under a
+    # label saying "432 bytes" — and the whole point of the panel is that the
+    # payload is small, which a wall of indented JSON argues against.
     text = json.dumps(sent, separators=(",", ":"))
     feat = sent["features"][0]
     out = Payload(
         route_bytes=len(text.encode()),
         n_waypoints=len(feat.get("geometry", {}).get("coordinates") or []),
-        route_text=json.dumps(sent, indent=1),
+        route_text=textwrap.fill(text, width=78),
     )
 
     per = (metrics.get("compression") or {}).get("per_scene") or []

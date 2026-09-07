@@ -195,7 +195,10 @@ def transit_card(entry: dict, provisional_speed: bool) -> str:
 
     cmp_ = entry["comparison"]
     ours = cmp_["iceroute"]["time_hours"]
-    note = "assume 12 kn in acqua libera (senza fonte)" if provisional_speed else ""
+    # Points at the tab that recomputes this, because otherwise the page shows
+    # two different transit times for the same route and neither says why.
+    note = ("assume 12 kn in acqua libera (senza fonte) — cambiala in "
+            "«Tempo e carburante»") if provisional_speed else ""
 
     if cmp_.get("time_saved_hours") is not None:
         saved = cmp_["time_saved_hours"]
@@ -513,10 +516,13 @@ def downlink_panel(scene: dict, entry: dict) -> None:
     with left:
         st.markdown(f'<table>{body}</table>', unsafe_allow_html=True)
         if p.total_bytes and p.sar_bytes:
+            # "su questa scena", because the card at the top of the page shows
+            # the median across scenes and the two numbers differ.
             st.markdown(
-                kpi("Totale trasmesso", f"{p.total_bytes / 1024:.0f} KB",
+                kpi("Totale trasmesso, su questa scena", f"{p.total_bytes / 1024:.0f} KB",
                     f"contro {p.sar_bytes / 1024**2:.1f} MB di SAR compresso senza perdita "
-                    f"— <b>{p.ratio:.0f}:1</b>"),
+                    f"— <b>{p.ratio:.0f}:1</b>. La scheda in alto riporta la "
+                    f"<b>mediana</b> sulle scene misurate."),
                 unsafe_allow_html=True)
         if p.note:
             st.caption(p.note)
