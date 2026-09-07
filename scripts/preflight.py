@@ -1,0 +1,235 @@
+"""Everything that must be true before the laptop goes on stage. SPEC Gate 4.
+
+This is the check to run the morning of 7 October, with the network off, after
+a reboot — and every time an artefact is regenerated before then.
+
+It is deliberately paranoid about one class of failure: a demo that *looks*
+built because the directories exist. `data/demo/` can hold an index pointing at
+PNGs that were never written, routes from a model that has since been replaced,
+or a carousel scene the evaluation now says is the worst of the set. None of
+those raise an exception. All of them are visible on stage.
+
+What this cannot check is the part of Gate 4 that matters most: three people who
+did not build it using it on their own. No script attests to that.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+from pathlib import Path
+
+import yaml
+
+log = logging.getLogger("preflight")
+
+OK, WARN, FAIL = "  ok  ", " avviso ", " ERRORE "
+
+
+class Report:
+    def __init__(self) -> None:
+        self.rows: list[tuple[str, str, str]] = []
+
+    def add(self, status: str, what: str, detail: str = "") -> None:
+        self.rows.append((status, what, detail))
+
+    def ok(self, what, detail=""):
+        self.add(OK, what, detail)
+
+    def warn(self, what, detail=""):
+        self.add(WARN, what, detail)
+
+    def fail(self, what, detail=""):
+        self.add(FAIL, what, detail)
+
+    @property
+    def failed(self) -> int:
+        return sum(1 for s, _, _ in self.rows if s == FAIL)
+
+    @property
+    def warned(self) -> int:
+        return sum(1 for s, _, _ in self.rows if s == WARN)
+
+
+def check_demo(repo: Path, rep: Report) -> dict:
+    index_path = repo / "data/demo/index.json"
+    if not index_path.exists():
+        rep.fail("data/demo/index.json", "assente: lancia make precompute")
+        return {}
+    index = json.loads(index_path.read_text())
+
+    if not index.get("generated_from_predicted_mask"):
+        rep.fail("rotte dalla maschera predetta",
+                 "l'indice viene da una classifica su ice chart, non dal modello")
+    else:
+        rep.ok("rotte dalla maschera predetta")
+
+    scenes = index.get("scenes") or []
+    carousel = [s for s in scenes if not s.get("worst_case")]
+    worst = [s for s in scenes if s.get("worst_case")]
+    if not carousel:
+        rep.fail("scene nel carosello", "nessuna")
+    else:
+        rep.ok("scene nel carosello", f"{len(carousel)} + {len(worst)} caso peggiore")
+
+    # Every file the UI will try to open, actually opened. The paths are
+    # resolved exactly as app.py resolves them — bare names under images/ and
+    # routes/ — because a check that looks somewhere else proves nothing.
+    #
+    # `files` also carries an "inference_stats" entry that is a JSON blob, not a
+    # filename. It is skipped here, but it should not be in a dict called
+    # `files` at all.
+    missing = []
+    for s in scenes:
+        for key, rel in (s.get("files") or {}).items():
+            if key == "inference_stats" or not isinstance(rel, str) or not rel.endswith(".png"):
+                continue
+            if not (repo / "data/demo/images" / rel).exists():
+                missing.append(f"{s['scene_id'][:14]}/{key}")
+        for ic, entry in (s.get("classes") or {}).items():
+            gj = entry.get("geojson")
+            if gj and not (repo / "data/demo/routes" / gj).exists():
+                missing.append(f"{s['scene_id'][:14]}/{ic}.geojson")
+    if missing:
+        rep.fail("file referenziati dall'indice", f"{len(missing)} mancanti: {missing[:3]}")
+    else:
+        rep.ok("file referenziati dall'indice", "tutti presenti")
+
+    # Leftovers from earlier builds. Harmless to the UI, which only opens what
+    # the index names, but they inflate the one artefact that has to be backed
+    # up before the pitch, and anyone browsing the folder sees scenes that were
+    # dropped. Reported, never deleted: this directory is not under git, so a
+    # wrong guess here is unrecoverable.
+    img_dir = repo / "data/demo/images"
+    if img_dir.exists():
+        referenced = {v for s in scenes for k, v in (s.get("files") or {}).items()
+                      if isinstance(v, str) and v.endswith(".png")}
+        on_disk = list(img_dir.glob("*.png"))
+        orphans = [p for p in on_disk if p.name not in referenced]
+        if orphans:
+            mb = sum(p.stat().st_size for p in orphans) / 1e6
+            rep.warn("immagini orfane in data/demo/images",
+                     f"{len(orphans)} su {len(on_disk)} non sono nell'indice ({mb:.0f} MB)")
+        else:
+            rep.ok("immagini orfane in data/demo/images", "nessuna")
+
+    differ = sum(1 for s in carousel if s.get("routes_differ"))
+    if differ == 0:
+        rep.fail("momento 'cambio classe di nave'",
+                 "nessuna scena lo sostiene: il selettore è teatro")
+    elif differ < 2:
+        rep.warn("momento 'cambio classe di nave'", f"solo {differ} scena su {len(carousel)}")
+    else:
+        rep.ok("momento 'cambio classe di nave'", f"{differ}/{len(carousel)} scene")
+    return index
+
+
+def check_model_is_current(repo: Path, index: dict, rep: Report) -> None:
+    """The demo, the picked config and the evaluation must be the same model.
+
+    They drift apart silently: retraining writes a new checkpoint, the picker
+    changes its mind, and data/demo/ keeps the routes of whatever ran last.
+    """
+    picked = repo / "artifacts/best_config.txt"
+    if not picked.exists():
+        rep.warn("modello scelto", "artifacts/best_config.txt assente")
+        return
+    cfg_path = repo / picked.read_text().strip()
+    if not cfg_path.exists():
+        rep.fail("modello scelto", f"{cfg_path} non esiste")
+        return
+    cfg = yaml.safe_load(cfg_path.read_text())
+    want = (cfg.get("output") or {}).get("best_checkpoint")
+    got = index.get("checkpoint")
+    if got != want:
+        rep.fail("demo allineata al modello scelto",
+                 f"la demo usa {got}, il modello scelto è {want}: rilancia precompute")
+    else:
+        rep.ok("demo allineata al modello scelto", str(want))
+
+
+def check_worst_case_is_worst(repo: Path, rep: Report) -> None:
+    demo_cfg = repo / "configs/demo.yaml"
+    metrics = repo / "artifacts/metrics.json"
+    if not (demo_cfg.exists() and metrics.exists()):
+        return
+    cfg = yaml.safe_load(demo_cfg.read_text())
+    worst_id = (cfg.get("worst_case") or {}).get("id")
+    per = ((json.loads(metrics.read_text()).get("evaluation") or {})
+           .get("scenes") or {}).get("per_scene") or []
+    scored = {r["scene_id"]: (r.get("rio") or {}).get("worst_unsafe_fraction") for r in per}
+    if not worst_id or not isinstance(scored.get(worst_id), float):
+        rep.warn("caso peggiore dichiarato", "non valutato")
+        return
+    offenders = [e["id"] for e in cfg["scenes"]
+                 if isinstance(scored.get(e["id"]), float)
+                 and scored[e["id"]] >= scored[worst_id]]
+    if offenders:
+        rep.fail("il caso peggiore è davvero il peggiore",
+                 f"più permissive nel carosello: {offenders}")
+    else:
+        rep.ok("il caso peggiore è davvero il peggiore",
+               f"{worst_id[:14]} a {scored[worst_id]:.1%}")
+
+
+def check_claims(repo: Path, rep: Report) -> None:
+    claims = repo / "artifacts/claims.md"
+    if not claims.exists():
+        rep.warn("artifacts/claims.md", "assente: lancia make report")
+        return
+    text = claims.read_text()
+    if "non misurat" in text:
+        rep.warn("verdetto sulle affermazioni", "qualche riga non è ancora misurata")
+    else:
+        rep.ok("verdetto sulle affermazioni", "ogni riga ha una misura")
+
+
+def check_backup_video(repo: Path, rep: Report) -> None:
+    vids = list((repo / "artifacts/video").glob("*.mp4")) if (repo / "artifacts/video").exists() else []
+    if not vids:
+        rep.warn("video di riserva", "non registrato: make video")
+    else:
+        newest = max(vids, key=lambda p: p.stat().st_mtime)
+        rep.ok("video di riserva", f"{newest.name} ({newest.stat().st_size / 1e6:.0f} MB)")
+
+
+def check_imports(rep: Report) -> None:
+    """The UI must import with the network off, before anyone clicks anything."""
+    try:
+        import iceroute.demo.app  # noqa: F401
+        rep.ok("la UI si importa")
+    except Exception as exc:  # noqa: BLE001
+        rep.fail("la UI si importa", str(exc))
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Controlli prima del palco. Gate 4.")
+    ap.add_argument("--repo", type=Path, default=Path("."))
+    args = ap.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    rep = Report()
+    index = check_demo(args.repo, rep)
+    if index:
+        check_model_is_current(args.repo, index, rep)
+    check_worst_case_is_worst(args.repo, rep)
+    check_claims(args.repo, rep)
+    check_backup_video(args.repo, rep)
+    check_imports(rep)
+
+    log.info("")
+    for status, what, detail in rep.rows:
+        log.info("[%s] %-38s %s", status, what, detail)
+    log.info("")
+    log.info("%d controlli · %d errori · %d avvisi", len(rep.rows), rep.failed, rep.warned)
+    log.info("")
+    log.info("Questo script NON può verificare il Gate 4 per intero: resta la prova con")
+    log.info("la rete staccata, la macchina riavviata e tre persone esterne che la usano")
+    log.info("da sole. Nessun file su disco lo attesta.")
+    return 1 if rep.failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

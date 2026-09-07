@@ -203,6 +203,13 @@ status:
 	$(REQUIRE_VENV)
 	@$(PY) scripts/status.py
 
+# Da lanciare la mattina del 7 ottobre, con la rete staccata, dopo il riavvio —
+# e ogni volta che si rigenera un artefatto da qui a lì.
+.PHONY: preflight
+preflight:
+	$(REQUIRE_VENV)
+	@$(PY) scripts/preflight.py
+
 .PHONY: all
 all: data train eval quantize route precompute report
 	@echo ""
