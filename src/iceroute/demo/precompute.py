@@ -27,6 +27,7 @@ import argparse
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -186,6 +187,7 @@ def process_scene(
     downscale: int,
     use_chart: bool = False,
     worst_case: bool = False,
+    on_stage: Callable[[str], None] | None = None,
 ) -> SceneAssets:
     """Everything the UI needs for one scene.
 
@@ -194,7 +196,14 @@ def process_scene(
     independently of a model that may still be training. Runs in this mode set
     ``generated_from_predicted_mask: false`` in the index, so a ranking pass can
     never be mistaken for a demo build.
+
+    ``on_stage`` is called as each phase begins. It exists so the demo's "run it
+    now" button can show the chain advancing **through this same function**: a
+    second implementation of the pipeline for the live path would make "watch it
+    compute" a claim about code the product does not use.
     """
+    step = on_stage or (lambda _name: None)
+    step("Lettura della scena dal disco")
     labels_from = resolve_labels(scene_path)
     scene = load_scene(scene_path, data_cfg, labels_from=labels_from)
     stem = scene.meta.scene_id.replace(".nc", "")
@@ -208,6 +217,7 @@ def process_scene(
     if use_chart:
         pred, inf_stats, infer_s = truth, None, 0.0
     else:
+        step("Inferenza U-Net sulla scena intera")
         t0 = time.monotonic()
         pred, inf_stats = predict_mask(model, scene, channels, train_cfg.get("eval", {}), device)
         infer_s = time.monotonic() - t0
@@ -223,6 +233,7 @@ def process_scene(
     )
 
     # -- rasters ------------------------------------------------------------
+    step("Rendering delle maschere")
     img_dir = out_dir / "images"
     hv8 = stretch(scene.hv, scene.mask_valid)
     assets.files["sar"] = save_png(hv8, img_dir / f"{stem}_sar.png", downscale=downscale)
@@ -236,6 +247,7 @@ def process_scene(
     # -- geocode, on the PREDICTED mask ------------------------------------
     # geocode_scene resamples whatever sits in scene.sod, so the prediction is
     # substituted before geocoding. The chart stays available as scene.sic etc.
+    step("Geocodifica in EPSG:3413 a 500 m")
     scene.sod = pred.astype("uint8")
     geo = geocode_scene(scene, resolution_m=float(routing_cfg["grid"]["resolution_m"]))
     land = build_land_mask(
@@ -254,6 +266,7 @@ def process_scene(
         colour_mask(geo.sod, geo.mask_valid), img_dir / f"{stem}_maskgeo.png", downscale=1
     )
 
+    step("RIO POLARIS e griglia di costo")
     rios, costs = {}, {}
     for ic in ice_classes:
         rio = compute_rio(
@@ -269,6 +282,7 @@ def process_scene(
         )
 
     # -- waypoints ----------------------------------------------------------
+    step("Scelta dei waypoint")
     entry = (routing_cfg.get("waypoints") or {}).get(scene.meta.scene_id)
     try:
         wp = (
@@ -282,6 +296,7 @@ def process_scene(
     assets.waypoints = wp.as_dict()
 
     # -- routes -------------------------------------------------------------
+    step("A*, semplificazione e confronto con la rotta diretta")
     routes_dir = out_dir / "routes"
     signatures = []
     for ic in ice_classes:

@@ -217,6 +217,32 @@ def rle_estimate_bytes(mask: np.ndarray) -> int:
     return n_runs * 3
 
 
+def downlink_route(collection: dict | None) -> dict | None:
+    """Strip a demo GeoJSON down to what the satellite would actually send.
+
+    Every ``data/demo/routes/*.geojson`` holds two tracks: the computed route
+    and the geodesic it is compared against. The comparison exists to argue a
+    point to a human on the ground — a satellite has no reason to transmit the
+    straight line between two points whose coordinates the recipient supplied.
+
+    Counting it as payload measured the wrong thing, and not by a little: the
+    baseline is sampled at every cell it crosses, so it ran to 26 KB against
+    430 bytes of real route. The error was conservative — it understated the
+    ratio — but a downlink figure that includes a file the downlink does not
+    carry is not a downlink figure.
+
+    Used by both the measurement and the UI panel that shows the payload, so
+    the bytes on screen and the bytes in the deck cannot disagree.
+    """
+    if not collection:
+        return None
+    kept = [
+        f for f in collection.get("features", [])
+        if (f.get("properties") or {}).get("kind") != "baseline"
+    ]
+    return {**collection, "features": kept} if kept else None
+
+
 def measure_scene(
     scene_id: str,
     mask: np.ndarray,

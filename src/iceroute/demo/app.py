@@ -5,11 +5,19 @@ argument has been left out.
 
 Two rules shaped this file:
 
-* **It reads only precomputed files.** No inference, no geocoding, no routing at
-  runtime in the main path. The demo has to start in under two seconds and must
-  not depend on PyTorch initialising on a stage. The one exception is the "Run
-  inference now" button, which proves this is not a video and which fails
-  softly: if it breaks, the rest of the demo carries on.
+* **The main path reads only precomputed files.** No inference, no geocoding,
+  no routing while the audience waits. The demo has to start in under two
+  seconds and must not depend on PyTorch initialising on a stage.
+
+  There are exactly two deliberate exceptions, both behind a button, both of
+  which fail into a message box rather than a traceback. **Calcola ora** re-runs
+  the entire chain on the raw NetCDF — the same ``process_scene`` the product
+  runs, not a copy — and reports whether the result matches the precomputed one.
+  The second times the INT8 model on a single CPU thread, kept separate because
+  the GPU in this laptop is not the hardware that would fly.
+
+  Neither weakens the first rule: if either breaks, the precomputed answer is
+  still on screen and the talk continues.
 * **It never invents a number.** Anything not measured reads as "non misurato",
   and anything measured under an assumption without a source is labelled as
   provisional right where it appears. ``configs/assumptions.yaml`` is one click
@@ -458,20 +466,251 @@ def main() -> None:
                 f"RIO minimo: {fmt(pol.get('rio_min'), '{:+.1f}')}"
             )
 
-        with st.expander("Prova che gira davvero"):
-            st.caption(
-                "Esegue il modello INT8 su una patch, adesso. Se fallisce, il resto "
-                "della demo continua a funzionare."
-            )
-            if st.button("Esegui l'inferenza ora"):
-                run_live_inference()
+    st.write("")
+    tab_down, tab_time, tab_live = st.tabs(
+        ["Cosa scende a terra", "Tempo e carburante", "Calcola ora"]
+    )
+    with tab_down:
+        downlink_panel(scene, entry)
+    with tab_time:
+        assumptions_panel(entry, ice_class, index)
+    with tab_live:
+        live_panel(scene, ice_class)
+        onboard_panel()
 
     # -- footer -------------------------------------------------------------
     render_footer(metrics, index, assumptions)
 
 
+# ---------------------------------------------------------------------------
+# What the satellite sends
+# ---------------------------------------------------------------------------
+
+
+def downlink_panel(scene: dict, entry: dict) -> None:
+    """The product, in bytes. The strongest measured claim we have."""
+    from iceroute.demo.estimate import payload
+
+    if not entry.get("route_exists"):
+        st.info("Nessuna rotta su questa scena: non c'è payload da trasmettere.")
+        return
+
+    p = payload(entry, DEMO_DIR / "routes", load_json(str(METRICS)), scene["scene_id"])
+    if p is None:
+        st.warning("File della rotta assente: lancia `make precompute`.")
+        return
+
+    rows = [("Maschera del ghiaccio (PNG)", p.mask_bytes),
+            (f"Rotta ({p.n_waypoints} waypoint, GeoJSON)", p.route_bytes),
+            ("Metadati", p.metadata_bytes)]
+    body = "".join(
+        f'<tr><td style="padding:3px 14px 3px 0;color:#9fb1c7">{n}</td>'
+        f'<td style="text-align:right;font-family:ui-monospace">'
+        f'{"non misurato" if v is None else f"{v:,} B".replace(",", ".")}</td></tr>'
+        for n, v in rows
+    )
+    left, right = st.columns([1, 1], gap="medium")
+    with left:
+        st.markdown(f'<table>{body}</table>', unsafe_allow_html=True)
+        if p.total_bytes and p.sar_bytes:
+            st.markdown(
+                kpi("Totale trasmesso", f"{p.total_bytes / 1024:.0f} KB",
+                    f"contro {p.sar_bytes / 1024**2:.1f} MB di SAR compresso senza perdita "
+                    f"— <b>{p.ratio:.0f}:1</b>"),
+                unsafe_allow_html=True)
+        if p.note:
+            st.caption(p.note)
+        st.caption(
+            "La rotta di confronto **non** è qui dentro: è calcolata a terra per "
+            "argomentare, e un satellite non ha ragione di trasmettere la linea retta "
+            "fra due punti che il destinatario gli ha dato lui."
+        )
+    with right:
+        st.caption(f"Il file che arriva alla nave, per intero — {p.route_bytes} byte:")
+        st.code(p.route_text, language="json")
+
+
+# ---------------------------------------------------------------------------
+# Time and fuel: the viewer's assumption, not our measurement
+# ---------------------------------------------------------------------------
+
+
+def assumptions_panel(entry: dict, ice_class: str, index: dict) -> None:
+    from iceroute.demo.estimate import fuel_tonnes, rescale_transit
+
+    if not entry.get("route_exists"):
+        st.info("Nessuna rotta: niente da stimare.")
+        return
+
+    ours = entry["comparison"]["iceroute"]
+    nominal = float(index.get("open_water_speed_kn") or 12.0)
+
+    st.warning(
+        "**Questi due valori non sono nostre misure.** La velocità in acqua libera è "
+        "l'unico numero senza fonte in `configs/routing.yaml` (P-05) e il consumo non "
+        "è nel progetto (P-09). Muovili: quello che cambia sotto è quanto pesa "
+        "l'assunzione, non quanto è brava IceRoute."
+    )
+    c1, c2 = st.columns(2)
+    speed = c1.slider("Velocità in acqua libera (nodi)", 8.0, 20.0, nominal, 0.5)
+    burn = c2.slider("Consumo a velocità piena (t/giorno)", 0.0, 120.0, 0.0, 5.0,
+                     help="0 = non impostato: senza un consumo non mostriamo carburante.")
+
+    t = rescale_transit(ours.get("time_hours"), ours.get("min_rio"),
+                        nominal_kn=nominal, chosen_kn=speed, ice_class=ice_class)
+    base = entry["comparison"]["baseline"]
+
+    cols = st.columns(3)
+    if t.hours is None:
+        cols[0].markdown(kpi("Transito IceRoute", "non riscalabile", t.reason[:150]),
+                         unsafe_allow_html=True)
+    else:
+        cols[0].markdown(
+            kpi("Transito IceRoute", f"{t.hours:.1f} h",
+                f"a {speed:.1f} kn · {ours['distance_km']:.0f} km"), unsafe_allow_html=True)
+
+    if base.get("blocked_by_ice"):
+        cols[1].markdown(
+            kpi("Rotta diretta", "vietata",
+                f'{base["n_no_go_cells"]} celle oltre il limite POLARIS per una nave '
+                f'{ice_class}. <b>Nessun tempo di riferimento</b>: non esiste un viaggio '
+                f'più lento da cui risparmiare.'), unsafe_allow_html=True)
+    elif base.get("feasible"):
+        bt = rescale_transit(base.get("time_hours"), ours.get("min_rio"),
+                             nominal_kn=nominal, chosen_kn=speed, ice_class=ice_class)
+        delta = (bt.hours - t.hours) if (bt.hours and t.hours) else None
+        cols[1].markdown(
+            kpi("Rotta diretta", f"{fmt(bt.hours)} h",
+                "percorribile: IceRoute la segue"
+                + (f", {delta:+.1f} h" if delta is not None else "")),
+            unsafe_allow_html=True)
+    else:
+        cols[1].markdown(kpi("Rotta diretta", "fuori copertura",
+                             "non è il ghiaccio a fermarla"), unsafe_allow_html=True)
+
+    f = fuel_tonnes(t.hours, burn)
+    cols[2].markdown(
+        kpi("Carburante", "non impostato" if f is None else f"{f:.1f} t",
+            "serve un consumo, e non ne abbiamo uno con una fonte (P-09)"
+            if f is None else
+            f'<span class="tag warn">assunzione tua</span> {burn:.0f} t/giorno × '
+            f'{t.hours / 24:.2f} giorni'), unsafe_allow_html=True)
+
+    from iceroute.demo.estimate import ELEVATED_CAP_KN
+
+    cap = ELEVATED_CAP_KN.get(ice_class)
+    st.caption(
+        "Il riscalamento è **esatto**, non approssimato, e solo quando la rotta resta "
+        "tutta in operazione normale (RIO ≥ 0): lì ogni tratto va a velocità piena e il "
+        "tempo è proporzionale a 1/v. Se la rotta entra in rischio elevato, POLARIS fissa "
+        + (f"un limite di {cap:.0f} kn (Tabella 1.2) che questo cursore non muove"
+           if cap else "che per questa classe la fascia è già impraticabile")
+        + ", e il numero non viene mostrato invece di essere inventato."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Run the whole chain, now
+# ---------------------------------------------------------------------------
+
+
+@st.cache_resource(show_spinner=False)
+def _model(train_config: str):
+    from iceroute.demo.live import load_model
+
+    return load_model(Path(train_config))
+
+
+def live_panel(scene: dict, ice_class: str) -> None:
+    """The answer to "how do I know these aren't pictures you made earlier"."""
+    import tempfile
+
+    from iceroute.demo import live
+    from iceroute.demo import overlay as ov
+
+    raw = Path("data/raw/test") / scene["scene_id"]
+    cfg = Path("artifacts/best_config.txt")
+    picked = cfg.read_text().strip() if cfg.exists() else "configs/train3.yaml"
+
+    st.caption(
+        "Rilegge il NetCDF grezzo e rifà tutto: inferenza, geocodifica, POLARIS, A\\*. "
+        "Non è un secondo programma — è **la stessa funzione** che ha generato quello "
+        "che stai guardando. Circa 15 s su GPU. Se fallisce, sopra resta il risultato "
+        "buono e la demo continua."
+    )
+    if not raw.exists():
+        st.info(f"Scena grezza non presente in `{raw.parent}`: il calcolo dal vivo "
+                f"richiede il NetCDF originale.")
+        return
+
+    if not st.button("Calcola ora dalla scena grezza", type="primary"):
+        return
+
+    slot, out = st.empty(), Path(tempfile.mkdtemp(prefix="iceroute_live_"))
+    with st.spinner("…"):
+        model, device = _model(picked)
+        run = live.compute(raw, model=model, device=device, out_dir=out,
+                           train_config=Path(picked),
+                           on_stage=lambda st_: slot.markdown(_stages_md(st_)))
+    slot.markdown(_stages_md(run.stages))
+
+    if not run.ok:
+        st.error(f"Calcolo dal vivo non riuscito: {run.error}")
+        return
+
+    st.success(f"**{run.total_seconds:.1f} s** su {run.device.upper()}, "
+               f"dalla scena grezza al waypoint.")
+
+    stem = scene["scene_id"].replace(".nc", "")
+    verdict = live.agreement(
+        ov.load(out / "overlays" / f"{stem}__{ice_class}.json"),
+        ov.load(DEMO_DIR / "overlays" / f"{stem}__{ice_class}.json"),
+    )
+    (st.success if verdict.get("identical") else st.warning)(
+        f"Confronto col precomputato: {verdict['note']}")
+
+    png = out / "images" / f"{stem}_maskgeo.png"
+    live_ov = out / "overlays" / f"{stem}__{ice_class}.json"
+    if png.exists() and live_ov.exists():
+        img, problem = composite(str(png), str(live_ov), "both")
+        if img:
+            st.image(img, caption="Calcolata adesso, non caricata da disco.",
+                     use_container_width=True)
+        else:
+            st.warning(problem)
+
+
+def onboard_panel() -> None:
+    """The other half of "does it run": the quantised model, on one CPU thread."""
+    st.markdown("---")
+    st.caption(
+        "Il calcolo qui sopra gira sulla GPU di questo portatile con il modello fp32: "
+        "dimostra che la **catena** è vera. Il satellite però monterebbe il modello "
+        "INT8 su CPU, ed è una macchina diversa — misurarla separatamente evita di far "
+        "passare la GPU del portatile per hardware di bordo."
+    )
+    if st.button("Cronometra il modello INT8 su 1 thread CPU"):
+        run_live_inference()
+
+
+def _stages_md(stages) -> str:
+    rows = []
+    for s in stages:
+        mark = "✓" if s.done else "▸"
+        secs = f"`{s.seconds:5.1f} s`" if s.done else "…"
+        rows.append(f"{mark} {s.name} &nbsp; {secs}")
+    return "  \n".join(rows)
+
+
 def run_live_inference() -> None:
-    """The controlled exception to 'no runtime inference'. SPEC §9.2.
+    """Time the INT8 model on one CPU thread. SPEC §9.2.
+
+    Deliberately kept alongside the full live run, because they measure
+    different machines. "Calcola ora" uses the fp32 network on this laptop's
+    GPU: it proves the *chain* is real. This measures the quantised model on a
+    single CPU thread, which is the thing that would actually fly. Letting the
+    GPU run stand in for the onboard claim would be showing hardware the
+    satellite does not have.
 
     Wrapped so that a failure is a message in a box, never a traceback across
     the projector.
@@ -480,7 +719,12 @@ def run_live_inference() -> None:
         import numpy as np
         import onnxruntime as ort
 
-        cfg = yaml.safe_load(Path("configs/train3.yaml").read_text())
+        # The deployed config, not a fixed filename. Reading configs/train3.yaml
+        # here meant timing whatever model that file pointed at, which stopped
+        # being the deployed one the moment the picker changed its mind.
+        picked = Path("artifacts/best_config.txt")
+        name_cfg = picked.read_text().strip() if picked.exists() else "configs/train3.yaml"
+        cfg = yaml.safe_load(Path(name_cfg).read_text())
         path = Path(cfg["output"]["onnx_int8"])
         if not path.exists():
             st.warning(f"Modello INT8 assente: {path}. Lancia `make quantize`.")
@@ -497,7 +741,8 @@ def run_live_inference() -> None:
         ms = (time.perf_counter() - t0) * 1000
 
         st.success(f"Una tile 256×256 in **{ms:.0f} ms** · modello "
-                   f"{path.stat().st_size / 1024**2:.2f} MB, INT8, CPU")
+                   f"{path.stat().st_size / 1024**2:.2f} MB, INT8, 1 thread CPU "
+                   f"({name_cfg})")
     except Exception as exc:  # noqa: BLE001 — must never break the demo
         st.warning(f"Inferenza dal vivo non riuscita: {exc}")
 

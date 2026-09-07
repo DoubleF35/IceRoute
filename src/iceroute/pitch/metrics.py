@@ -24,7 +24,7 @@ import yaml
 from iceroute.data.collapse import N_CLASSES
 from iceroute.data.loader import load_config, load_scene
 from iceroute.demo.precompute import resolve_labels
-from iceroute.pitch.compression import measure_scene, summarise, verdict
+from iceroute.pitch.compression import downlink_route, measure_scene, summarise, verdict
 
 log = logging.getLogger("metrics")
 
@@ -82,7 +82,9 @@ def measure_downlink(
         first = next(iter(entry.get("classes", {}).values()), {})
         gj = demo_dir / "routes" / first.get("geojson", "")
         if gj.exists():
-            route = json.loads(gj.read_text())
+            # Only the transmitted track. The same file also holds the
+            # ground-side comparison geodesic, 26 KB the satellite never sends.
+            route = downlink_route(json.loads(gj.read_text()))
 
         results.append(measure_scene(
             scene.meta.scene_id, mask, np.stack([scene.hh, scene.hv]),
