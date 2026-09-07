@@ -361,3 +361,85 @@ def test_page_never_shows_a_number_that_was_not_measured(tmp_path):
     # INT8 cards must say so rather than render 0.00.
     assert page.count(MISSING) >= 2
     assert "0,00 MB" not in page
+
+
+# ---------------------------------------------------------------------------
+# The route figure and its caption
+# ---------------------------------------------------------------------------
+
+
+def _repo_with_route(tmp_path, *, ice_class="PC6", blocked=True, lead_class=None):
+    """A repo where the figure generator has run and left its lead behind."""
+    import json
+
+    repo = _repo(tmp_path)
+    (repo / "artifacts/figures").mkdir(parents=True, exist_ok=True)
+    (repo / "artifacts/figures/route_lead.json").write_text(json.dumps(
+        {"scene_id": "SCENA.nc", "ice_class": lead_class or ice_class,
+         "figure": "02_useful.png"}))
+    (repo / "data/demo").mkdir(parents=True, exist_ok=True)
+    (repo / "data/demo/index.json").write_text(json.dumps({"scenes": [{
+        "scene_id": "SCENA.nc", "region": "Kara",
+        "classes": {ice_class: {
+            "route_exists": True, "n_waypoints": 5,
+            "separation": {"pct_diagonal": 9.4, "max_km": 81.0},
+            "comparison": {"iceroute": {"time_hours": 23.7},
+                           "baseline": {"blocked_by_ice": blocked,
+                                        "n_no_go_cells": 104 if blocked else 0}},
+        }},
+    }]}))
+    return repo
+
+
+def test_the_route_caption_names_the_class_the_figure_was_drawn_for(tmp_path):
+    """The drift this guards against was real and lived in the first version.
+
+    The caption ranked over every vessel class and picked IA; the figure had
+    been generated for PC6. The page then showed a PC6 route under a sentence
+    about IA, with numbers to match — a wrong claim next to a correct picture.
+    """
+    repo = _repo_with_route(tmp_path, ice_class="PC6")
+    (repo / "data/demo/index.json").write_text(
+        (repo / "data/demo/index.json").read_text().replace(
+            '"PC6": {', '"IA": {"route_exists": true, "n_waypoints": 9,'
+            '"separation": {"pct_diagonal": 30.0, "max_km": 250.0},'
+            '"comparison": {"iceroute": {"time_hours": 30.0},'
+            '"baseline": {"blocked_by_ice": true, "n_no_go_cells": 999}}}, "PC6": {'))
+
+    story = collect(repo, TODAY)["route"]
+    assert story["ice_class"] == "PC6", "la didascalia ha scelto una classe diversa dalla figura"
+    assert story["n_no_go"] == 104
+    assert "999" not in build_page(collect(repo, TODAY))
+
+
+def test_no_recorded_lead_means_no_route_claim(tmp_path):
+    """Absent evidence must not produce a caption."""
+    repo = _repo_with_route(tmp_path)
+    (repo / "artifacts/figures/route_lead.json").unlink()
+    assert collect(repo, TODAY)["route"] == {}
+    assert "celle vietate" not in build_page(collect(repo, TODAY))
+
+
+def test_a_lead_pointing_at_a_missing_scene_makes_no_claim(tmp_path):
+    import json
+
+    repo = _repo_with_route(tmp_path)
+    (repo / "artifacts/figures/route_lead.json").write_text(json.dumps(
+        {"scene_id": "SPARITA.nc", "ice_class": "PC6"}))
+    assert collect(repo, TODAY)["route"] == {}
+
+
+def test_a_passable_direct_route_is_labelled_a_weak_comparison(tmp_path):
+    """If the figure fell back to a scene POLARIS allows, the two lines
+    overlap and the picture argues nothing. The page must say so."""
+    repo = _repo_with_route(tmp_path, blocked=False)
+    page = build_page(collect(repo, TODAY))
+    assert "confronto debole" in page
+    assert "non può percorrere" not in page
+
+
+def test_the_route_section_never_quotes_a_time_saving(tmp_path):
+    """D-026: against an impossible voyage there is no time to save."""
+    page = build_page(collect(_repo_with_route(tmp_path), TODAY))
+    assert "risparmi" in page and "% in meno" not in page
+    assert "ore risparmiate" not in page

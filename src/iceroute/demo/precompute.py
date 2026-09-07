@@ -36,6 +36,7 @@ import yaml
 from iceroute.data.collapse import N_CLASSES, collapse, polaris_mapping
 from iceroute.data.collapse import NAMES as CLASS_NAMES
 from iceroute.data.loader import load_config, load_scene, reference_path
+from iceroute.demo import overlay as overlay_mod
 from iceroute.model.metrics import IGNORE_INDEX
 from iceroute.routing.astar import NoRouteFound, find_route
 from iceroute.routing.baseline import compare, geodesic_baseline
@@ -244,6 +245,15 @@ def process_scene(
         {int(k): v for k, v in data_cfg["sod_to_polaris"].items()}, ice_classes, table=table
     )
 
+    # The mask again, this time on the geocoded grid. The raw-swath version
+    # above is the honest picture of what the model saw; this one is the only
+    # backdrop a route can legally be drawn on, because the route cells are
+    # indexed in *this* grid and no other. Keeping both, clearly named, is what
+    # stops someone pairing a track with the wrong raster (see demo/overlay.py).
+    assets.files["mask_geo"] = save_png(
+        colour_mask(geo.sod, geo.mask_valid), img_dir / f"{stem}_maskgeo.png", downscale=1
+    )
+
     rios, costs = {}, {}
     for ic in ice_classes:
         rio = compute_rio(
@@ -318,9 +328,19 @@ def process_scene(
             ],
         }, indent=1))
 
+        # The drawable form of the same two tracks, in grid pixels. Separate
+        # file, never inside the GeoJSON: that one goes down the downlink and
+        # its byte count is part of the compression figure.
+        ov_path = out_dir / overlay_mod.OVERLAY_DIR / f"{stem}__{ic}.json"
+        ov_path.parent.mkdir(parents=True, exist_ok=True)
+        ov = overlay_mod.build(geo.grid, route, simple, base, wp.start, wp.goal)
+        ov_path.write_text(json.dumps(ov))
+        entry_out["separation"] = ov.get("separation") or {}
+
         entry_out.update({
             "route_exists": True,
             "geojson": path.name,
+            "overlay": ov_path.name,
             "comparison": compare(route, base),
             "n_waypoints": len(simple),
             "simplify_warnings": simple.warnings,
@@ -490,6 +510,20 @@ def main(argv: list[str] | None = None) -> int:
         len(differing), len(carousel),
         f" — {', '.join(s[:15] for s in differing)}" if differing else "",
     )
+    # Which scene actually *looks* like the claim. A scene can forbid the
+    # direct route in three hundred cells and still draw two lines on top of
+    # each other; on a projector that argues nothing. Ranked here so the choice
+    # of what to open on stage is made against a measurement.
+    ranked = sorted(
+        ((a.scene_id, ic, (e.get("separation") or {}).get("pct_diagonal") or 0.0)
+         for a in carousel for ic, e in a.classes.items() if e.get("route_exists")),
+        key=lambda t: -t[2],
+    )
+    if ranked:
+        log.info("Separazione visibile fra le due rotte (% della diagonale):")
+        for sid, ic, pct in ranked[:4]:
+            log.info("    %-16s %-4s %5.2f%%", sid[:16], ic, pct)
+
     if not differing:
         log.warning(
             "Nessuna scena sostiene il momento 'cambio classe e non si passa'. "

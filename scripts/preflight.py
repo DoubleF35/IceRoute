@@ -92,6 +92,9 @@ def check_demo(repo: Path, rep: Report) -> dict:
             gj = entry.get("geojson")
             if gj and not (repo / "data/demo/routes" / gj).exists():
                 missing.append(f"{s['scene_id'][:14]}/{ic}.geojson")
+            ovl = entry.get("overlay")
+            if ovl and not (repo / "data/demo/overlays" / ovl).exists():
+                missing.append(f"{s['scene_id'][:14]}/{ic}.overlay")
     if missing:
         rep.fail("file referenziati dall'indice", f"{len(missing)} mancanti: {missing[:3]}")
     else:
@@ -174,6 +177,46 @@ def check_worst_case_is_worst(repo: Path, rep: Report) -> None:
                f"{worst_id[:14]} a {scored[worst_id]:.1%}")
 
 
+def check_routes_are_drawable(repo: Path, index: dict, rep: Report) -> None:
+    """Not "is there an overlay file" — does drawing it change any pixels.
+
+    The failure being guarded against here already happened once and shipped:
+    the drawing code looked up something nothing wrote, skipped every track and
+    saved a perfectly clean image. Checking that the file exists would not have
+    caught it. Checking that the picture changes does.
+    """
+    from PIL import Image
+
+    from iceroute.demo import overlay as ov
+
+    drawn, failures = 0, []
+    for s in index.get("scenes") or []:
+        png = repo / "data/demo/images" / ((s.get("files") or {}).get("mask_geo") or "")
+        for ic, entry in (s.get("classes") or {}).items():
+            if not entry.get("route_exists"):
+                continue
+            data = ov.load(repo / "data/demo/overlays" / (entry.get("overlay") or ""))
+            tag = f"{s['scene_id'][:14]}/{ic}"
+            if not png.is_file() or not data:
+                failures.append(tag)
+                continue
+            try:
+                img = Image.open(png)
+                if img.convert("RGB").tobytes() == ov.draw(img, data, show="both").tobytes():
+                    failures.append(f"{tag} (nessun pixel cambiato)")
+                else:
+                    drawn += 1
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"{tag} ({exc})")
+
+    if failures:
+        rep.fail("le rotte si disegnano davvero", f"{len(failures)} problemi: {failures[:3]}")
+    elif drawn:
+        rep.ok("le rotte si disegnano davvero", f"{drawn} rotte verificate a pixel")
+    else:
+        rep.warn("le rotte si disegnano davvero", "nessuna rotta da verificare")
+
+
 def check_claims(repo: Path, rep: Report) -> None:
     claims = repo / "artifacts/claims.md"
     if not claims.exists():
@@ -214,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     index = check_demo(args.repo, rep)
     if index:
         check_model_is_current(args.repo, index, rep)
+        check_routes_are_drawable(args.repo, index, rep)
     check_worst_case_is_worst(args.repo, rep)
     check_claims(args.repo, rep)
     check_backup_video(args.repo, rep)

@@ -24,12 +24,18 @@ from pathlib import Path
 
 import numpy as np
 
+from iceroute.demo import overlay as overlay_mod
+
 log = logging.getLogger("figures")
 
 DPI = 300
 # Same palette as the demo, so the deck and the live run look like one product.
 COL_WATER, COL_THIN, COL_THICK = "#0a2859", "#00c8ff", "#ffffff"
-COL_ROUTE, COL_BASE = "#00e08a", "#8899aa"
+# Magenta appears in neither the ice-class palette (blue/cyan/white) nor the
+# RIO one (green/yellow/red), which is the whole reason to use it for the
+# route. Kept identical to demo/overlay.py: the slide and the live run have to
+# read as one product, and a route that changes colour between them does not.
+COL_ROUTE, COL_BASE = "#ff2d95", "#f5f5f5"
 COL_INK, COL_MUTED = "#eaf1fa", "#8397ae"
 
 
@@ -123,14 +129,17 @@ def figure_useful(demo_dir: Path, out: Path, scene: dict | None, ice_class: str)
 
     fig, ax = plt.subplots(figsize=(10, 9))
     ax.axis("off")
-    img_path = demo_dir / "images" / scene["files"].get("mask_pred", "")
+    # The GEOCODED mask, not the raw-swath one. The routes are indexed in the
+    # 500 m EPSG:3413 grid; drawn over the raw swath they would be nonsense.
+    # This figure used to use the raw mask and scale by the raw scene shape,
+    # which is one of the two reasons it shipped with no route on it at all.
+    img_path = demo_dir / "images" / scene["files"].get("mask_geo", "")
     if img_path.exists():
         img = mpimg.imread(img_path)
         ax.imshow(img)
         h, w = img.shape[:2]
-        gj = demo_dir / "routes" / entry.get("geojson", "")
-        if gj.exists():
-            _draw_routes(ax, json.loads(gj.read_text()), scene, w, h)
+        ov = overlay_mod.load(demo_dir / overlay_mod.OVERLAY_DIR / entry.get("overlay", ""))
+        _draw_routes(ax, ov, w, h)
 
     cmp_ = entry["comparison"]
     saved = cmp_.get("time_saved_hours")
@@ -152,25 +161,50 @@ def figure_useful(demo_dir: Path, out: Path, scene: dict | None, ice_class: str)
     return _save(fig, out)
 
 
-def _draw_routes(ax, collection: dict, scene: dict, w: int, h: int) -> None:
-    """Overlay the GeoJSON tracks, mapped from lon/lat back to image pixels."""
-    rows, cols = scene["shape"]
-    for feat in collection.get("features", []):
-        coords = feat.get("geometry", {}).get("coordinates") or []
-        if len(coords) < 2:
-            continue
-        props = feat.get("properties", {})
-        # The GeoJSON carries lon/lat; the PNG is the raw scene grid. Waypoint
-        # row/col are the reliable link, so use them where present.
-        cells = props.get("cells")
-        if not cells:
-            continue
-        y = [c[0] * h / rows for c in cells]
-        x = [c[1] * w / cols for c in cells]
-        if props.get("kind") == "baseline":
-            ax.plot(x, y, "--", color=COL_BASE, lw=2.2, label="rotta diretta")
-        else:
-            ax.plot(x, y, "-", color=COL_ROUTE, lw=3.0, label="IceRoute")
+def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
+    """Overlay both tracks, in the grid the overlay declares.
+
+    Reads ``data/demo/overlays/`` rather than the GeoJSON. The GeoJSON carries
+    lon/lat only — it is the downlink product and deliberately holds nothing
+    the ship does not need — so pixel positions live beside it, computed in
+    precompute where the grid is still in hand. See ``demo/overlay.py``.
+    """
+    rows, cols = ov.get("grid_shape") or (0, 0)
+    if not rows or not cols:
+        return
+    sx, sy = w / cols, h / rows
+    if abs(sx - sy) > 0.02 * max(sx, sy):
+        raise ValueError(
+            f"figura {w}x{h} incompatibile con la griglia della rotta {cols}x{rows}"
+        )
+
+    base, ours = ov.get("baseline") or {}, ov.get("iceroute") or {}
+    if base.get("path"):
+        pts = base["path"]
+        ax.plot([c * sx for _, c in pts], [r * sy for r, _ in pts],
+                "--", color=COL_BASE, lw=2.2, label="rotta diretta")
+    if base.get("no_go"):
+        # Contiguous stretches, not one marker per cell — see overlay.no_go_runs.
+        runs = overlay_mod.no_go_runs(base["no_go"])
+        label = f"vietata da POLARIS ({len(base['no_go'])} celle)"
+        for run in runs:
+            xs, ys = [c * sx for _, c in run], [r * sy for r, _ in run]
+            if len(run) > 2:
+                ax.plot(xs, ys, "-", color="#ff2020", lw=4.0, solid_capstyle="round",
+                        label=label)
+            else:
+                ax.plot(xs, ys, "x", color="#ff2020", ms=8, mew=2.4, ls="none",
+                        label=label)
+            label = "_nolegend_"   # one legend entry, not one per run
+    if ours.get("path"):
+        pts = ours["path"]
+        ax.plot([c * sx for _, c in pts], [r * sy for r, _ in pts],
+                "-", color=COL_ROUTE, lw=3.0, label="IceRoute")
+    if ours.get("waypoints"):
+        wp = ours["waypoints"]
+        ax.plot([c * sx for _, c in wp], [r * sy for r, _ in wp], "o",
+                color=COL_ROUTE, ms=6, mec="#0a0e14", mew=1.4, ls="none",
+                label=f"waypoint trasmessi ({len(wp)})")
     if ax.get_legend_handles_labels()[0]:
         ax.legend(loc="lower right", framealpha=0.3, facecolor="#111823")
 
@@ -312,16 +346,44 @@ def main(argv: list[str] | None = None) -> int:
 
     # Lead with a scene that has a route for the reference class: a figure of a
     # scene with no route argues the opposite of what it is there to argue.
-    scenes = [s for s in index.get("scenes", []) if s.get("classes")]
-    lead = next(
-        (s for s in scenes
-         if s["classes"].get(args.ice_class, {}).get("route_exists")),
-        scenes[0] if scenes else None,
-    )
+    # Among those, prefer one whose *direct* route POLARIS forbids — that is
+    # the figure's actual claim, and now that the forbidden cells are drawn, a
+    # scene where the straight line is perfectly legal shows two lines on top
+    # of each other and proves nothing. The worst case is never the lead.
+    scenes = [s for s in index.get("scenes", [])
+              if s.get("classes") and not s.get("worst_case")]
+
+    def _entry(s):
+        return s["classes"].get(args.ice_class) or {}
+
+    def _blocked(s):
+        return ((_entry(s).get("comparison") or {}).get("baseline") or {}).get("blocked_by_ice")
+
+    def _separation(s):
+        ov = overlay_mod.load(args.demo_dir / overlay_mod.OVERLAY_DIR
+                              / (_entry(s).get("overlay") or ""))
+        return (ov.get("separation") or {}).get("pct_diagonal") or 0.0
+
+    with_route = [s for s in scenes if _entry(s).get("route_exists")]
+    candidates = [s for s in with_route if _blocked(s)] or with_route
+    lead = max(candidates, key=_separation) if candidates else (scenes[0] if scenes else None)
+    if lead:
+        log.info("Scena guida: %s — diretta vietata: %s, le due rotte si separano "
+                 "del %.1f%% della diagonale", lead["scene_id"][:20],
+                 bool(_blocked(lead)), _separation(lead))
 
     log.info("Figure in %s", args.out)
     figure_works(args.demo_dir, args.out / "01_works.png", lead)
     figure_useful(args.demo_dir, args.out / "02_useful.png", lead, args.ice_class)
+
+    # Which scene and class ended up in the route figure, recorded rather than
+    # re-derived. The dashboard captions that image, and a caption that picks
+    # the subject by reimplementing this rule will eventually disagree with the
+    # picture it sits under — it already did, naming IA under a PC6 figure.
+    if lead:
+        (args.out / "route_lead.json").write_text(json.dumps(
+            {"scene_id": lead["scene_id"], "ice_class": args.ice_class,
+             "figure": "02_useful.png"}, indent=1))
     figure_onboard(metrics, args.out / "03_onboard.png")
     figure_business(metrics, args.out / "04_business.png")
     figure_confusion(metrics, args.out / "05_confusion.png")

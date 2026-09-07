@@ -28,6 +28,8 @@ from pathlib import Path
 import streamlit as st
 import yaml
 
+from iceroute.demo import overlay as overlay_mod
+
 DEMO_DIR = Path("data/demo")
 ASSUMPTIONS = Path("configs/assumptions.yaml")
 METRICS = Path("artifacts/metrics.json")
@@ -63,6 +65,26 @@ CLASS_COLOURS = {"Acqua libera": "#0a2859", "Ghiaccio sottile": "#00c8ff",
                  "Ghiaccio spesso": "#ffffff"}
 RIO_LEVELS = [("Navigazione normale", "#2ecc71"), ("Rischio elevato", "#f1c40f"),
               ("Considerazione speciale", "#e74c3c")]
+
+# Which raster each layer shows, and whether a route can be drawn on it.
+#
+# Only the geocoded rasters are routable. The SAR and the analyst's chart are
+# the raw swath: the route cells are indexed in the 500 m EPSG:3413 grid and
+# mean nothing there. Rather than quietly not drawing — the failure this whole
+# feature exists to fix — the UI says why the tracks are unavailable.
+LAYERS = {
+    "SAR": ("sar", False),
+    "Maschera del ghiaccio": ("mask_geo", True),
+    "RIO": ("rio_{ice_class}", True),
+    "Carta di riferimento": ("mask_truth", False),
+}
+ROUTE_MODES = {"Rotta diretta": "baseline", "IceRoute": "iceroute",
+               "Entrambe": "both", "Nessuna": "none"}
+ROUTE_LEGEND = {
+    "baseline": [("Rotta diretta (carta nautica)", "#f5f5f5"),
+                 ("Cella vietata da POLARIS", "#ff2020")],
+    "iceroute": [("IceRoute", "#ff2d95"), ("Waypoint trasmessi a terra", "#ff2d95")],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +135,44 @@ def kpi(label: str, value: str, sub: str = "") -> str:
             f'<div class="val">{value}</div><div class="sub">{sub}</div></div>')
 
 
+@st.cache_data(show_spinner=False)
+def composite(img_path: str, ov_path: str, show: str) -> tuple[bytes | None, str]:
+    """The layer with the routes painted on, as PNG bytes plus any complaint.
+
+    This is the one thing the UI computes rather than reads, and it is worth
+    being precise about why that does not break the "no runtime work" rule.
+    Drawing a polyline is a few hundred integer coordinates through Pillow: no
+    model, no torch, no geocoding, no A\\*, a couple of milliseconds, and the
+    result is cached per (layer, mode). Precomputing it instead would mean a
+    PNG for every scene x class x layer x mode — well over a hundred files, in
+    the one directory that is already carrying orphans.
+
+    The error is *returned* rather than raised or logged: the caller has to
+    decide what to show, and a cached function that writes to session state
+    would report the problem on the first call and stay silent on every reload
+    after it — which is exactly the kind of quiet that let the missing overlay
+    survive this long.
+    """
+    import io
+
+    from PIL import Image
+
+    p = Path(img_path)
+    if not p.exists():
+        return None, f"Immagine assente: {p.name}"
+
+    img = Image.open(p)
+    ov = overlay_mod.load(Path(ov_path)) if ov_path else {}
+    try:
+        img = overlay_mod.draw(img, ov, show=show)
+    except overlay_mod.GridMismatch as exc:
+        return None, str(exc)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue(), ""
+
+
 # ---------------------------------------------------------------------------
 # KPI cards — SPEC §9.3
 # ---------------------------------------------------------------------------
@@ -132,11 +192,20 @@ def transit_card(entry: dict, provisional_speed: bool) -> str:
     if cmp_.get("time_saved_hours") is not None:
         saved = cmp_["time_saved_hours"]
         pct = cmp_.get("time_saved_percent")
-        colour = "#4ade9b" if saved > 0 else "#f0b849"
-        sub = f"contro {fmt(cmp_['baseline']['time_hours'])} h della rotta diretta"
+        base_h = fmt(cmp_["baseline"]["time_hours"])
+        if saved > 0:
+            body = (f'<span style="color:#4ade9b">{saved:+.1f} h ({pct:+.0f}%)</span> '
+                    f"contro {base_h} h della rotta diretta")
+        else:
+            # The direct route is legal and IceRoute all but follows it. There
+            # is nothing to win here, and dressing a 1% loss in warning colours
+            # would be editorialising a non-event. The honest reading is the
+            # better one anyway: no detour was invented where none was needed.
+            body = ('<span class="tag info">la rotta diretta è percorribile</span> '
+                    f"IceRoute la segue: {cmp_['detour_km']:+.1f} km e "
+                    f"{abs(saved):.1f} h in più su {base_h} h")
         return kpi("Tempo di transito", f"{fmt(ours)} h",
-                   f'<span style="color:{colour}">{saved:+.1f} h ({pct:+.0f}%)</span> — {sub}'
-                   + (f"<br>{note}" if note else ""))
+                   body + (f"<br>{note}" if note else ""))
 
     # No comparable baseline. Say which of the two reasons applies — they mean
     # completely different things and conflating them would be a false claim.
@@ -251,11 +320,21 @@ def main() -> None:
         ice_class = st.radio("Classe", available, label_visibility="collapsed")
 
         st.markdown("### Livelli")
-        layer = st.radio(
-            "Livello", ["SAR", "Maschera del ghiaccio", "RIO", "Carta di riferimento"],
-            label_visibility="collapsed",
-        )
-        show_route = st.checkbox("Mostra la rotta", value=True)
+        layer = st.radio("Livello", list(LAYERS), index=1, label_visibility="collapsed")
+        key_tpl, routable = LAYERS[layer]
+
+        st.markdown("### Rotte sulla mappa")
+        if routable:
+            mode = ROUTE_MODES[
+                st.radio("Rotte", list(ROUTE_MODES), index=2, label_visibility="collapsed")
+            ]
+        else:
+            mode = "none"
+            st.caption(
+                "Su questo livello le rotte non sono disegnabili: è il raster della "
+                "scena grezza, mentre la rotta è calcolata sulla griglia geocodificata "
+                "a 500 m. Passa a **Maschera del ghiaccio** o **RIO**."
+            )
 
     entry = scene["classes"][ice_class]
 
@@ -297,13 +376,25 @@ def main() -> None:
     # -- map ----------------------------------------------------------------
     left, right = st.columns([3, 1], gap="medium")
     with left:
-        key = {"SAR": "sar", "Maschera del ghiaccio": "mask_pred",
-               "RIO": f"rio_{ice_class}", "Carta di riferimento": "mask_truth"}[layer]
+        key = key_tpl.format(ice_class=ice_class)
         img = DEMO_DIR / "images" / scene["files"].get(key, "")
-        if img.exists():
-            st.image(str(img), use_container_width=True)
+        # No route on this scene/class means no overlay file; the layer still
+        # renders, which is the point — "nessuna rotta" is a real outcome.
+        name = entry.get("overlay") or ""
+        ov = str(DEMO_DIR / overlay_mod.OVERLAY_DIR / name) if name and mode != "none" else ""
+        png, problem = composite(str(img), ov, mode)
+        if png:
+            st.image(png, use_container_width=True)
         else:
-            st.warning(f"Immagine assente: {key}")
+            st.warning(problem or f"Immagine assente: {key}")
+
+        if mode != "none":
+            shown = [x for m, x in ROUTE_LEGEND.items() if mode in (m, "both")]
+            st.markdown(
+                '<div class="legend">'
+                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
+                          for group in shown for n, c in group)
+                + "</div>", unsafe_allow_html=True)
 
         if layer == "Maschera del ghiaccio":
             st.markdown(
@@ -312,8 +403,9 @@ def main() -> None:
                           for n, c in CLASS_COLOURS.items())
                 + "</div>", unsafe_allow_html=True)
             st.caption(
-                "Maschera **predetta dal modello**, non la carta dell'analista. "
-                "È su questa che è calcolata la rotta."
+                "Maschera **predetta dal modello**, non la carta dell'analista, "
+                "riproiettata in EPSG:3413 a 500 m. È su questa che è calcolata "
+                "la rotta, ed è per questo che le rotte si disegnano qui."
             )
         elif layer == "RIO":
             st.markdown(
@@ -331,14 +423,30 @@ def main() -> None:
     with right:
         st.markdown("#### Rotta")
         if entry.get("route_exists"):
-            c = entry["comparison"]["iceroute"]
-            st.metric("Distanza", f"{c['distance_km']:.0f} km")
-            st.metric("Waypoint", entry.get("n_waypoints", "—"))
-            if show_route:
-                gj = DEMO_DIR / "routes" / entry.get("geojson", "")
-                if gj.exists():
-                    st.download_button("Scarica GeoJSON", gj.read_bytes(),
-                                       file_name=gj.name, mime="application/geo+json")
+            cmp_ = entry["comparison"]
+            st.metric("Distanza", f"{cmp_['iceroute']['distance_km']:.0f} km")
+            st.metric("Waypoint", entry.get("n_waypoints", "—"),
+                      help="I soli punti che scendono a terra: la linea sulla mappa "
+                           "è il percorso completo, i pallini sono ciò che si trasmette.")
+
+            # The direct route's verdict, in words, next to the map that just
+            # drew it. Three outcomes, and they are not interchangeable.
+            base = cmp_["baseline"]
+            st.markdown("#### Rotta diretta")
+            if base.get("blocked_by_ice"):
+                st.error(f"Vietata: {base['n_no_go_cells']} celle oltre il limite "
+                         f"POLARIS per una nave {ice_class}.")
+            elif base.get("feasible"):
+                st.success(f"Percorribile in {fmt(base['time_hours'])} h. "
+                           f"IceRoute devia di {cmp_['detour_km']:+.1f} km.")
+            else:
+                st.info("Fuori dalla copertura della carta: non è il ghiaccio a "
+                        "fermarla, lì non abbiamo una mappa.")
+
+            gj = DEMO_DIR / "routes" / entry.get("geojson", "")
+            if gj.exists():
+                st.download_button("Scarica GeoJSON", gj.read_bytes(),
+                                   file_name=gj.name, mime="application/geo+json")
         else:
             st.error(entry.get("message", "Nessuna rotta trovata.")[:200])
 

@@ -434,6 +434,75 @@ def _fmt(v, decimals: int = 3, missing: str = MISSING) -> str:
     return _it(v, decimals) if isinstance(v, int | float) else missing
 
 
+def route_figure(repo: Path, max_px: int = 1000) -> str:
+    """The route comparison, inlined as a data URI.
+
+    Inlined rather than linked because this page has to survive being emailed
+    or opened from a USB stick with the network off, which is also why it has
+    no external resources at all. The deck version is 300 DPI and far too heavy
+    to paste into an HTML file, so it is downscaled here — the page wants a
+    thumbnail of the argument, not the printable asset.
+    """
+    import base64
+    import io
+
+    path = repo / "artifacts/figures/02_useful.png"
+    if not path.exists():
+        return ('<div class="note">Figura della rotta non generata: '
+                '<span class="mono">make report</span>.</div>')
+    from PIL import Image
+
+    img = Image.open(path).convert("RGB")
+    if img.width > max_px:
+        img = img.resize((max_px, round(img.height * max_px / img.width)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=82, optimize=True)
+    uri = base64.b64encode(buf.getvalue()).decode()
+    return (f'<img src="data:image/jpeg;base64,{uri}" alt="Rotta IceRoute contro '
+            f'rotta diretta" style="width:100%;border-radius:8px;display:block">')
+
+
+def _route_note(r: dict) -> str:
+    """The caption. Every figure in it comes from the demo index.
+
+    Deliberately makes no claim about time saved. On these scenes the direct
+    route is forbidden, so there is no feasible voyage to be faster than, and
+    a percentage would have to be invented against a baseline that does not
+    exist (D-026). "That route is illegal and this one is not" is both the
+    honest statement and the stronger one.
+    """
+    if not r:
+        return ('<h3>Nessun confronto disponibile</h3><div class="note">Serve '
+                '<span class="mono">make report</span>: la figura mostra la rotta '
+                'diretta contro quella calcolata, e senza scene non c\'è confronto.</div>')
+
+    head = f"<h3>{html.escape(r['scene_id'][:15])} · nave {html.escape(r['ice_class'])}</h3>"
+    if r["blocked_by_ice"]:
+        claim = f"""<div class="big">{_it(r['n_no_go'])} celle vietate</div>
+<div class="note">La rotta diretta — la linea che seguirebbe una nave con la sola
+carta nautica — attraversa {_it(r['n_no_go'])} celle oltre il limite POLARIS per una
+nave {html.escape(r['ice_class'])}. Non è una rotta più lenta: è una rotta che quella
+nave <b>non può percorrere</b>. IceRoute ne trova una in {_fmt(r['hours'], 1)} h,
+riassunta in {r['n_waypoints']} waypoint — gli unici dati che scendono a terra.</div>"""
+    else:
+        # The figure fell back to a scene whose direct route is legal. Saying
+        # anything stronger here would be describing a picture that is not on
+        # the page.
+        claim = """<div class="big"><span class="tag prov">confronto debole</span></div>
+<div class="note">Su questa scena la rotta diretta <b>è percorribile</b>: la figura
+mostra due tracce che in larga parte coincidono, il che non dimostra la tesi.
+Rigenerare con una scena in cui POLARIS vieta la linea retta.</div>"""
+
+    return f"""{head}{claim}
+<div class="note" style="margin-top:11px">Le due tracce si separano fino a
+{_fmt(r['separation_km'], 0)} km, il {_fmt(r['separation_pct'], 1)}% della diagonale
+dell'immagine. La scena è scelta su questo numero: un confronto in cui le due linee
+si sovrappongono non dimostra niente, per quante celle siano vietate sotto.</div>
+<div class="note" style="margin-top:11px">Nessuna percentuale di tempo risparmiato:
+contro una rotta non percorribile non esiste un tempo di riferimento da cui
+risparmiare (D-026).</div>"""
+
+
 def build_page(ctx: dict) -> str:
     today = ctx["today"]
     to_freeze = (FREEZE - today).days
@@ -593,6 +662,9 @@ def build_page(ctx: dict) -> str:
         for c in g.get("recent", [])
     )
 
+    route_img = route_figure(ctx["repo"])
+    route_note = _route_note(ctx.get("route") or {})
+
     comp_note = (
         f"{_it(ratio['value'])}:1 <span class='tag prov'>limite superiore</span>"
         if ratio else MISSING
@@ -632,6 +704,12 @@ def build_page(ctx: dict) -> str:
 
 <h2>Numeri misurati</h2>
 <div class="grid g4">{cards_html}</div>
+
+<h2>La rotta</h2>
+<div class="grid g2">
+  <div class="card">{route_img}</div>
+  <div class="card">{route_note}</div>
+</div>
 
 <h2>Gate</h2>
 <div class="card">{gates_html}</div>
@@ -728,6 +806,40 @@ def selected_training_config(repo: Path) -> tuple[str, dict]:
     return name, (yaml.safe_load(path.read_text()) if path.exists() else {})
 
 
+def route_story(repo: Path, demo_index: dict) -> dict:
+    """The numbers for the scene the route figure is actually showing.
+
+    The subject is *read* from ``artifacts/figures/route_lead.json``, which the
+    figure generator writes, not re-derived here. Two places choosing the lead
+    scene by reimplementing the same rule is two places that can disagree, and
+    the first version of this function did: it captioned an IA route under a
+    PC6 picture, because it ranked over every vessel class while the figure was
+    generated for one. A caption naming a different subject than the image is
+    worse than no caption — it is a wrong claim with a picture next to it.
+    """
+    lead = _json(repo / "artifacts/figures/route_lead.json")
+    if not lead:
+        return {}
+    scene = next((s for s in demo_index.get("scenes") or []
+                  if s["scene_id"] == lead.get("scene_id")), None)
+    entry = ((scene or {}).get("classes") or {}).get(lead.get("ice_class")) or {}
+    if not entry.get("route_exists"):
+        return {}
+    cmp_ = entry.get("comparison") or {}
+    base, sep = cmp_.get("baseline") or {}, entry.get("separation") or {}
+    return {
+        "scene_id": scene["scene_id"],
+        "region": scene.get("region", ""),
+        "ice_class": lead["ice_class"],
+        "blocked_by_ice": bool(base.get("blocked_by_ice")),
+        "n_no_go": base.get("n_no_go_cells"),
+        "hours": (cmp_.get("iceroute") or {}).get("time_hours"),
+        "n_waypoints": entry.get("n_waypoints"),
+        "separation_pct": sep.get("pct_diagonal"),
+        "separation_km": sep.get("max_km"),
+    }
+
+
 def collect(repo: Path, today: date) -> dict:
     decisions_text = (repo / "DECISIONS.md").read_text() if (repo / "DECISIONS.md").exists() else ""
     metrics = _json(repo / "artifacts/metrics.json")
@@ -758,6 +870,8 @@ def collect(repo: Path, today: date) -> dict:
         "has_video": any((repo / "artifacts/video").glob("*.mp4")),
     }
 
+    route = route_story(repo, demo_index)
+
     comp = metrics.get("compression") or {}
     ratio = None
     if comp.get("ratio_median"):
@@ -765,6 +879,7 @@ def collect(repo: Path, today: date) -> dict:
 
     ctx = {
         "today": today,
+        "repo": repo,
         "metrics": metrics,
         "data_stats": stats,
         "routes": routes,
@@ -775,6 +890,7 @@ def collect(repo: Path, today: date) -> dict:
         "selected_config": cfg_name,
         "eval_split": evaluation.get("split"),
         "demo": demo,
+        "route": route,
         "compression": ratio,
         "download": download_status(repo),
         "git": git_info(repo),

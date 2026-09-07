@@ -18,7 +18,7 @@ Two properties make it honest rather than a straw man:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from pyproj import Geod
@@ -50,6 +50,16 @@ class BaselineResult:
     # really stopped by a gap in coverage.
     n_no_data_cells: int = 0
     blocked_by_ice: bool = False
+    # Where, not just how many. The demo draws a marker on each forbidden cell,
+    # which is the difference between asserting "POLARIS blocks this track" and
+    # showing the twelve pixels that do it.
+    #
+    # Deliberately absent from ``as_geojson``: that file is the downlink
+    # product and its size is part of a measured claim (the compression ratio).
+    # A per-cell list would inflate it by two orders of magnitude to say
+    # something only the ground UI needs.
+    no_go_cells: list[tuple[int, int]] = field(default_factory=list)
+    no_data_cells: list[tuple[int, int]] = field(default_factory=list)
 
     def as_geojson(self) -> dict:
         gj = self.route.as_geojson(
@@ -140,11 +150,12 @@ def geodesic_baseline(
     # attribution, since it is the one that does not overstate our case.
     if coverage is not None:
         cov = np.asarray(coverage, dtype=bool)
-        n_no_data = sum(1 for r, c in blocked if not cov[r, c])
-        n_no_go = len(blocked) - n_no_data
+        no_data_cells = [(r, c) for r, c in blocked if not cov[r, c]]
+        no_go_cells = [(r, c) for r, c in blocked if cov[r, c]]
     else:
-        n_no_data = 0
-        n_no_go = len(blocked)
+        no_data_cells = []
+        no_go_cells = list(blocked)
+    n_no_data, n_no_go = len(no_data_cells), len(no_go_cells)
 
     n_slow = sum(
         1
@@ -214,6 +225,8 @@ def geodesic_baseline(
         note=note,
         n_no_data_cells=n_no_data,
         blocked_by_ice=n_no_go > 0,
+        no_go_cells=no_go_cells,
+        no_data_cells=no_data_cells,
     )
 
 
