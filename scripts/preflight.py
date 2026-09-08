@@ -251,6 +251,32 @@ def check_standalone(repo: Path, rep: Report) -> None:
         rep.ok("copia statica demo.html", f"{mb:.1f} MB, aggiornata")
 
 
+def check_assumptions(repo: Path, rep: Report) -> None:
+    """The file the footer shows must not still say `null` for measured things.
+
+    SPEC §10.1 makes ``configs/assumptions.yaml`` the source of every economic and
+    performance claim, and the demo renders it verbatim in front of the audience.
+    For weeks it read ``provisional: true`` beside quantities ``metrics.json`` had
+    already measured — the pitch quoting a number while the file behind it said
+    the number was not yet known.
+    """
+    from iceroute.pitch import assumptions as asm
+
+    try:
+        res = asm.run(repo, dry_run=True)
+    except asm.SyncError as exc:
+        rep.warn("assunzioni allineate alle misure", str(exc))
+        return
+    if res.changed:
+        rep.fail("assunzioni allineate alle misure",
+                 f"{len(res.changed)} indietro ({', '.join(res.changed[:3])}): make report")
+    elif res.missing:
+        rep.warn("assunzioni allineate alle misure",
+                 f"{len(res.missing)} non ancora misurate: {', '.join(res.missing[:3])}")
+    else:
+        rep.ok("assunzioni allineate alle misure", f"{len(res.unchanged)} voci")
+
+
 def check_backup_video(repo: Path, rep: Report) -> None:
     vids = list((repo / "artifacts/video").glob("*.mp4")) if (repo / "artifacts/video").exists() else []
     if not vids:
@@ -283,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     check_worst_case_is_worst(args.repo, rep)
     check_claims(args.repo, rep)
     check_standalone(args.repo, rep)
+    check_assumptions(args.repo, rep)
     check_backup_video(args.repo, rep)
     check_imports(rep)
 

@@ -143,24 +143,50 @@ dataset:
 # Misure — riempite da metrics.json, MAI a mano
 # ---------------------------------------------------------------------------
 downlink:
-  raw_scene_bytes: null        # MISURATO da pitch/compression.py
-  payload_bytes: null          # MISURATO da pitch/compression.py
-  ratio: null                  # MISURATO
+  # Le tre cifre vengono dalla STESSA scena — quella la cui compressione è la mediana —
+  # perché raw / payload deve fare esattamente `ratio`. Tre mediane indipendenti danno
+  # un quoziente che non è nessuno dei numeri stampati, e in sala qualcuno divide.
+  ratio_scene: "20180917T121813_cis_prep.nc" # SCRITTO da pitch/assumptions.py
+  raw_scene_bytes: 64991441    # SCRITTO da pitch/assumptions.py
+  payload_bytes: 147986        # SCRITTO da pitch/assumptions.py
+  ratio: 439.2                 # SCRITTO da pitch/assumptions.py
+  ratio_min: 281.0             # SCRITTO da pitch/assumptions.py
+  ratio_max: 770.0             # SCRITTO da pitch/assumptions.py
+  provisional: false           # SCRITTO da pitch/assumptions.py
   numerator_definition: >-
     Canali SAR compressi senza perdita. Non i byte grezzi: un payload reale comprime
     prima di trasmettere, e dal 7% al 58% di una scena è padding di swath a 0.0.
     Confrontarsi con dati non compressi significa battere una baseline che nessuno
     manderebbe in orbita.
-  provisional: true
-  provisional_reason: >-
-    P-06. Finora misurato sull'ice chart, che è disegnata a poligoni e si comprime
-    molto meglio dell'uscita di una rete. Va rimisurato sulla maschera predetta.
+  payload_definition: >-
+    Maschera di ghiaccio PREDETTA (PNG) + rotta (GeoJSON) + metadati. NON contiene la
+    rotta diretta di confronto, che il satellite non trasmette (D-028).
+    Attenzione a cosa c'è dentro: la maschera è circa il 99,7% del pacchetto, la rotta
+    da sola sono ~430 byte. I deck di giugno dichiarano «< 4 KB, un vettore tattico,
+    non immagini»: è A-10 di §98, sbagliato di circa 37 volte. Il numero da citare è
+    payload_bytes, e la frase che lo accompagna va cambiata insieme al numero.
+  note: >-
+    P-06 chiusa il 07/09. Misurato sulla maschera predetta, non sull'ice chart: quella
+    è disegnata a poligoni e si comprime molto meglio dell'uscita di una rete, quindi
+    dava 1012:1 invece di 439:1 (D-016). La SPEC ipotizzava 200:1.
 
 model:
-  parameters: 1964182
-  onnx_int8_bytes: null        # MISURATO da model/quantize.py
-  latency_ms_per_tile: null    # MISURATO, CPU 1 thread
+  parameters: 1964131          # SCRITTO da pitch/assumptions.py
+  onnx_int8_bytes: 2148589     # SCRITTO da pitch/assumptions.py
+  latency_ms_per_tile: 39.744  # SCRITTO da pitch/assumptions.py
+  int8_degradation: 0.0046     # SCRITTO da pitch/assumptions.py
+  provisional: false           # SCRITTO da pitch/assumptions.py
   latency_note: >-
     Misurata a 1 thread. Il portatile ha 22 core, il payload no: citare il numero
     a 22 thread per un target FPGA non vorrebbe dire niente.
-  int8_degradation: null       # MISURATO
+  size_note: >-
+    Il deck di giugno dichiara 58 KB (A-02 di §98). Implicherebbero circa 59.000
+    parametri, contro i quasi due milioni reali: era aritmeticamente impossibile.
+    Per confronto utile in sala: CloudScout, il modello che ESA ha davvero fatto
+    volare su PhiSat-1 nel 2020, occupava 2,1 MB.
+  degradation_note: >-
+    È la DIFFERENZA fra fp32 e INT8, misurata sulle stesse scene attraverso lo stesso
+    identico codice di tiling. Solo la differenza è citabile: le mIoU assolute di
+    quella verifica girano su scene di training, già viste. La qualità vera è mIoU
+    0,532 su test ufficiale. Il deck dichiara «1–3% mIoU lost to INT8» (A-04): il
+    misurato è più basso, cioè migliore del dichiarato.
