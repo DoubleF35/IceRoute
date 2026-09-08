@@ -170,6 +170,28 @@ downlink:
     è disegnata a poligoni e si comprime molto meglio dell'uscita di una rete, quindi
     dava 1012:1 invece di 439:1 (D-016). La SPEC ipotizzava 200:1.
 
+# ---------------------------------------------------------------------------
+# Budget di link — A-10 di §98, deciso il 09/09
+# ---------------------------------------------------------------------------
+# Queste NON sono misure nostre: sono le velocità dichiarate dagli operatori.
+# Servono a rispondere alla sola obiezione seria contro il pacchetto da 148 KB
+# ("il link della nave ce la fa?"), e vanno citate come specifica di terzi.
+# I secondi sono DERIVATI dalla velocità di picco: il throughput reale è più
+# basso, quindi vanno detti come ordine di grandezza, non come cronometro.
+link:
+  iridium_certus_100_kbps: 88
+  iridium_certus_100_source: "Iridium, scheda prodotto Certus 100 (IP data fino a 88 kbps)"
+  inmarsat_fleetbroadband_kbps: 432
+  inmarsat_fleetbroadband_source: "Inmarsat FleetBroadband, fino a 432 kbps"
+  iridium_sbd_message_bytes: 300
+  iridium_sbd_source: "Iridium Short Burst Data, messaggi fino a ~300 byte"
+  note: >-
+    Il pacchetto completo (148 KB) impiega circa 13 s a 88 kbps e circa 3 s a 432 kbps.
+    La sola rotta (~430 byte) sta in DUE messaggi SBD, cioè nel canale dati marittimo
+    più economico e diffuso che esista. FleetBroadband distribuisce già aggiornamenti
+    ECDIS in tempo reale come servizio ordinario: 148 KB di strato di ghiaccio sono
+    esattamente il tipo di traffico per cui quel link è pensato.
+
 model:
   parameters: 1964131          # SCRITTO da pitch/assumptions.py
   onnx_int8_bytes: 2148589     # SCRITTO da pitch/assumptions.py
