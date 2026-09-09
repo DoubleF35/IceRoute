@@ -176,6 +176,7 @@ report:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.pitch.metrics
 	$(PY) -m iceroute.pitch.assumptions
+	$(PY) -m iceroute.pitch.classes
 	$(PY) -m iceroute.pitch.figures
 	$(PY) -m iceroute.pitch.dashboard
 	@$(MAKE) --no-print-directory demo-static
