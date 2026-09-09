@@ -430,7 +430,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Genera data/demo/ per la UI. SPEC §9.2.")
     ap.add_argument("--config", type=Path, default=Path("configs/routing.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--train-config", type=Path, default=Path("configs/train3.yaml"))
+    ap.add_argument("--train-config", type=Path, default=None,
+                    help="default: il config schierato, da artifacts/best_config.txt")
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=Path("data/demo"))
     ap.add_argument("--demo-config", type=Path, default=Path("configs/demo.yaml"))
@@ -455,7 +456,10 @@ def main(argv: list[str] | None = None) -> int:
 
     data_cfg = load_config(args.data_config)
     routing_cfg = yaml.safe_load(args.config.read_text())
-    train_cfg = yaml.safe_load(args.train_config.read_text())
+    from iceroute.pitch.metrics import deployed_config
+    train_path = args.train_config or deployed_config()
+    train_cfg = yaml.safe_load(train_path.read_text())
+    log.info("Modello: %s", train_path)
     table = PolarisTable.load()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -148,10 +148,10 @@ downlink:
   # un quoziente che non è nessuno dei numeri stampati, e in sala qualcuno divide.
   ratio_scene: "20180917T121813_cis_prep.nc" # SCRITTO da pitch/assumptions.py
   raw_scene_bytes: 64991441    # SCRITTO da pitch/assumptions.py
-  payload_bytes: 187339        # SCRITTO da pitch/assumptions.py
-  ratio: 346.9                 # SCRITTO da pitch/assumptions.py
-  ratio_min: 237.6             # SCRITTO da pitch/assumptions.py
-  ratio_max: 604.4             # SCRITTO da pitch/assumptions.py
+  payload_bytes: 147986        # SCRITTO da pitch/assumptions.py
+  ratio: 439.2                 # SCRITTO da pitch/assumptions.py
+  ratio_min: 281.0             # SCRITTO da pitch/assumptions.py
+  ratio_max: 770.0             # SCRITTO da pitch/assumptions.py
   provisional: false           # SCRITTO da pitch/assumptions.py
   numerator_definition: >-
     Canali SAR compressi senza perdita. Non i byte grezzi: un payload reale comprime

@@ -6,9 +6,12 @@ cases computed by hand rather than against the implementation's own output.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
+import yaml
 
 from iceroute.model.losses import (
     IGNORE_INDEX,
@@ -203,3 +206,64 @@ def test_class_weights_move_with_the_module():
     """A bare tensor attribute would stay on CPU and raise mid-training."""
     loss = CombinedLoss(3, class_weights=torch.ones(3))
     assert "class_weights" in dict(loss.named_buffers())
+
+
+# ---------------------------------------------------------------------------
+# Which model the measurement runs on
+# ---------------------------------------------------------------------------
+
+
+def test_the_deployed_config_comes_from_the_picker_not_a_default(tmp_path, monkeypatch):
+    """The bug this guards already fired, on 2026-09-09.
+
+    ``pitch/metrics.py`` defaulted to ``configs/train3.yaml`` — the *baseline*
+    checkpoint — while the deployed model is whatever ``pick_model.py`` wrote into
+    ``artifacts/best_config.txt`` (D-025). Both files load, both produce numbers,
+    so ``make report`` silently restated the headline compression ratio as 347:1
+    instead of 439:1 with no measurement code having changed. It went unnoticed
+    because report had not been re-run since the model switch.
+    """
+    from iceroute.pitch import metrics as mx
+
+    picked = tmp_path / "configs/train3_lovasz.yaml"
+    picked.parent.mkdir(parents=True)
+    picked.write_text("output: {best_checkpoint: lovasz.pt}\n")
+    marker = tmp_path / "best_config.txt"
+    marker.write_text(str(picked) + "\n")
+
+    monkeypatch.setattr(mx, "DEPLOYED", marker)
+    assert mx.deployed_config() == picked
+
+
+def test_a_missing_marker_falls_back_rather_than_crashing(tmp_path, monkeypatch):
+    from iceroute.pitch import metrics as mx
+
+    monkeypatch.setattr(mx, "DEPLOYED", tmp_path / "assente.txt")
+    assert mx.deployed_config(Path("configs/train3.yaml")) == Path("configs/train3.yaml")
+
+
+def test_a_marker_pointing_at_a_deleted_config_falls_back(tmp_path, monkeypatch):
+    """A dangling pointer must not take the whole report down the morning of the
+    pitch; it must degrade to the baseline and say so through the fallback."""
+    from iceroute.pitch import metrics as mx
+
+    marker = tmp_path / "best_config.txt"
+    marker.write_text(str(tmp_path / "sparito.yaml") + "\n")
+    monkeypatch.setattr(mx, "DEPLOYED", marker)
+    assert mx.deployed_config(Path("configs/train3.yaml")) == Path("configs/train3.yaml")
+
+
+def test_the_real_repository_measures_on_the_deployed_model():
+    """metrics.json must record which model produced the compression figure, and
+    it must be the deployed one. Without the record a stale file cannot be told
+    from a fresh one measured on the wrong network."""
+    import json
+
+    mpath, marker = Path("artifacts/metrics.json"), Path("artifacts/best_config.txt")
+    if not (mpath.exists() and marker.exists()):
+        pytest.skip("metrics.json o best_config.txt assenti")
+    comp = json.loads(mpath.read_text()).get("compression") or {}
+    if not comp or comp.get("error"):
+        pytest.skip("compressione non misurata")
+    want = yaml.safe_load(Path(marker.read_text().strip()).read_text())
+    assert comp.get("checkpoint") == want["output"]["best_checkpoint"]

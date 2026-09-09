@@ -26,6 +26,28 @@ from iceroute.data.loader import load_config, load_scene
 from iceroute.demo.precompute import resolve_labels
 from iceroute.pitch.compression import downlink_route, measure_scene, summarise, verdict
 
+DEPLOYED = Path("artifacts/best_config.txt")
+
+
+def deployed_config(fallback: Path = Path("configs/train3.yaml")) -> Path:
+    """The config the model picker chose, not a filename frozen in an argparse default.
+
+    ``configs/train3.yaml`` names the *baseline* checkpoint. The deployed model is
+    whatever ``scripts/pick_model.py`` last wrote into ``artifacts/best_config.txt``
+    (D-025: the Lovász run). Defaulting to the fixed name measured a model nobody
+    ships — and did so silently, because both files load and both produce numbers.
+
+    That is exactly how the compression figure moved from 439:1 to 347:1 on
+    2026-09-09 without a line of measurement code changing: ``make report`` had not
+    been re-run since the model switch, so the wrong default had never fired.
+    """
+    if DEPLOYED.exists():
+        picked = Path(DEPLOYED.read_text().strip())
+        if picked.exists():
+            return picked
+    return fallback
+
+
 log = logging.getLogger("metrics")
 
 
@@ -205,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--demo-dir", type=Path, default=Path("data/demo"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--train-config", type=Path, default=Path("configs/train3.yaml"))
+    ap.add_argument("--train-config", type=Path, default=None,
+                    help="default: il config schierato, da artifacts/best_config.txt")
     ap.add_argument("--raw-dir", type=Path, default=None)
     ap.add_argument("--device", default=None)
     ap.add_argument("--skip-downlink", action="store_true")
@@ -215,7 +238,9 @@ def main(argv: list[str] | None = None) -> int:
 
     metrics = json.loads(args.metrics.read_text()) if args.metrics.exists() else {}
     data_cfg = load_config(args.data_config)
-    train_cfg = yaml.safe_load(args.train_config.read_text())
+    train_path = args.train_config or deployed_config()
+    train_cfg = yaml.safe_load(train_path.read_text())
+    log.info("Modello: %s", train_path)
 
     if args.raw_dir is None:
         demo_cfg_path = Path("configs/demo.yaml")
@@ -231,6 +256,10 @@ def main(argv: list[str] | None = None) -> int:
             args.demo_dir, data_cfg, args.raw_dir,
             checkpoint=Path(train_cfg["output"]["best_checkpoint"]), device=device,
         )
+        # The number carries the model that produced it. Without this a stale
+        # metrics.json cannot be told from a fresh one measured on the wrong net.
+        metrics["compression"]["checkpoint"] = train_cfg["output"]["best_checkpoint"]
+        metrics["compression"]["train_config"] = str(train_path)
         v = metrics["compression"].get("verdict") or metrics["compression"].get("error")
         log.info("  %s", v)
 

@@ -152,6 +152,26 @@ def check_model_is_current(repo: Path, index: dict, rep: Report) -> None:
     else:
         rep.ok("demo allineata al modello scelto", str(want))
 
+    # And the *measurements* must come from that same model. They did not, once:
+    # pitch/metrics.py defaulted to configs/train3.yaml — the baseline — so
+    # `make report` quietly restated the headline compression ratio as 347:1
+    # instead of 439:1, with no code in the measurement chain having changed.
+    # Nothing caught it, because the check above only looks at data/demo/.
+    comp = (json.loads((repo / "artifacts/metrics.json").read_text()).get("compression")
+            if (repo / "artifacts/metrics.json").exists() else None) or {}
+    measured = comp.get("checkpoint")
+    if not comp:
+        return
+    if measured is None:
+        rep.warn("compressione misurata sul modello scelto",
+                 "metrics.json non registra con quale modello: rilancia make report")
+    elif measured != want:
+        rep.fail("compressione misurata sul modello scelto",
+                 f"misurata su {measured}, schierato è {want}: rilancia make report")
+    else:
+        rep.ok("compressione misurata sul modello scelto",
+               f"{comp.get('ratio_median')}:1")
+
 
 def check_worst_case_is_worst(repo: Path, rep: Report) -> None:
     demo_cfg = repo / "configs/demo.yaml"
