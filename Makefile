@@ -65,6 +65,7 @@ help:
 	@echo "    make test         pytest"
 	@echo "    make dashboard    rigenera index.html: stato del progetto nel browser"
 	@echo "    make status       a che punto siamo (file presenti, gate superati)"
+	@echo "    make backup       archivia cio che non sta in git e serve il 7 ottobre"
 	@echo "    make all          data -> train -> eval -> quantize -> route -> precompute -> report"
 	@echo ""
 
@@ -225,6 +226,23 @@ all: data train eval quantize route precompute report
 	@echo ""
 	@echo "  Pipeline completa. Verifica artifacts/metrics.json prima del pitch."
 	@echo ""
+
+# Gli artefatti che non stanno in git e che il 7 ottobre servono. Vedi README.
+.PHONY: backup
+backup:
+	@out=$$HOME/iceroute-backup-$$(date +%Y%m%d-%H%M).tar.gz; \
+	files=""; \
+	for f in data/demo demo.html artifacts/models artifacts/metrics.json artifacts/video; do \
+		[ -e "$$f" ] && files="$$files $$f"; \
+	done; \
+	tar czf "$$out" $$files; \
+	echo ""; \
+	echo "  $$out  ($$(du -h "$$out" | cut -f1))"; \
+	echo "  contiene:$$files"; \
+	echo ""; \
+	echo "  Ora copialo ALTROVE: chiavetta o cloud."; \
+	echo "  Un backup sullo stesso disco non è un backup."; \
+	echo ""
 
 .PHONY: clean-cache
 clean-cache:

@@ -81,6 +81,9 @@ rotta più corta e la più veloce non coincidono, ed è quello che la demo mostr
 | `configs/` | tutta la configurazione. Nessun parametro hardcodato nel codice. |
 | `artifacts/` | output generati: modelli, figure, `metrics.json` |
 | `data/polaris_rv.csv` | tabella Risk Value POLARIS, **versionata**, con la fonte per riga |
+| `pitch/` | materiali per il palco: script parlato e modifiche slide per slide |
+| `demo.html` | la demo congelata in un file solo. Doppio clic, zero dipendenze (`make demo-static`) |
+| `index.html` | stato del progetto nel browser (`make dashboard`) |
 
 ---
 
@@ -100,13 +103,17 @@ Sono nella specifica (`ICEROUTE_BUILD_SPEC.md`), ma le tre che contano:
 
 ## Backup
 
-`data/demo/` è gitignored perché grande, ma è **l'artefatto più importante del progetto**:
-è ciò che fa girare la demo senza rete. Va copiato su una chiavetta insieme a
-`artifacts/models/` e al video di backup prima di partire per Torino.
+`data/demo/` e `demo.html` sono gitignored perché grandi, ma sono **gli artefatti più
+importanti del progetto**: sono ciò che fa girare la demo senza rete. Se muore il disco,
+muoiono con lui.
 
 ```bash
-tar czf iceroute_demo_backup.tar.gz data/demo/ artifacts/models/ artifacts/video/ artifacts/metrics.json
+make backup
 ```
+
+Produce `~/iceroute-backup-<data>.tar.gz` (~77 MB) con `data/demo/`, `demo.html`,
+`artifacts/models/` e `artifacts/metrics.json`. **Poi copialo altrove** — chiavetta o cloud.
+Un backup accanto all'originale non è un backup.
 
 ---
 
