@@ -81,7 +81,7 @@ rotta più corta e la più veloce non coincidono, ed è quello che la demo mostr
 | `configs/` | tutta la configurazione. Nessun parametro hardcodato nel codice. |
 | `artifacts/` | output generati: modelli, figure, `metrics.json` |
 | `data/polaris_rv.csv` | tabella Risk Value POLARIS, **versionata**, con la fonte per riga |
-| `pitch/` | materiali per il palco: script parlato e modifiche slide per slide |
+| `pitch/` | materiali per il palco: script parlato (IT, e EN per le domande), modifiche slide per slide, tabella delle classi |
 | `demo.html` | la demo congelata in un file solo. Doppio clic, zero dipendenze (`make demo-static`) |
 | `index.html` | stato del progetto nel browser (`make dashboard`) |
 
