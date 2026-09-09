@@ -13,6 +13,7 @@ import json
 
 import pytest
 
+from iceroute.demo import estimate
 from iceroute.demo.estimate import (
     ELEVATED_CAP_KN,
     fuel_tonnes,
@@ -172,3 +173,57 @@ def test_no_consumption_means_no_fuel_figure_and_never_a_zero():
     assert fuel_tonnes(48.0, None) is None
     assert fuel_tonnes(48.0, 0.0) is None
     assert fuel_tonnes(None, 30.0) is None
+
+
+# ---------------------------------------------------------------------------
+# What the payload costs on the link — A-10
+# ---------------------------------------------------------------------------
+
+ASM_LINK = {"link": {"iridium_certus_100_kbps": 88, "inmarsat_fleetbroadband_kbps": 432,
+                     "iridium_sbd_message_bytes": 300}}
+
+
+def test_no_link_rate_means_no_number():
+    """Third-party specs live in assumptions.yaml with a source. Without them
+    the panel says nothing rather than picking a plausible speed."""
+    lt = estimate.link_time(147986, 431, {})
+    assert lt.seconds is None and "assumptions" in lt.reason
+
+
+def test_the_slowest_terminal_is_the_one_quoted():
+    """Quoting FleetBroadband's three seconds would be quoting the best case at
+    someone who may not have it. The claim has to survive the worst link."""
+    lt = estimate.link_time(147986, 431, ASM_LINK)
+    assert lt.kbps == 88
+    assert lt.seconds == pytest.approx(147986 * 8 / 88_000)
+
+
+def test_the_route_is_counted_in_whole_sbd_messages():
+    """431 bytes is 1.4 messages, and you cannot send 0.4 of one."""
+    assert estimate.link_time(147986, 431, ASM_LINK).sbd_messages == 2
+    assert estimate.link_time(147986, 300, ASM_LINK).sbd_messages == 1
+    assert estimate.link_time(147986, 301, ASM_LINK).sbd_messages == 2
+
+
+def test_no_payload_means_no_link_time():
+    assert estimate.link_time(None, 431, ASM_LINK).seconds is None
+    assert estimate.link_time(0, 431, ASM_LINK).seconds is None
+
+
+def test_a_missing_sbd_size_still_gives_the_seconds():
+    """The two facts are independent: one missing must not suppress the other."""
+    lt = estimate.link_time(147986, 431, {"link": {"iridium_certus_100_kbps": 88}})
+    assert lt.seconds is not None and lt.sbd_messages is None
+
+
+def test_the_real_assumptions_put_the_payload_in_seconds_not_minutes():
+    """This is the answer to the only serious objection A-10 invites. If it ever
+    stops being a small number, the deck claim needs revisiting, not the wording."""
+    from pathlib import Path
+
+    import yaml
+    if not Path("configs/assumptions.yaml").exists():
+        pytest.skip("assumptions.yaml assente")
+    a = yaml.safe_load(Path("configs/assumptions.yaml").read_text())
+    lt = estimate.link_time(a["downlink"]["payload_bytes"], 431, a)
+    assert lt.seconds is not None and lt.seconds < 60, f"{lt.seconds:.0f} s non è più 'tredici'"

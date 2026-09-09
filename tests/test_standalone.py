@@ -196,3 +196,51 @@ def test_the_generated_page_carries_every_demo_route():
             assert e["svg"], f"{s['id']}/{ice_class}: rotta senza SVG"
             assert 'class="lay-iceroute"' in e["svg"]
             assert e["transit"]["values"], f"{s['id']}/{ice_class}: nessuna tabella dei tempi"
+
+
+# ---------------------------------------------------------------------------
+# The link time is baked, like everything else
+# ---------------------------------------------------------------------------
+
+
+def test_the_offline_copy_carries_the_link_time_too():
+    """Same rule as the transit table: computed in Python, chosen in the browser.
+    The page cannot arrive at a transmission time of its own."""
+    from pathlib import Path
+
+    page = Path("demo.html")
+    if not page.exists():
+        pytest.skip("demo.html assente")
+    blob = json.loads(re.search(r"const D = (\{.*?\});</script>",
+                                page.read_text(), re.S).group(1))
+    pays = [c["payload"] for s in blob["scenes"] for c in s["classes"].values()
+            if c.get("payload")]
+    assert pays, "nessun payload nella pagina"
+
+    measured = [p for p in pays if p.get("total")]
+    assert measured, "nessun payload con byte misurati"
+    for p in measured:
+        lk = p["link"]
+        assert lk and lk["s"] > 0 and lk["kbps"] == 88, lk
+        assert lk["sbd"] >= 1
+
+    # The worst-case scene has no compression measurement — `make report` covers
+    # the carousel only — so it has no bytes, and therefore must have no seconds.
+    # A transmission time next to an unmeasured payload would be pure invention.
+    for p in pays:
+        if not p.get("total"):
+            assert p["link"] is None, "tempo di link senza byte misurati"
+
+
+def test_without_assumptions_the_page_shows_no_transmission_time():
+    """A missing source must produce silence, not a default speed."""
+    from pathlib import Path
+
+    demo_dir = Path("data/demo")
+    if not (demo_dir / "index.json").exists():
+        pytest.skip("data/demo assente")
+    ctx = sa.collect(demo_dir, {}, {})
+    for s in ctx["scenes"]:
+        for c in s["classes"].values():
+            if c.get("payload"):
+                assert c["payload"]["link"] is None

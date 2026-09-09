@@ -43,8 +43,10 @@ import json
 import logging
 from pathlib import Path
 
+import yaml
+
 from iceroute.demo import overlay as ov
-from iceroute.demo.estimate import HOURS_PER_DAY, payload, rescale_transit
+from iceroute.demo.estimate import HOURS_PER_DAY, link_time, payload, rescale_transit
 
 log = logging.getLogger("standalone")
 
@@ -155,7 +157,7 @@ def transit_table(entry: dict, ice_class: str, nominal: float) -> dict:
     return {"values": values, "baseline": baseline, "note": note}
 
 
-def collect(demo_dir: Path, metrics: dict) -> dict:
+def collect(demo_dir: Path, metrics: dict, assumptions: dict | None = None) -> dict:
     """Everything the page shows, read out of the demo build."""
     index = json.loads((demo_dir / "index.json").read_text())
     nominal = float(index.get("open_water_speed_kn") or 12.0)
@@ -198,6 +200,13 @@ def collect(demo_dir: Path, metrics: dict) -> dict:
                     "total": pay.total_bytes, "ratio": pay.ratio,
                     "n_waypoints": pay.n_waypoints, "text": pay.route_text,
                     "note": pay.note,
+                    # Computed here, not in the browser: same rule as the transit
+                    # table. If assumptions.yaml has no link rate, this is null and
+                    # the page shows nothing rather than a plausible number.
+                    "link": (lambda lt: None if lt.seconds is None else {
+                        "s": round(lt.seconds), "terminal": lt.terminal,
+                        "kbps": lt.kbps, "sbd": lt.sbd_messages,
+                    })(link_time(pay.total_bytes, pay.route_bytes, assumptions or {})),
                 },
             }
 
@@ -453,6 +462,14 @@ function renderPanes() {
           <div class="sub">contro ${(p.sar / 1048576).toFixed(1)} MB di SAR compresso senza
           perdita — <b>${Math.round(p.ratio)}:1</b>. La scheda in alto riporta la
           <b>mediana</b>.</div></div>` : `<div class="note">${p.note || ''}</div>`}
+        ${p.link ? `<div class="kpi" style="margin-top:12px">
+          <div class="lab">Tempo sul collegamento</div>
+          <div class="val">&asymp; ${p.link.s} s</div>
+          <div class="sub">su ${p.link.terminal} a ${p.link.kbps} kbps, il terminale più
+          lento fra quelli in <code>configs/assumptions.yaml</code>.${p.link.sbd ?
+          ` La sola rotta sta in <b>${p.link.sbd} messaggi Iridium SBD</b>.` : ''}
+          Derivato dalla velocità di picco dichiarata dall'operatore: il throughput reale
+          è più basso.</div></div>` : ''}
         <div class="note">La rotta di confronto <b>non</b> è qui dentro: è calcolata a terra
         per argomentare, e un satellite non ha ragione di trasmettere la linea retta fra due
         punti che il destinatario gli ha dato lui.</div></div>
@@ -595,8 +612,10 @@ def main(argv: list[str] | None = None) -> int:
         log.error("%s assente: lancia prima 'make precompute'.", args.demo_dir / "index.json")
         return 1
     metrics = json.loads(args.metrics.read_text()) if args.metrics.exists() else {}
+    asm_path = Path("configs/assumptions.yaml")
+    assumptions = yaml.safe_load(asm_path.read_text()) if asm_path.exists() else {}
 
-    ctx = collect(args.demo_dir, metrics)
+    ctx = collect(args.demo_dir, metrics, assumptions)
     args.out.write_text(build_page(ctx), encoding="utf-8")
     mb = args.out.stat().st_size / 1e6
     log.info("%s — %.1f MB, %d scene, %d immagini incorporate",

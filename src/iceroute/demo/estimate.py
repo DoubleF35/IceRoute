@@ -130,6 +130,55 @@ def payload(entry: dict, routes_dir: Path, metrics: dict, scene_id: str) -> Payl
 
 
 # ---------------------------------------------------------------------------
+# What the payload costs on the link
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LinkTime:
+    """How long the payload takes to reach the bridge, and on what terminal."""
+
+    seconds: float | None = None
+    terminal: str = ""
+    kbps: int | None = None
+    sbd_messages: int | None = None
+    reason: str = ""
+
+
+def link_time(payload_bytes: int | None, route_bytes: int | None,
+              assumptions: dict) -> LinkTime:
+    """Seconds on the *smallest* terminal a ship is likely to carry.
+
+    This exists because of A-10. Stating that the downlink is 148 KB invites
+    exactly one objection — "can the ship's link carry that?" — and the honest
+    answer is thirteen seconds, which is better than the question expects. A
+    panel that gives the size and not the cost leaves the objection standing.
+
+    The rates are third-party specifications, not our measurements, so they live
+    in ``configs/assumptions.yaml`` with a source and this function refuses
+    without them. The seconds are **derived from rated peak**: real throughput is
+    lower, so the figure is an order of magnitude and the UI says so.
+
+    The slowest terminal is chosen deliberately. Quoting FleetBroadband's three
+    seconds would be quoting the best case at someone who may not have it.
+    """
+    link = (assumptions or {}).get("link") or {}
+    rates = [(v, k) for k, v in link.items()
+             if k.endswith("_kbps") and isinstance(v, int | float) and v > 0]
+    if not rates or not payload_bytes:
+        return LinkTime(reason="Velocità del collegamento non in configs/assumptions.yaml.")
+
+    kbps, key = min(rates)
+    msgs = None
+    per_msg = link.get("iridium_sbd_message_bytes")
+    if route_bytes and isinstance(per_msg, int) and per_msg > 0:
+        msgs = -(-route_bytes // per_msg)
+    return LinkTime(seconds=payload_bytes * 8 / (kbps * 1000),
+                    terminal=key[:-5].replace("_", " ").title(),
+                    kbps=int(kbps), sbd_messages=msgs)
+
+
+# ---------------------------------------------------------------------------
 # Time and fuel, under an assumption the viewer sets
 # ---------------------------------------------------------------------------
 

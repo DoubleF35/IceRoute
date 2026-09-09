@@ -552,7 +552,7 @@ def conditions_note(entry: dict, ice_class: str) -> None:
 
 def downlink_panel(scene: dict, entry: dict) -> None:
     """The product, in bytes. The strongest measured claim we have."""
-    from iceroute.demo.estimate import payload
+    from iceroute.demo.estimate import link_time, payload
 
     if not entry.get("route_exists"):
         st.info("Nessuna rotta su questa scena: non c'è payload da trasmettere.")
@@ -583,6 +583,16 @@ def downlink_panel(scene: dict, entry: dict) -> None:
                     f"contro {p.sar_bytes / 1024**2:.1f} MB di SAR compresso senza perdita "
                     f"— <b>{p.ratio:.0f}:1</b>. La scheda in alto riporta la "
                     f"<b>mediana</b> sulle scene misurate."),
+                unsafe_allow_html=True)
+        lt = link_time(p.total_bytes, p.route_bytes, load_assumptions())
+        if lt.seconds is not None:
+            sbd = (f" La sola rotta sta in <b>{lt.sbd_messages} messaggi Iridium SBD</b>."
+                   if lt.sbd_messages else "")
+            st.markdown(
+                kpi("Tempo sul collegamento", f"≈ {lt.seconds:.0f} s",
+                    f"su {lt.terminal} a {lt.kbps} kbps, il terminale più lento fra quelli "
+                    f"in configs/assumptions.yaml.{sbd} Derivato dalla velocità di picco "
+                    f"dichiarata dall'operatore: il throughput reale è più basso."),
                 unsafe_allow_html=True)
         if p.note:
             st.caption(p.note)
