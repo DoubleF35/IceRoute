@@ -70,6 +70,9 @@ RAW_DIR = Path("data/raw/test")
 METRICS = Path("artifacts/metrics.json")
 ASSUMPTIONS = Path("configs/assumptions.yaml")
 OUT = Path("console.html")
+# Rasters this page builds and the demo does not. Kept apart from
+# data/demo/images so preflight does not count them as orphans of the build.
+CACHE_DIR = Path("data/demo/console")
 
 ARCTIC_CIRCLE = 66.5633      # definition, not a measurement
 
@@ -172,6 +175,64 @@ def footprint(raw: Path, *, step: int = 2) -> dict | None:
             "seconds": round((int(g["t1"][13:15]) - int(g["t0"][13:15])
                               + 60 * (int(g["t1"][11:13]) - int(g["t0"][11:13]))), 0),
         }
+    return out
+
+
+def sar_geocoded(raw: Path, grid_shape, resolution_m: float, cache: Path) -> Path | None:
+    """The SAR put on the routing grid, so the layers stop jumping.
+
+    ``sar`` is the decimated swath; the mask, the concentration, the RIO raster
+    and the routes are EPSG:3413 at 500 m. Switching between them moves the
+    scene, because the picture really has changed projection — correct, and
+    still the thing that makes the two halves of the demo look like two
+    different places.
+
+    The fix is not to warp anything by hand. The SAR is handed to the *same*
+    ``geocode_scene`` call that built the routing grid, as an extra band, so it
+    lands on that grid by construction rather than by agreement. The shape is
+    then checked against the overlay's own ``grid_shape``, and a mismatch
+    returns nothing: a layer that is one cell out would put the route in the
+    wrong place while looking perfectly convincing, which is D-027 again.
+
+    Stretching happens *before* resampling, on the native band, exactly as
+    ``precompute`` does it for the swath SAR — so the geocoded layer carries
+    the same grey mapping and the two are comparable rather than merely
+    similar.
+    """
+    out = cache / f"{raw.stem}_sargeo.png"
+    if out.is_file():
+        # The cache is checked against the grid, not trusted for being present.
+        # A PNG left over from a different resolution would otherwise sail past
+        # the shape check below and misplace every route drawn on it.
+        from PIL import Image
+
+        with Image.open(out) as im:
+            cached = [im.height, im.width]
+        if cached == list(grid_shape):
+            return out
+        log.info("  cache obsoleta per %s (%s contro %s): rigenero",
+                 raw.name, cached, list(grid_shape))
+        out.unlink()
+    if not raw.is_file():
+        return None
+
+    from iceroute.data.loader import load_config, load_scene
+    from iceroute.demo.precompute import resolve_labels, save_png, stretch
+    from iceroute.routing.geocode import geocode_scene
+
+    scene = load_scene(raw, load_config(Path("configs/data.yaml")),
+                       labels_from=resolve_labels(raw))
+    hv8 = stretch(scene.hv, scene.mask_valid)
+    geo = geocode_scene(scene, resolution_m=resolution_m, extra={"sar": hv8})
+    if list(geo.shape) != list(grid_shape):
+        log.warning("  %s: griglia %s contro %s dell'overlay — livello non generato",
+                    raw.name, list(geo.shape), list(grid_shape))
+        return None
+
+    img = geo.extra["sar"].copy()
+    img[~geo.mask_valid] = 0
+    cache.mkdir(parents=True, exist_ok=True)
+    save_png(img, out, downscale=1)
     return out
 
 
@@ -454,7 +515,8 @@ def panels(entry: dict, fp: dict | None, stats: dict | None,
             "mix": mix, "trace": trace, "bridge": bridge(entry)}
 
 
-def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path) -> dict:
+def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
+            cache_dir: Path = CACHE_DIR) -> dict:
     """standalone's context, plus geography and the console's own strings."""
     ctx = sa.collect(demo_dir, metrics, assumptions)
     index = json.loads((demo_dir / "index.json").read_text())
@@ -471,12 +533,15 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path) -> 
                   "warnings": src.get("warnings") or [],
                   "inference_seconds": src.get("inference_seconds")}
 
+        grid_shape = grid_res = None
         for ic, entry in scene["classes"].items():
             raw_entry = ((src.get("classes") or {}).get(ic)) or {}
             ov_name = raw_entry.get("overlay") or ""
             overlay = {}
             if ov_name and (demo_dir / "overlays" / ov_name).is_file():
                 overlay = json.loads((demo_dir / "overlays" / ov_name).read_text())
+                grid_shape = grid_shape or overlay.get("grid_shape")
+                grid_res = grid_res or overlay.get("resolution_m")
             adm = admissibility(overlay) if overlay else None
             entry |= {
                 "adm": adm,
@@ -487,12 +552,33 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path) -> 
                 "log": event_log(scene, ic, entry, stats, fp, overlay, adm),
             }
             entry["panels"] = panels(entry, fp, stats, adm, sa.palette())
+        scene["_grid"] = (grid_shape, grid_res)
+
+    # The SAR on the routing grid, built from the same geocode call that made
+    # that grid. Done per scene, after its overlay has said what the grid is.
+    any_geo = False
+    for scene in ctx["scenes"]:
+        shape, res = scene.pop("_grid", (None, None))
+        if not (shape and res):
+            continue
+        png = sar_geocoded(raw_dir / scene["id"], shape, res, cache_dir)
+        if png is None:
+            continue
+        scene["files"]["sar_geo"] = png.name
+        if png.name not in ctx["images"]:
+            ctx["images"][png.name] = sa.data_uri(png, photographic=True)
+        any_geo = True
+
+    layers = list(sa.LAYERS)
+    if any_geo:
+        at = next((i for i, lay in enumerate(layers) if lay[0] == "sar"), len(layers))
+        layers.insert(at, ("sar_geo", "SAR sulla griglia delle rotte", True))
 
     ctx |= {
         "palette": sa.palette(),
         "arctic_circle": ARCTIC_CIRCLE,
         "missing_raw": missing_raw,
-        "layers": sa.LAYERS,
+        "layers": layers,
         "modes": sa.MODES,
     }
     return ctx

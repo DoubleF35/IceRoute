@@ -352,3 +352,59 @@ def test_every_real_packet_parses_as_the_file_it_claims_to_be():
             assert e["payload"]["route"] == b["bytes"], f"{s['id']}/{ic}: conteggio diverso"
             checked += 1
     assert checked, "nessun pacchetto verificato"
+
+
+# ---------------------------------------------------------------------------
+# The two grids, made to coincide
+# ---------------------------------------------------------------------------
+
+
+def test_the_geocoded_sar_lands_on_the_same_raster_as_the_mask():
+    """The whole point of the layer: SAR, mask, concentration, RIO and the
+    routes on one grid, so switching layers stops moving the scene."""
+    from PIL import Image
+
+    ctx = _real_ctx()
+    checked = 0
+    for s in ctx["scenes"]:
+        files = s.get("files") or {}
+        if "sar_geo" not in files:
+            continue
+        geo = Image.open(Path("data/demo/images") / files["mask_geo"]).size
+        sar = Image.open(co.CACHE_DIR / files["sar_geo"]).size
+        assert sar == geo, f"{s['id']}: SAR {sar} contro maschera {geo}"
+        checked += 1
+    if not checked:
+        pytest.skip("nessun SAR geocodificato in questa build")
+
+
+def test_a_grid_that_does_not_match_the_overlay_produces_no_layer(tmp_path):
+    """Refusing is the point. A layer one cell out would put the route in the
+    wrong place while looking perfectly convincing — D-027, again."""
+    raw = Path("data/raw/test/20180707T113313_cis_prep.nc")
+    if not raw.is_file():
+        pytest.skip("scena grezza assente")
+    assert co.sar_geocoded(raw, [10, 10], 500.0, tmp_path) is None
+    assert not list(tmp_path.glob("*.png")), "non deve lasciare un raster inutilizzabile"
+
+
+def test_a_cached_raster_of_the_wrong_shape_is_rebuilt_not_served(tmp_path):
+    """Presence is not correctness: a PNG left from another resolution would
+    otherwise sail past the shape check it was meant to fail."""
+    from PIL import Image
+
+    raw = Path("data/raw/test/20180707T113313_cis_prep.nc")
+    stale = tmp_path / f"{raw.stem}_sargeo.png"
+    Image.new("L", (7, 9)).save(stale)
+    assert co.sar_geocoded(raw, [10, 10], 500.0, tmp_path) is None
+    assert not stale.exists(), "la cache obsoleta va rimossa, non restituita"
+
+
+def test_the_layer_is_offered_only_when_a_scene_actually_has_it():
+    ctx = _real_ctx()
+    ids = [x[0] for x in ctx["layers"]]
+    has = any("sar_geo" in (s.get("files") or {}) for s in ctx["scenes"])
+    assert ("sar_geo" in ids) == has
+    if has:
+        assert ids.index("sar_geo") < ids.index("sar"), \
+            "il livello geocodificato sta accanto a quello a swath, per il confronto"

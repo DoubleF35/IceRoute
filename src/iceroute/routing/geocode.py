@@ -31,7 +31,7 @@ Three things had to be established against the real data rather than assumed:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 import numpy as np
@@ -214,6 +214,8 @@ class GeocodedScene:
     sic: np.ndarray | None = None
     distance_to_land: np.ndarray | None = None
     scene_id: str = ""
+    # Extra bands resampled onto *this* grid, by name. Empty unless asked for.
+    extra: dict = field(default_factory=dict)
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -263,6 +265,7 @@ def geocode_scene(
     resolution_m: float = 500.0,
     crs: str = POLAR_CRS,
     subsample: int | None = None,
+    extra: dict[str, np.ndarray] | None = None,
 ) -> GeocodedScene:
     """Project a :class:`~iceroute.data.loader.Scene` onto a regular grid.
 
@@ -277,6 +280,12 @@ def geocode_scene(
         Take every n-th source pixel before resampling. ``None`` picks a factor
         that keeps the source about twice as dense as the target, which is
         enough to leave no destination cell empty while cutting the work.
+    extra
+        Further source-shaped arrays to put on the same grid, returned in
+        :attr:`GeocodedScene.extra`. This exists so a caller that wants, say,
+        the SAR on the routing grid gets it from *this* call rather than
+        rebuilding the grid itself — two grids built separately are two grids
+        that can disagree, which is D-027.
     """
     from iceroute.data.loader import FILL_VALUE
 
@@ -314,6 +323,13 @@ def geocode_scene(
         100 * valid.mean(),
     )
 
+    resampled = {}
+    for name, band in (extra or {}).items():
+        fill = np.nan if np.issubdtype(np.asarray(band).dtype, np.floating) else 0
+        resampled[name] = _resample_nearest(
+            sx, sy, np.asarray(band)[sl].ravel(), grid, fill, str(np.asarray(band).dtype)
+        )
+
     return GeocodedScene(
         grid=grid,
         sod=sod,
@@ -321,4 +337,5 @@ def geocode_scene(
         sic=sic,
         distance_to_land=dist,
         scene_id=scene.meta.scene_id,
+        extra=resampled,
     )
