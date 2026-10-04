@@ -706,6 +706,7 @@ b,strong{color:#eaf2fb;font-weight:600}
 .dot.on{fill:var(--c-ours);stroke-width:1}
 .trk{fill:none;stroke:#ffd166;stroke-width:1.8}
 .orb{fill:none;stroke:#ffd16655;stroke-width:.8;stroke-dasharray:2 5}
+.orb.moving{stroke:#ffd166cc;stroke-width:1.3}
 .satg .body{fill:#ffd166;stroke:#10141c;stroke-width:.6}
 .satg .pan{fill:#5b7fa6;stroke:#10141c;stroke-width:.5}
 .satg .ant{stroke:#ffd166;stroke-width:.7;fill:none}
@@ -808,6 +809,29 @@ const E = () => S().classes[st.cls];
 // ---------------------------------------------------------------------------
 const CX = 150, CY = 150, rad = Math.PI / 180;
 let R = 118, lat0 = 62, phase = 0;
+// Moving between scenes bends the satellite from one pass onto the next
+// instead of teleporting it. Both circles are real; the bend between them is
+// a transition, and the caption says so — these acquisitions are years apart.
+let orbFrom = null, orbTo = null, orbT = 1;
+const ORB_STEP = 0.012;                       // ~1,4 s di deviazione a 60 fps
+const ease = x => x * x * (3 - 2 * x);
+
+function orbitNow() {
+  if (!orbTo) return null;
+  if (!orbFrom || orbT >= 1) return orbTo;
+  const t = ease(orbT);
+  const A = norm(slerp(orbFrom[0], orbTo[0], t));
+  let N = slerp(orbFrom[1], orbTo[1], t);
+  N = norm(sub(N, mul(A, dot(A, N))));         // riortogonalizza: resta un cerchio
+  return [A, N];
+}
+
+function aimAt(f) {
+  const next = f && f.track_line ? frameOf(f.track_line) : null;
+  if (!next) { orbFrom = null; orbTo = null; orbT = 1; return; }
+  const cur = orbitNow();
+  orbFrom = cur; orbTo = next; orbT = cur ? 0 : 1;
+}
 
 function proj(lon, lat) {
   const p = lat * rad, l = (lon - st.lon) * rad, p0 = lat0 * rad;
@@ -829,16 +853,33 @@ function toLonLat(v) {
   return [Math.atan2(v[1], v[0]) / rad,
           Math.asin(Math.max(-1, Math.min(1, v[2]))) / rad];
 }
-function greatCircle(a, b) {
-  const A = toVec(a[0], a[1]), B = toVec(b[0], b[1]);
-  const d = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
-  let N = [B[0] - d * A[0], B[1] - d * A[1], B[2] - d * A[2]];
-  const m = Math.hypot(N[0], N[1], N[2]);
-  if (!m) return null;
-  N = [N[0] / m, N[1] / m, N[2] / m];
-  return th => toLonLat([A[0] * Math.cos(th) + N[0] * Math.sin(th),
-                         A[1] * Math.cos(th) + N[1] * Math.sin(th),
-                         A[2] * Math.cos(th) + N[2] * Math.sin(th)]);
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+function norm(a) { const m = Math.hypot(a[0], a[1], a[2]); return m ? mul(a, 1 / m) : a; }
+
+// A pass as an orthonormal frame: P(th) = A cos th + N sin th sweeps the whole
+// circle. Keeping the frame rather than the two points is what lets one pass
+// be interpolated into the next.
+function frameOf(trackLine) {
+  const A = toVec(trackLine[0][0], trackLine[0][1]);
+  const B = toVec(trackLine[1][0], trackLine[1][1]);
+  const N = norm(sub(B, mul(A, dot(A, B))));
+  return Math.hypot(N[0], N[1], N[2]) ? [A, N] : null;
+}
+
+function slerp(a, b, t) {
+  let d = Math.max(-1, Math.min(1, dot(a, b)));
+  if (d < 0) { b = mul(b, -1); d = -d; }        // via breve
+  if (d > 0.9995) return norm(add(mul(a, 1 - t), mul(b, t)));
+  const w = Math.acos(d), s = Math.sin(w);
+  return add(mul(a, Math.sin((1 - t) * w) / s), mul(b, Math.sin(t * w) / s));
+}
+
+function circleOf(fr) {
+  const [A, N] = fr;
+  return th => toLonLat(add(mul(A, Math.cos(th)), mul(N, Math.sin(th))));
 }
 
 function pathOf(pts, close) {
@@ -893,12 +934,13 @@ function drawGlobe() {
     // The satellite travels the great circle the sixty seconds of real ground
     // track lie on. That circle is geometry those two measured points already
     // imply; the acquisition itself stays solid and bright over it.
-    const gc = greatCircle(f.track_line[0], f.track_line[1]);
+    const fr = orbitNow();
+    const gc = fr ? circleOf(fr) : null;
     if (gc) {
       const ring = [];
       for (let k = 0; k <= 180; k++) ring.push(gc(k / 180 * 2 * Math.PI));
       const d = pathOf(ring, false);
-      if (d) g.push(`<path class="orb" d="${d}"/>`);
+      if (d) g.push(`<path class="orb${orbT < 1 ? ' moving' : ''}" d="${d}"/>`);
 
       const th = phase * 2 * Math.PI;
       const here = gc(th), ahead = gc(th + 0.02);
@@ -1043,8 +1085,9 @@ addEventListener('click', ev => {
   if (r.dataset.s != null) {
     st.scene = +r.dataset.s;
     if (!S().classes[st.cls]) st.cls = Object.keys(S().classes)[0];
-    const f = S().footprint;
-    if (f) { st.lon = f.centre[0]; lat0 = f.centre[1]; }
+    // Il globo resta dov'è: a muoversi è il satellite, che devia sulla
+    // traiettoria della scena scelta.
+    aimAt(S().footprint);
   }
   if (r.dataset.c) st.cls = r.dataset.c;
   if (r.dataset.l) st.layer = r.dataset.l;
@@ -1054,6 +1097,11 @@ addEventListener('click', ev => {
 
 let drag = null;
 $('#globe').addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY, st.lon, lat0]; st.spin = false; });
+// Il globo non insegue piu' la scena, quindi serve un modo per tornarci.
+$('#globe').addEventListener('dblclick', () => {
+  const f = S().footprint;
+  if (f) { st.lon = f.centre[0]; lat0 = f.centre[1]; drawGlobe(); }
+});
 $('#globe').addEventListener('wheel', e => {
   e.preventDefault();
   R = Math.max(90, Math.min(1400, R * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
@@ -1073,13 +1121,14 @@ function tick() {
   $('#clock').textContent = [d.getHours(), d.getMinutes(), d.getSeconds()]
     .map(x => String(x).padStart(2, '0')).join(':');
   phase = (phase + 0.0011) % 1;    // giro completo in ~15 s, continuo
+  if (orbT < 1) orbT = Math.min(1, orbT + ORB_STEP);
   if (!drag) { if (st.spin) st.lon -= 0.12; drawGlobe(); }
   requestAnimationFrame(tick);
 }
 
 st.cls = Object.keys(D.scenes[0].classes)[0];
 const f0 = D.scenes[0].footprint;
-if (f0) { st.lon = f0.centre[0]; lat0 = f0.centre[1]; }
+if (f0) { st.lon = f0.centre[0]; lat0 = f0.centre[1]; aimAt(f0); }
 render(); tick();
 """
 
@@ -1138,7 +1187,7 @@ def build_page(ctx: dict) -> str:
 
   <div class="pane">
     <div class="hd"><h2>Globo</h2>
-      <span class="rt">trascina · rotella per zoom &nbsp;
+      <span class="rt">trascina · rotella zoom · doppio clic centra &nbsp;
       <button id="spin" style="background:none;border:0;color:inherit;
         font:inherit;cursor:pointer">ruota ⏸</button></span></div>
     <div class="bd flush"><svg id="globe" viewBox="0 0 300 300"
@@ -1158,7 +1207,10 @@ def build_page(ctx: dict) -> str:
       Impronte, traccia e rotta sono alle coordinate vere lette dalle scene. Il tratto
       pieno è l'acquisizione vera; il tratteggio è <b>lo stesso cerchio massimo
       continuato</b> — geometria che quei due punti già definiscono, non un'orbita
-      ricavata da elementi che qui non abbiamo.{warn}</div>
+      ricavata da elementi che qui non abbiamo. Cambiando scena il satellite
+      <b>devia</b> da un cerchio all'altro: i due passaggi sono veri, la curva
+      fra loro è una transizione — queste acquisizioni distano anni, non
+      un'orbita.{warn}</div>
     </div>
   </div>
 
