@@ -59,6 +59,7 @@ help:
 	@echo "    make report       artifacts/metrics.json + figure per il deck"
 	@echo "    make demo         avvia la UI  [Gate 4]"
 	@echo "    make demo-static  congela la demo in demo.html: un file, zero dipendenze"
+	@echo "    make console      console.html: la stessa demo con globo e impronte reali"
 	@echo "    make present      modalità presentazione: una schermata per passo  [Demo Night]"
 	@echo "    make video        registra il video di backup 90s"
 	@echo ""
@@ -192,6 +193,14 @@ demo-static:
 # Modalità presentazione: una schermata per passo, guidata da tastiera o
 # telecomando. Entry point separato — non tocca `make demo`, che resta la UI
 # completa. Vedi D-037.
+.PHONY: console
+console:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.pitch.console
+	@echo ""
+	@echo "  Doppio clic su console.html. Trascina il globo, rotella per lo zoom."
+	@echo ""
+
 .PHONY: present
 present:
 	$(REQUIRE_VENV)
@@ -246,7 +255,7 @@ all: data train eval quantize route precompute report
 backup:
 	@out=$$HOME/iceroute-backup-$$(date +%Y%m%d-%H%M).tar.gz; \
 	files=""; \
-	for f in data/demo demo.html present.html artifacts/models artifacts/metrics.json artifacts/video; do \
+	for f in data/demo demo.html present.html console.html artifacts/models artifacts/metrics.json artifacts/video; do \
 		[ -e "$$f" ] && files="$$files $$f"; \
 	done; \
 	tar czf "$$out" $$files; \
