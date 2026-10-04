@@ -9,8 +9,10 @@ with no data behind them are absent rather than approximated.
 
 from __future__ import annotations
 
+import html
 import json
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -255,3 +257,98 @@ def test_the_page_says_out_loud_that_it_has_no_coastlines():
     there will read the empty sphere as ocean."""
     page = co.build_page(_real_ctx())
     assert "Nessuna linea" in page and "costa" in page
+
+
+# ---------------------------------------------------------------------------
+# What arrives on the bridge
+# ---------------------------------------------------------------------------
+
+
+_ROUTE = ('{"type":"FeatureCollection","features":[{"type":"Feature","geometry":'
+          '{"type":"LineString","coordinates":[[-76.567482,56.331759],'
+          '[-76.690202,56.200049]]},"properties":{"ice_class":"PC6"}}]}')
+
+
+def _paid(text=None, route=None, **extra):
+    body = text if text is not None else _ROUTE
+    import textwrap
+    return {"payload": {"text": textwrap.fill(body, width=78),
+                        "route": route if route is not None else len(body.encode()),
+                        "n_waypoints": 2, **extra}}
+
+
+def test_the_dump_is_the_transmitted_file_and_nothing_else():
+    """Concatenating the chunks has to give back the exact bytes, because the
+    byte count printed beside them is a claim about this text."""
+    b = co.bridge(_paid())
+    joined = "".join(re.sub(r"<[^>]+>", "", h) for _, h in b["lines"])
+    assert html.unescape(joined) == _ROUTE
+    assert b["bytes"] == len(_ROUTE.encode())
+    assert json.loads(html.unescape(joined))["type"] == "FeatureCollection"
+
+
+def test_the_offsets_are_byte_offsets():
+    b = co.bridge(_paid(), width=64)
+    assert [int(o, 16) for o, _ in b["lines"]] == list(range(0, len(_ROUTE), 64))
+    assert b["ruler"] is True
+
+
+def test_a_byte_count_that_disagrees_refuses_to_draw_a_dump():
+    """A dump that contradicts the number printed next to it is worse than no
+    dump: both look authoritative and one of them is wrong."""
+    b = co.bridge(_paid(route=999))
+    assert b["mismatch"] is True and b["declared"] == 999
+    assert "lines" not in b
+
+
+def test_no_route_means_no_packet_rather_than_an_empty_frame():
+    assert co.bridge({}) is None
+    assert co.bridge({"payload": {"text": ""}}) is None
+
+
+def test_a_non_ascii_payload_drops_the_ruler_instead_of_misnumbering_it():
+    """Character offsets stop being byte offsets the moment a multi-byte
+    character appears, and a ruler that is quietly wrong is the kind of detail
+    nobody checks."""
+    b = co.bridge(_paid(text='{"nome":"Rotta nord-est — Grønland"}'))
+    assert b["ruler"] is False and all(o == "" for o, _ in b["lines"])
+
+
+def test_the_colouring_marks_strings_and_numbers_and_escapes_the_rest():
+    out = co.tint('{"a":-76.5,"b":"<x>"}')
+    assert '<i class="n">-76.5</i>' in out
+    assert '<i class="s">&quot;a&quot;</i>' in out
+    assert "&lt;x&gt;" in out and "<x>" not in out
+
+
+def test_the_byte_rows_quote_only_what_was_measured():
+    b = co.bridge(_paid(mask=169558, meta=60, total=170186, ratio=324.7,
+                        sar=55_300_000, link={"s": 15, "terminal": "Iridium Certus 100",
+                                              "kbps": 88, "sbd": 2}))
+    labels = {k for k, _, _ in b["rows"]}
+    assert "maschera del ghiaccio" in labels and "compressione" in labels
+    assert "in messaggi SBD" in labels
+    b2 = co.bridge(_paid())
+    assert {k for k, _, _ in b2["rows"]} == {"rotta · 2 waypoint"}, \
+        "senza misure di compressione non si inventano righe"
+
+
+def test_every_real_packet_parses_as_the_file_it_claims_to_be():
+    """Against the build: for every scene and vessel class, the text on screen
+    is valid GeoJSON and weighs exactly what the panel says it weighs."""
+    ctx = _real_ctx()
+    checked = 0
+    for s in ctx["scenes"]:
+        for ic, e in s["classes"].items():
+            b = (e.get("panels") or {}).get("bridge")
+            if not b:
+                assert not e.get("route_exists"), f"{s['id']}/{ic}: rotta senza pacchetto"
+                continue
+            assert not b.get("mismatch"), f"{s['id']}/{ic}: byte incoerenti"
+            joined = html.unescape(
+                "".join(re.sub(r"<[^>]+>", "", h) for _, h in b["lines"]))
+            assert len(joined.encode()) == b["bytes"], f"{s['id']}/{ic}: byte diversi"
+            assert json.loads(joined)["type"] == "FeatureCollection"
+            assert e["payload"]["route"] == b["bytes"], f"{s['id']}/{ic}: conteggio diverso"
+            checked += 1
+    assert checked, "nessun pacchetto verificato"

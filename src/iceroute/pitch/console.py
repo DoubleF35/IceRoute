@@ -289,6 +289,75 @@ def event_log(scene: dict, ice_class: str, entry: dict, stats: dict | None,
     return rows
 
 
+_TOKENS = re.compile(r'("(?:[^"\\]|\\.)*")|(-?\d+(?:\.\d+)?)')
+
+
+def tint(chunk: str) -> str:
+    """Colour JSON by token, one fixed-width chunk at a time.
+
+    Chunks are cut on byte boundaries so the offsets stay true, which means a
+    string or a number can be sliced in half. A partial token simply fails to
+    match and renders plain — wrong-looking colour on a cut token is cosmetic,
+    a lying offset would not be.
+    """
+    out, i = [], 0
+    for m in _TOKENS.finditer(chunk):
+        out.append(html.escape(chunk[i:m.start()]))
+        cls = "s" if m.group(1) else "n"
+        out.append(f'<i class="{cls}">{html.escape(m.group(0))}</i>')
+        i = m.end()
+    out.append(html.escape(chunk[i:]))
+    return "".join(out)
+
+
+def bridge(entry: dict, width: int = 64) -> dict | None:
+    """The bytes that actually reach the ship, laid out like a dump.
+
+    ``payload.text`` is the transmitted feature, wrapped for display; the
+    separators are ``(",", ":")`` so there are no spaces to wrap on and joining
+    the lines restores the exact string — asserted here rather than assumed,
+    because the whole panel is a claim about how many bytes arrive.
+    """
+    pay = entry.get("payload") or {}
+    text = pay.get("text")
+    if not text:
+        return None
+    flat = "".join(text.splitlines())
+    n = len(flat.encode())
+    if pay.get("route") and n != pay["route"]:
+        # Rather than print a dump that disagrees with the byte count beside it.
+        return {"mismatch": True, "declared": pay["route"], "rebuilt": n}
+
+    # Offsets are byte offsets. ASCII makes character and byte indices the same;
+    # if that ever stops holding the ruler would quietly start lying, so it is
+    # checked and the ruler is dropped instead.
+    ruler = flat.isascii()
+    lines = [[f"{i:04x}" if ruler else "", tint(flat[i:i + width])]
+             for i in range(0, len(flat), width)]
+
+    link = pay.get("link") or {}
+    rows = [
+        ["maschera del ghiaccio", f"{it(pay['mask'])} B"] if pay.get("mask") else None,
+        [f"rotta · {pay.get('n_waypoints')} waypoint", f"{it(pay['route'])} B"]
+        if pay.get("route") else None,
+        ["metadati", f"{it(pay['meta'])} B"] if pay.get("meta") else None,
+        ["totale trasmesso", f"{it(pay['total'] / 1000)} KB"] if pay.get("total") else None,
+        ["contro il radar", f"{it(pay['sar'] / 1e6, 1)} MB"] if pay.get("sar") else None,
+        ["compressione", f"{it(pay['ratio'], 1)}:1"] if pay.get("ratio") else None,
+        ["sul collegamento", f"≈ {it(link['s'])} s · {link['terminal']}"]
+        if link.get("s") is not None else None,
+        ["in messaggi SBD", f"{it(link['sbd'])}"] if link.get("sbd") else None,
+    ]
+    return {
+        "lines": lines, "bytes": n, "ruler": ruler,
+        "n_waypoints": pay.get("n_waypoints"),
+        "head": (f"{it(n)} byte · {pay.get('n_waypoints')} waypoint"
+                 + (f" · {it(link['sbd'])} messaggi SBD" if link.get("sbd") else "")),
+        "rows": [[*r, ""] for r in rows if r],
+        "note": pay.get("note") or "",
+    }
+
+
 def panels(entry: dict, fp: dict | None, stats: dict | None,
            adm: dict | None, pal: dict) -> dict:
     """Every row and every bar width, resolved here.
@@ -382,7 +451,7 @@ def panels(entry: dict, fp: dict | None, stats: dict | None,
 
     return {"prod": [r for r in prod if r], "onboard": [r for r in onboard if r],
             "rio_meter": rio_meter, "rio_rows": [r for r in rio_rows if r],
-            "mix": mix, "trace": trace}
+            "mix": mix, "trace": trace, "bridge": bridge(entry)}
 
 
 def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path) -> dict:
@@ -536,6 +605,19 @@ dd.sm{font-size:10.5px;color:var(--dim)}
 .track{height:7px;background:#0a121b;border:1px solid var(--rule);display:flex;overflow:hidden}
 .track i{display:block;height:100%}
 
+#dump{font-size:10.5px;line-height:1.75}
+#dump .ln{display:flex;gap:13px}
+#dump .off{color:#2d3a49;flex-shrink:0;user-select:none;letter-spacing:.05em}
+#dump .hx{color:#6f8299;word-break:break-all;white-space:pre-wrap}
+#dump i{font-style:normal}
+#dump i.s{color:#8fd6a8}
+#dump i.n{color:#ffd166}
+#dump .hdr{display:flex;gap:10px;align-items:baseline;margin-bottom:7px;
+  padding-bottom:6px;border-bottom:1px solid var(--rule)}
+#dump .hdr b{color:#eaf2fb;font-size:13px}
+#dump .hdr span{color:var(--faint);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase}
+
 #log{font-size:10.5px;line-height:1.65}
 #log .l{display:flex;gap:9px;white-space:nowrap}
 #log .n{color:#33404f}
@@ -555,6 +637,8 @@ dd.sm{font-size:10.5px;color:var(--dim)}
   cursor:pointer;font-weight:700}
 .tabs button.on{color:#eaf2fb;background:var(--panel);box-shadow:inset 0 -2px 0 var(--accent)}
 .tabs button:hover{color:var(--dim)}
+.tabs .rt{margin-left:auto;padding:0 10px;align-self:center;font-size:9.5px;
+  color:var(--faint);letter-spacing:.06em}
 
 .bars{display:flex;align-items:flex-end;gap:1px;height:56px;padding-top:4px}
 .bars i{flex:1;min-width:1px;background:#1d3348;align-self:flex-end}
@@ -725,6 +809,26 @@ function render() {
       + `<div class="note">${P.trace.note}</div>`
     : '<div class="note">Nessuna rotta diretta da analizzare.</div>';
 
+  $('#downlink').innerHTML = (P.bridge && P.bridge.rows) ? dlOf(P.bridge.rows)
+    : '<div class="note">Nessuna rotta: non c\'è payload.</div>';
+
+  // The transmitted file, byte for byte. Offsets, colouring and byte count all
+  // come from Python; the browser places them.
+  const br = P.bridge;
+  $('#dump').innerHTML = !br ? '<div class="note">Nessuna rotta: niente da trasmettere.</div>'
+    : br.mismatch
+    ? `<div class="note" style="color:#e8b54a">Il file ricostruito pesa ${br.rebuilt} B
+       ma il conteggio dice ${br.declared} B: non mostro un dump che contraddice
+       il numero accanto.</div>`
+    : `<div class="hdr"><b>${br.head}</b>
+        <span>${br.ruler ? 'offset in byte' : 'offset non mostrati: file non ASCII'}</span></div>`
+      + br.lines.map(([off, hx]) =>
+          `<div class="ln"><span class="off">${off}</span><span class="hx">${hx}</span></div>`
+        ).join('')
+      + (br.note ? `<div class="note">${br.note}</div>` : '');
+  $('#paneinfo').textContent = br && br.bytes
+    ? `${br.bytes} byte · è tutto ciò che il satellite manda alla nave` : '';
+
   $('#log').innerHTML = (e.log || []).map(([n, t, m]) =>
     `<div class="l${t === 'AVVISO' ? ' w' : ''}"><span class="n">${n}</span>`
     + `<span class="t">${t}</span><span class="m">${m}</span></div>`).join('');
@@ -740,6 +844,12 @@ function render() {
 }
 
 // ---------------------------------------------------------------------------
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#dump').hidden = b.dataset.t !== 'bridge';
+  $('#log').hidden = b.dataset.t !== 'log';
+});
+
 addEventListener('click', ev => {
   const r = ev.target.closest('.row'); if (!r) return;
   if (r.dataset.s != null) {
@@ -878,12 +988,18 @@ def build_page(ctx: dict) -> str:
     <div class="bd" id="onboard"></div>
     <div class="hd"><h2>POLARIS</h2><span class="rt">MSC.1/Circ.1519</span></div>
     <div class="bd" id="polaris"></div>
+    <div class="hd"><h2>Downlink</h2><span class="rt">misurato</span></div>
+    <div class="bd" id="downlink"></div>
   </div>
 
   <div class="pane" style="grid-column:1/3">
-    <div class="hd"><h2>Registro della costruzione</h2>
-      <span class="rt">data/demo · artifacts/metrics.json</span></div>
-    <div class="bd" id="log"></div>
+    <div class="tabs">
+      <button data-t="bridge" class="on">Quello che arriva in plancia</button>
+      <button data-t="log">Registro della costruzione</button>
+      <span class="rt" id="paneinfo"></span>
+    </div>
+    <div class="bd" id="dump"></div>
+    <div class="bd" id="log" hidden></div>
   </div>
 
   <div class="pane" style="grid-column:3/5">
