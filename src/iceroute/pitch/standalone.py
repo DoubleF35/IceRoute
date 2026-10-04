@@ -67,19 +67,23 @@ MODES = [("both", "Entrambe"), ("baseline", "Rotta diretta"),
          ("iceroute", "IceRoute"), ("none", "Nessuna")]
 
 
-def data_uri(path: Path, *, photographic: bool) -> str:
+def data_uri(path: Path, *, photographic: bool, max_px: int = MAX_PX) -> str:
     """A raster, downscaled and inlined.
 
     Categorical layers stay PNG and are resampled with nearest neighbour:
     averaging class ids invents classes nobody predicted, which on the RIO layer
     would mean inventing navigability. Only the SAR, which is a photograph, is
     resampled smoothly and stored as JPEG.
+
+    ``max_px`` defaults to the size this page needs; the presentation build asks
+    for more, because one raster filling a projector is a different job from
+    forty-two thumbnails in a scrolling page.
     """
     from PIL import Image
 
     img = Image.open(path).convert("RGB")
-    if max(img.size) > MAX_PX:
-        scale = MAX_PX / max(img.size)
+    if max(img.size) > max_px:
+        scale = max_px / max(img.size)
         size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
         img = img.resize(size, Image.LANCZOS if photographic else Image.NEAREST)
 

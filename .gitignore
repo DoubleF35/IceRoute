@@ -48,3 +48,4 @@ artifacts/inspect_*.json
 # ATTENZIONE: è la rete di sicurezza del 7 ottobre. Non essendo in git va copiata
 # altrove a mano (chiavetta, mail a sé stessi) insieme a data/demo/.
 demo.html
+present.html

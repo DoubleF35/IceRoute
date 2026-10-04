@@ -59,6 +59,7 @@ help:
 	@echo "    make report       artifacts/metrics.json + figure per il deck"
 	@echo "    make demo         avvia la UI  [Gate 4]"
 	@echo "    make demo-static  congela la demo in demo.html: un file, zero dipendenze"
+	@echo "    make present      modalità presentazione: una schermata per passo  [Demo Night]"
 	@echo "    make video        registra il video di backup 90s"
 	@echo ""
 	@echo "  Qualità"
@@ -187,6 +188,18 @@ report:
 demo-static:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.pitch.standalone
+
+# Modalità presentazione: una schermata per passo, guidata da tastiera o
+# telecomando. Entry point separato — non tocca `make demo`, che resta la UI
+# completa. Vedi D-037.
+.PHONY: present
+present:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.pitch.present
+	@echo ""
+	@echo "  Apri present.html nel browser e premi F per lo schermo intero."
+	@echo "  → spazio PagGiù avanti · ← PagSu indietro · C classe nave · T timer · ? aiuto"
+	@echo ""
 
 .PHONY: demo
 demo:
