@@ -62,6 +62,7 @@ from pathlib import Path
 import yaml
 
 from iceroute.pitch import standalone as sa
+from iceroute.routing.geocode import POLAR_CRS
 
 log = logging.getLogger("console")
 
@@ -155,6 +156,7 @@ def footprint(raw: Path, *, step: int = 2) -> dict | None:
 
     out = {
         "ring": ring,
+        "corners": [pt(0, 0), pt(0, m - 1), pt(n - 1, m - 1), pt(n - 1, 0)],
         "centre": [round(float(lo.mean()), 4), round(float(la.mean()), 4)],
         "track_az": round(track, 1),
         "look_az": round(azimuth(tuple(a1[0]), tuple(a1[1])), 1),
@@ -234,6 +236,55 @@ def sar_geocoded(raw: Path, grid_shape, resolution_m: float, cache: Path) -> Pat
     cache.mkdir(parents=True, exist_ok=True)
     save_png(img, out, downscale=1)
     return out
+
+
+def frame(fp: dict | None, grid_shape, resolution_m: float) -> dict | None:
+    """How far the swath is turned inside its own raster, and how far it can be
+    enlarged without losing a corner of it.
+
+    The geocoded grid is north-up; the swath is flown at about 192 degrees. So
+    the scene sits in its raster as a diamond with four empty corners, and on
+    screen it reads as a crooked picture in a mostly empty box. The angle is
+    not guessed: the four corners of the geolocation grid are projected into
+    EPSG:3413 — the grid the raster is actually on — and the tilt is measured
+    from them.
+
+    ``scale`` is the largest enlargement that still contains all four corners.
+    Filling the frame by cropping would be trading empty pixels for scene, and
+    the corner that disappears is always somebody's ice.
+    """
+    if not (fp and fp.get("corners") and grid_shape and resolution_m):
+        return None
+    from pyproj import Transformer
+
+    tr = Transformer.from_crs("EPSG:4326", POLAR_CRS, always_xy=True)
+    # Image axes: x grows with projected x, y grows downward as projected y falls.
+    pts = []
+    for lon, lat in fp["corners"]:
+        x, y = tr.transform(lon, lat)
+        pts.append((x, -y))
+
+    # Tilt of the along-track edge, then the smallest turn that squares it up.
+    (x0, y0), (_, _), (_, _), (x3, y3) = pts
+    tilt = math.degrees(math.atan2(y3 - y0, x3 - x0))
+    # Rounded here, before the fit is measured: the browser applies this value,
+    # and sizing the enlargement for a slightly different angle quietly crops
+    # the corners — half a hundredth of a degree across 419 km is 38 metres.
+    rot = round(((90.0 - tilt) + 45.0) % 90.0 - 45.0, 2)
+
+    c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    xs = [x * c - y * s for x, y in pts]
+    ys = [x * s + y * c for x, y in pts]
+    w, h = max(xs) - min(xs), max(ys) - min(ys)
+    if w <= 0 or h <= 0:
+        return None
+    rows, cols = grid_shape
+    scale = min(cols * resolution_m / w, rows * resolution_m / h)
+    # Rounded *down*. To the nearest would push it over by a hair — fifteen
+    # metres on this scene — and the guarantee here is "never crops", not
+    # "almost never crops".
+    scale = math.floor(max(1.0, scale) * 1e4) / 1e4
+    return {"rot": rot, "scale": scale}
 
 
 def route_lonlat(routes_dir: Path, name: str) -> list[list[float]] | None:
@@ -560,7 +611,9 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
     for scene in ctx["scenes"]:
         shape, res = scene.pop("_grid", (None, None))
         if not (shape and res):
+            scene["frame"] = None
             continue
+        scene["frame"] = frame(scene.get("footprint"), shape, res)
         png = sar_geocoded(raw_dir / scene["id"], shape, res, cache_dir)
         if png is None:
             continue
@@ -651,14 +704,21 @@ b,strong{color:#eaf2fb;font-weight:600}
 .fp.on{fill:#ff2d9522;stroke:var(--c-ours);stroke-width:1.6}
 .dot{fill:#4a9eff;stroke:#060a10;stroke-width:.7}
 .dot.on{fill:var(--c-ours);stroke-width:1}
-.trk{fill:none;stroke:#ffd166;stroke-width:1.2}
+.trk{fill:none;stroke:#ffd166;stroke-width:1.8}
+.orb{fill:none;stroke:#ffd16655;stroke-width:.8;stroke-dasharray:2 5}
+.satg .body{fill:#ffd166;stroke:#10141c;stroke-width:.6}
+.satg .pan{fill:#5b7fa6;stroke:#10141c;stroke-width:.5}
+.satg .ant{stroke:#ffd166;stroke-width:.7;fill:none}
 .rt{fill:none;stroke:var(--c-ours);stroke-width:1.6}
 .sat{fill:#ffd166;stroke:#1a1203;stroke-width:1}
 .lbl{fill:#89a3bd;font-size:8.5px;letter-spacing:.08em}
 
 .map{position:relative;line-height:0;background:#060a10;height:100%;
-  display:flex;align-items:center;justify-content:center}
-.mapin{position:relative;max-width:100%;max-height:100%}
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* Rotating the stack turns the raster and its overlay together, so the routes
+   stay on the pixels they were computed for. */
+.mapin{position:relative;max-width:100%;max-height:100%;
+  transition:transform .35s ease}
 .mapin img{max-width:100%;max-height:100%;display:block}
 .ovwrap{position:absolute;inset:0}
 svg.ov{width:100%;height:100%;display:block;overflow:visible}
@@ -757,6 +817,30 @@ function proj(lon, lat) {
           CY - R * (Math.cos(p0) * Math.sin(p) - Math.sin(p0) * Math.cos(p) * Math.cos(l))];
 }
 
+// A great circle through two real points: the sixty-second ground track,
+// continued. Nothing orbital is assumed — the circle is the plane those two
+// measured points and the centre of the Earth already define. It is drawn
+// dashed, and the sixty seconds actually acquired stay solid over it.
+function toVec(lon, lat) {
+  const p = lat * rad, l = lon * rad;
+  return [Math.cos(p) * Math.cos(l), Math.cos(p) * Math.sin(l), Math.sin(p)];
+}
+function toLonLat(v) {
+  return [Math.atan2(v[1], v[0]) / rad,
+          Math.asin(Math.max(-1, Math.min(1, v[2]))) / rad];
+}
+function greatCircle(a, b) {
+  const A = toVec(a[0], a[1]), B = toVec(b[0], b[1]);
+  const d = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
+  let N = [B[0] - d * A[0], B[1] - d * A[1], B[2] - d * A[2]];
+  const m = Math.hypot(N[0], N[1], N[2]);
+  if (!m) return null;
+  N = [N[0] / m, N[1] / m, N[2] / m];
+  return th => toLonLat([A[0] * Math.cos(th) + N[0] * Math.sin(th),
+                         A[1] * Math.cos(th) + N[1] * Math.sin(th),
+                         A[2] * Math.cos(th) + N[2] * Math.sin(th)]);
+}
+
 function pathOf(pts, close) {
   let d = '', pen = false;
   for (const [lo, la] of pts) {
@@ -806,19 +890,32 @@ function drawGlobe() {
       const r = pathOf(e.route_lonlat, false);
       if (r) g.push(`<path class="rt" d="${r}"/>`);
     }
-    // The satellite rides the segment of ground track that produced this scene:
-    // two real endpoints from the geolocation grid, sixty real seconds between
-    // them. It is not an orbit, and it is not pretending to be one.
-    const [a, b] = f.track_line;
-    const q = proj(a[0] + (b[0] - a[0]) * phase, a[1] + (b[1] - a[1]) * phase);
-    if (q) {
-      const s = Math.max(1, R / 118);
-      g.push(`<g transform="translate(${q[0].toFixed(1)} ${q[1].toFixed(1)}) scale(${s.toFixed(2)})">`
-        + `<rect class="sat" x="-3.5" y="-2.5" width="7" height="5"/>`
-        + `<rect class="sat" x="-8.5" y="-1" width="4.5" height="2"/>`
-        + `<rect class="sat" x="4" y="-1" width="4.5" height="2"/></g>`);
-      g.push(`<text class="lbl" x="${(q[0] + 12 * s).toFixed(1)}" `
-        + `y="${(q[1] - 7 * s).toFixed(1)}">${f.platform || ''} ${f.t0 ? f.t0.slice(11) : ''}</text>`);
+    // The satellite travels the great circle the sixty seconds of real ground
+    // track lie on. That circle is geometry those two measured points already
+    // imply; the acquisition itself stays solid and bright over it.
+    const gc = greatCircle(f.track_line[0], f.track_line[1]);
+    if (gc) {
+      const ring = [];
+      for (let k = 0; k <= 180; k++) ring.push(gc(k / 180 * 2 * Math.PI));
+      const d = pathOf(ring, false);
+      if (d) g.push(`<path class="orb" d="${d}"/>`);
+
+      const th = phase * 2 * Math.PI;
+      const here = gc(th), ahead = gc(th + 0.02);
+      const q = proj(here[0], here[1]), q2 = proj(ahead[0], ahead[1]);
+      if (q) {
+        // Fixed screen size on purpose: an icon that grew with the zoom ended
+        // up larger than the swath it had just imaged.
+        const ang = q2 ? Math.atan2(q2[1] - q[1], q2[0] - q[0]) * 180 / Math.PI : 0;
+        g.push(`<g class="satg" transform="translate(${q[0].toFixed(1)} `
+          + `${q[1].toFixed(1)}) rotate(${ang.toFixed(1)})">`
+          + `<line class="ant" x1="0" y1="0" x2="0" y2="5"/>`
+          + `<rect class="pan" x="-1.4" y="-5.2" width="2.8" height="3.4"/>`
+          + `<rect class="pan" x="-1.4" y="1.8" width="2.8" height="3.4"/>`
+          + `<rect class="body" x="-2.6" y="-1.7" width="5.2" height="3.4" rx=".6"/></g>`);
+        g.push(`<text class="lbl" x="${(q[0] + 9).toFixed(1)}" `
+          + `y="${(q[1] - 5).toFixed(1)}">${f.platform || ''}</text>`);
+      }
     }
   }
   $('#globe').innerHTML = g.join('');
@@ -875,6 +972,11 @@ function render() {
   $('#img').src = name ? D.images[name] : '';
   $('#img').style.display = name ? '' : 'none';
   $('#ov').innerHTML = (routable && e) ? e.svg : '';
+  // Only the geocoded layers are tilted inside their raster; the swath ones
+  // are already square with their own grid.
+  const fr = routable ? s.frame : null;
+  $('#mapin').style.transform = fr
+    ? `rotate(${fr.rot}deg) scale(${fr.scale})` : '';
   $('#maptitle').textContent = (D.layers.find(l => l[0] === st.layer) || [0, st.layer])[1];
   $('#mapmeta').textContent = e && e.grid.shape
     ? `${e.grid.shape[0]}×${e.grid.shape[1]} @ ${e.grid.res} m`
@@ -970,7 +1072,7 @@ function tick() {
   const d = new Date();
   $('#clock').textContent = [d.getHours(), d.getMinutes(), d.getSeconds()]
     .map(x => String(x).padStart(2, '0')).join(':');
-  phase = (phase + 0.004) % 1;
+  phase = (phase + 0.0011) % 1;    // giro completo in ~15 s, continuo
   if (!drag) { if (st.spin) st.lon -= 0.12; drawGlobe(); }
   requestAnimationFrame(tick);
 }
@@ -1044,7 +1146,8 @@ def build_page(ctx: dict) -> str:
     <div class="legend">
       <span><i style="background:#4a9eff;border-radius:50%"></i>scene</span>
       <span><i class="ln" style="background:#4a9eff"></i>impronta swath</span>
-      <span><i class="ln" style="background:#ffd166"></i>traccia dell'acquisizione (60&#8239;s)</span>
+      <span><i class="ln" style="background:#ffd166"></i>acquisizione (60&#8239;s)</span>
+      <span><i class="ln" style="background:#ffd16688"></i>cerchio massimo del passaggio</span>
       <span><i class="ln" style="background:{pal['ours']}"></i>rotta</span>
       <span><i class="ln" style="background:#2f7fae"></i>Circolo Polare Artico</span>
     </div>
@@ -1052,13 +1155,16 @@ def build_page(ctx: dict) -> str:
       <div class="note">Reticolato ogni 30°/20° e Circolo Polare Artico a
       {sa.dec(ctx['arctic_circle'], 4)}°: definizioni, non misure. <b>Nessuna linea di
       costa</b> — in questo progetto non c'è un dataset di coste e la pagina non va in rete.
-      Impronte, traccia e rotta sono alle coordinate vere lette dalle scene.{warn}</div>
+      Impronte, traccia e rotta sono alle coordinate vere lette dalle scene. Il tratto
+      pieno è l'acquisizione vera; il tratteggio è <b>lo stesso cerchio massimo
+      continuato</b> — geometria che quei due punti già definiscono, non un'orbita
+      ricavata da elementi che qui non abbiamo.{warn}</div>
     </div>
   </div>
 
   <div class="pane">
     <div class="hd"><h2 id="maptitle">Vista</h2><span class="rt" id="mapmeta"></span></div>
-    <div class="bd flush"><div class="map"><div class="mapin">
+    <div class="bd flush"><div class="map"><div class="mapin" id="mapin">
       <img id="img" alt="livello"><div id="ov" class="ovwrap"></div></div></div></div>
     <div class="legend">{leg_cls}
       <span><i class="ln" style="background:{pal['base']}"></i>diretta</span>

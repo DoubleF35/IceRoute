@@ -408,3 +408,79 @@ def test_the_layer_is_offered_only_when_a_scene_actually_has_it():
     if has:
         assert ids.index("sar_geo") < ids.index("sar"), \
             "il livello geocodificato sta accanto a quello a swath, per il confronto"
+
+
+# ---------------------------------------------------------------------------
+# Straightening the scene inside its own raster
+# ---------------------------------------------------------------------------
+
+
+def test_no_footprint_means_no_straightening():
+    assert co.frame(None, [100, 100], 500.0) is None
+    assert co.frame({"corners": []}, [100, 100], 500.0) is None
+    assert co.frame({"corners": [[0, 0]] * 4}, None, 500.0) is None
+
+
+def test_the_turn_is_the_smallest_one_that_squares_the_scene_up():
+    """Any multiple of ninety degrees aligns the edges; the one worth applying
+    is the one that moves the scene least."""
+    ctx = _real_ctx()
+    seen = 0
+    for s in ctx["scenes"]:
+        fr = s.get("frame")
+        if not fr:
+            continue
+        assert -45.0 <= fr["rot"] <= 45.0, f"{s['id']}: rotazione {fr['rot']}°"
+        assert fr["scale"] >= 1.0, f"{s['id']}: ingrandimento {fr['scale']}"
+        seen += 1
+    assert seen, "nessuna scena raddrizzata"
+
+
+def test_straightening_never_crops_the_scene():
+    """``scale`` is the largest enlargement that still holds all four corners.
+    One step past it and the corner that leaves the frame is somebody's ice."""
+    from pyproj import Transformer
+
+    ctx = _real_ctx()
+    tr = Transformer.from_crs("EPSG:4326", co.POLAR_CRS, always_xy=True)
+    for s in ctx["scenes"]:
+        fr, fp = s.get("frame"), s.get("footprint")
+        if not (fr and fp):
+            continue
+        ov = next(iter(s["classes"].values()))["grid"]
+        rows, cols = ov["shape"]
+        res = ov["res"]
+        pts = [(x, -y) for x, y in (tr.transform(lo, la) for lo, la in fp["corners"])]
+        c, sn = math.cos(math.radians(fr["rot"])), math.sin(math.radians(fr["rot"]))
+        w = max(x * c - y * sn for x, y in pts) - min(x * c - y * sn for x, y in pts)
+        h = max(x * sn + y * c for x, y in pts) - min(x * sn + y * c for x, y in pts)
+        assert w * fr["scale"] <= cols * res + 1, f"{s['id']}: tagliata in larghezza"
+        assert h * fr["scale"] <= rows * res + 1, f"{s['id']}: tagliata in altezza"
+        # and it really is the largest such enlargement, not a timid one.
+        # The tolerance is the cost of rounding the scale down to four
+        # decimals — about forty metres here — not a licence to be loose.
+        assert (w * fr["scale"] > cols * res * 0.999
+                or h * fr["scale"] > rows * res * 0.999), f"{s['id']}: ingrandimento timido"
+
+
+def test_only_scenes_on_the_routing_grid_get_a_frame():
+    """The swath layers are already square with their own grid; turning them
+    would tilt a picture that was straight."""
+    ctx = _real_ctx()
+    for s in ctx["scenes"]:
+        has_grid = any((e.get("grid") or {}).get("shape") for e in s["classes"].values())
+        assert bool(s.get("frame")) == bool(has_grid), s["id"]
+
+
+def test_the_ground_track_has_two_distinct_ends_the_satellite_can_fly_between():
+    """The great circle the satellite travels is defined by these two points;
+    if they coincided there would be no circle to define."""
+    ctx = _real_ctx()
+    for s in ctx["scenes"]:
+        f = s.get("footprint")
+        if not f:
+            continue
+        a, b = f["track_line"]
+        assert a != b, f"{s['id']}: estremi coincidenti"
+        assert co.great_circle_km(tuple(a), tuple(b)) == pytest.approx(
+            f["along_km"], rel=0.01), f"{s['id']}: la traccia non è lunga quanto dichiarato"
