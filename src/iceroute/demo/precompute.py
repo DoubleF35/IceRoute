@@ -50,6 +50,7 @@ from iceroute.routing.polaris import (
     conditions_along,
     summarise,
 )
+from iceroute.routing.shortcut import straighten
 from iceroute.routing.simplify import simplify_route
 from iceroute.routing.waypoints import choose_waypoints, waypoints_from_config
 
@@ -353,6 +354,20 @@ def process_scene(
             signatures.append(None)
             log.info("  %s: nessuna rotta (%s)", ic, exc.reason)
             continue
+
+        # String pulling, before anything is measured off the route: A* is
+        # optimal for the grid, and the grid is what makes it wander.
+        if bool(astar_cfg.get("straighten", True)):
+            pulled = straighten(route, cost, geo.grid, rio=rio)
+            route = pulled.route
+            entry_out["straightened"] = {
+                "legs": pulled.n_legs,
+                "cells_before": pulled.n_cells_before,
+                "seconds_saved": round(pulled.seconds_saved, 1),
+                "metres_saved": round(pulled.metres_saved, 1),
+                "percent_time": round(pulled.percent_time, 3),
+                "percent_distance": round(pulled.percent_distance, 3),
+            }
 
         base = geodesic_baseline(
             geo.grid, cost, wp.start, wp.goal, open_water_speed_kn=v_open,

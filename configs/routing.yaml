@@ -101,6 +101,14 @@ astar:
 
   max_expansions: 20000000  # [SCELTA] guardia contro un loop su griglia grande
 
+  # Raddrizzamento (string pulling) dopo A*. Su griglia, anche 16-connessa, un
+  # tratto che dovrebbe correre a 20° viene costruito con passi a 0°, 26,6° e
+  # 45°: la rotta serpeggia in acqua libera, ed è più lenta di quanto serva.
+  # Il passaggio sostituisce un tratto con la retta solo se ogni cella che
+  # attraversa è praticabile, se NON abbassa il RIO minimo del tratto
+  # sostituito, e se è davvero più veloce. Vedi DECISIONS.md D-040.
+  straighten: true          # [SCELTA]
+
 # ---------------------------------------------------------------------------
 # Waypoint della demo
 # ---------------------------------------------------------------------------
