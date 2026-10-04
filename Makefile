@@ -246,7 +246,7 @@ all: data train eval quantize route precompute report
 backup:
 	@out=$$HOME/iceroute-backup-$$(date +%Y%m%d-%H%M).tar.gz; \
 	files=""; \
-	for f in data/demo demo.html artifacts/models artifacts/metrics.json artifacts/video; do \
+	for f in data/demo demo.html present.html artifacts/models artifacts/metrics.json artifacts/video; do \
 		[ -e "$$f" ] && files="$$files $$f"; \
 	done; \
 	tar czf "$$out" $$files; \
