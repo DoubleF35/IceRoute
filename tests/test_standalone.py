@@ -162,7 +162,22 @@ def test_the_embedded_data_is_valid_json():
 
 def test_the_footer_quotes_the_measured_scores_not_placeholders():
     page = sa.build_page(_ctx())
-    assert "0.532" in page and "0.906" in page and "20 scene di test ufficiali" in page
+    assert "0,532" in page and "0,906" in page and "20 scene di test ufficiali" in page
+
+
+def test_every_score_on_the_page_uses_the_italian_decimal_separator():
+    """The page grouped thousands in Italian and printed decimals in English —
+    "94.220 B" beside "15.6 h", two conventions inside one card. A reader who
+    takes "94.220" as a decimal reads the mask as ninety-four bytes."""
+    page = sa.build_page(_ctx())
+    # Only the rendered markup: the embedded blob is raw data, where 0.5324 is
+    # the measurement itself and localising it would corrupt it.
+    shell = page.split("<script>")[0]
+    assert "0.532" not in shell and "0.906" not in shell
+    js = page.split("<script>")[-1]
+    # Exactly one toFixed survives, inside the formatter that appends the comma.
+    assert js.count("toFixed") == 1
+    assert ".replace('.', ',')" in js
 
 
 def test_a_page_without_an_evaluation_states_nothing_rather_than_zero():
@@ -244,3 +259,76 @@ def test_without_assumptions_the_page_shows_no_transmission_time():
         for c in s["classes"].values():
             if c.get("payload"):
                 assert c["payload"]["link"] is None
+
+
+# ---------------------------------------------------------------------------
+# The legend is a reading of the image, not a claim about it
+# ---------------------------------------------------------------------------
+
+
+def test_the_legend_colours_come_from_the_modules_that_paint_the_rasters():
+    """Retyped hex values drift. This file carried #0a2859 for open water while
+    precompute paints it #0a285a — one channel out, invisible on screen, and
+    enough to make the legend describe a picture that has moved. The other
+    eleven happened to be right, which is the argument for deriving all twelve.
+    """
+    from iceroute.demo import overlay as ov
+    from iceroute.demo.precompute import CLASS_COLOURS, RIO_COLOURS, SIC_COLOURS
+
+    def h(c):
+        return "#{:02x}{:02x}{:02x}".format(*c)
+
+    pal = sa.palette()
+    assert pal["classes"] == [h(CLASS_COLOURS[i]) for i in (0, 1, 2)]
+    assert pal["rio"] == [h(RIO_COLOURS[i]) for i in (0, 1, 2)]
+    assert pal["sic"]["10"] == h(SIC_COLOURS[10])
+    assert (pal["ours"], pal["base"], pal["nogo"]) == (
+        h(ov.COL_ICEROUTE), h(ov.COL_BASELINE), h(ov.COL_NO_GO))
+
+
+def test_no_legend_colour_is_typed_into_the_javascript():
+    page = sa.build_page(_ctx())
+    js = page.split("<script>")[-1]
+    assert "#0a2859" not in page, "il vecchio refuso è tornato"
+    for literal in ("'#2ecc71'", "'#f1c40f'", "'#e74c3c'", "'#00c8ff'",
+                    "'#f5f5f5'", "'#ff2020'", "'#ff2d95'"):
+        assert literal not in js, f"colore ribattuto a mano: {literal}"
+
+
+def test_the_interface_accent_is_not_the_colour_of_our_route():
+    """Chrome that borrows a series colour makes the eye ask whether a
+    highlighted tab is part of the route. Magenta means "this is our track",
+    and nothing else on the page is allowed to mean it."""
+    page = sa.build_page(_ctx())
+    css = page.split("<style>")[1].split("</style>")[0]
+    accent = re.search(r"--accent:(#[0-9a-f]{6})", css).group(1)
+    assert accent != sa.palette()["ours"]
+    for rule in ("label.opt.on{", ".tabs button.on{"):
+        block = css.split(rule)[1].split("}")[0]
+        assert sa.palette()["ours"] not in block
+
+
+# ---------------------------------------------------------------------------
+# Console chrome
+# ---------------------------------------------------------------------------
+
+
+def test_the_command_bar_states_which_model_produced_the_page():
+    """Provenance belongs in the chrome: the first question about any screen
+    full of numbers is which build it came from."""
+    page = sa.build_page(_ctx())
+    assert '<div id="top">' in page
+    bar = page.split('<div id="top">')[1].split("</div>\n\n<div class=\"wrap\">")[0]
+    assert "m.pt" in bar and "3 classi" in bar and "20 scene" in bar
+
+
+def test_the_status_line_is_filled_by_the_renderer_not_hardcoded():
+    page = sa.build_page(_ctx())
+    for slot in ("st-scene", "st-cls", "st-layer", "st-mode"):
+        assert f'id="{slot}"' in page
+        assert f"$('#{slot}').textContent" in page
+
+
+def test_a_page_without_a_checkpoint_omits_the_cell_instead_of_guessing():
+    page = sa.build_page(_ctx() | {"checkpoint": None, "aggregate": {}})
+    assert "modello</span>" not in page and "miou</span>" not in page

@@ -237,90 +237,245 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict | None = None) -> d
     }
 
 
+def palette() -> dict:
+    """Every legend colour, read from the module that paints the raster.
+
+    Retyping them is how a legend starts describing a picture that has moved:
+    this file carried ``#0a2859`` for open water, which ``precompute`` paints in
+    ``#0a285a``. One channel out is invisible on screen and still turns the
+    legend from a reading of the image into a claim about it. The other eleven
+    happened to be right, which is the argument for deriving all twelve rather
+    than fixing one.
+    """
+    from iceroute.demo.precompute import CLASS_COLOURS, RIO_COLOURS, SIC_COLOURS
+
+    def h(t):
+        return "#{:02x}{:02x}{:02x}".format(*t)
+
+    return {
+        "classes": [h(CLASS_COLOURS[i]) for i in sorted(CLASS_COLOURS)],
+        "rio": [h(RIO_COLOURS[i]) for i in (0, 1, 2)],
+        "sic": {str(k): h(v) for k, v in SIC_COLOURS.items()},
+        "ours": h(ov.COL_ICEROUTE),
+        "base": h(ov.COL_BASELINE),
+        "nogo": h(ov.COL_NO_GO),
+    }
+
+
 # ---------------------------------------------------------------------------
 # The page
 # ---------------------------------------------------------------------------
 
+# An operator console, not a web page: a command bar, a rail, panels with title
+# strips, a status line, 2px corners and one weight of rule. Three choices carry
+# most of it.
+#
+# **The interface accent is blue; magenta belongs to the data.** The tabs, the
+# selected rail row and the sliders used to be #ff2d95 — the same colour the
+# IceRoute track is drawn in. On a screen whose subject is the map, chrome that
+# borrows a series colour makes the eye ask whether a highlighted tab is part of
+# the route. Interaction is now #4a9eff and magenta appears only where it means
+# "this is our route".
+#
+# **Numbers are monospaced and tabular everywhere.** Figures that change when
+# you move a slider must not reflow the line they sit on.
+#
+# **Density over air.** 13px base, 2px radii, one hairline between things.
+# Measurements sit next to each other so they can be compared, which is what the
+# page is for.
 CSS = """
-*{box-sizing:border-box} html,body{margin:0;background:#0a0e14;color:#eaf1fa;
- font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
-a{color:#7fb2ff}
-.wrap{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-aside{background:#0d131c;border-right:1px solid #1d2633;padding:20px 16px;
- position:sticky;top:0;height:100vh;overflow-y:auto}
-aside h3{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#6b7f99;
- margin:20px 0 8px;font-weight:700}
-aside h3:first-child{margin-top:0}
-label.opt{display:block;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:13.5px;
- color:#9fb1c7}
-label.opt:hover{background:#141d2a}
-label.opt input{margin-right:8px;accent-color:#ff2d95}
-label.opt.on{background:#182234;color:#eaf1fa}
-main{padding:24px 30px 60px;max-width:1500px}
-h1{font-size:31px;margin:0 0 4px} h1 small{font-size:14px;color:#6b7f99;font-weight:400}
-h2{font-size:17px;margin:26px 0 10px}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(4,1fr);margin:16px 0}
-.kpi{background:#111823;border:1px solid #1d2633;border-radius:12px;padding:15px 17px}
-.kpi .lab{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:#6b7f99;
- font-weight:700;margin-bottom:6px}
-.kpi .val{font-size:28px;font-weight:700;font-family:ui-monospace,Menlo,monospace;
- line-height:1.15}
-.kpi .sub{font-size:12.5px;color:#8397ae;margin-top:6px}
-.tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.7px;padding:2px 7px;
- border-radius:4px;text-transform:uppercase}
-.ok{background:#0d3b2a;color:#4ade9b}.warn{background:#3d3212;color:#f0b849}
-.bad{background:#3b1c1c;color:#f08a8a}.info{background:#1b2735;color:#7d92ad}
-.cols{display:grid;grid-template-columns:3fr 1fr;gap:22px;align-items:start}
-.map{position:relative;background:#0d131c;border:1px solid #1d2633;border-radius:12px;
- overflow:hidden;line-height:0}
+:root{
+  --bg:#0a0e14; --panel:#0f141c; --raise:#131a24; --line:#1c2531; --rule:#161d27;
+  --text:#dbe4ef; --dim:#7e90a6; --faint:#5a6b80; --accent:#4a9eff;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+b,strong{color:#eef4fb;font-weight:650}
+code{font-family:var(--mono);font-size:.92em;color:#9fc6f0;background:#121a26;
+  border:1px solid var(--rule);border-radius:2px;padding:0 4px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#1f2a38;border:2px solid var(--bg);border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:#2b3a4d}
+
+/* -- command bar ---------------------------------------------------------- */
+#top{position:fixed;top:0;left:0;right:0;height:42px;z-index:20;display:flex;
+  align-items:center;gap:14px;padding:0 14px;background:var(--raise);
+  border-bottom:1px solid var(--line)}
+#top .mark{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.14em;
+  font-size:12px;text-transform:uppercase;color:#eef4fb}
+#top .mark i{width:9px;height:9px;background:var(--ours);display:inline-block;
+  box-shadow:0 0 0 3px #ff2d9524}
+#top .what{color:var(--faint);font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.14em;border-left:1px solid var(--line);padding-left:14px}
+#top .sp{flex:1}
+#top .meta{display:flex;gap:0;align-items:stretch;font-size:10.5px}
+#top .meta div{padding:0 13px;border-left:1px solid var(--line);display:flex;
+  flex-direction:column;justify-content:center;gap:2px}
+#top .meta .k{color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-size:9px}
+#top .meta .v{font-family:var(--mono);color:var(--text);font-size:11.5px}
+
+/* -- frame ---------------------------------------------------------------- */
+.wrap{display:grid;grid-template-columns:238px 1fr;min-height:100vh;
+  padding:42px 0 26px}
+aside{background:var(--panel);border-right:1px solid var(--line);
+  position:sticky;top:42px;height:calc(100vh - 68px);overflow-y:auto}
+aside h3{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);
+  margin:0;font-weight:700;padding:9px 12px 8px;background:var(--raise);
+  border-bottom:1px solid var(--line);border-top:1px solid var(--line)}
+aside h3:first-child{border-top:0}
+label.opt{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;cursor:pointer;
+  font-size:12.5px;color:var(--dim);border-left:2px solid transparent;
+  border-bottom:1px solid var(--rule);font-family:var(--mono);letter-spacing:-.01em}
+label.opt:hover{background:#141d29;color:var(--text)}
+label.opt input{appearance:none;width:9px;height:9px;margin:0;border:1px solid #3a4a5e;
+  border-radius:50%;flex-shrink:0;background:transparent}
+label.opt.on{background:#152235;color:#eef4fb;border-left-color:var(--accent)}
+label.opt.on input{border-color:var(--accent);background:var(--accent);
+  box-shadow:inset 0 0 0 2px #152235}
+main{padding:16px 18px 30px;max-width:1680px;min-width:0}
+
+/* -- panels --------------------------------------------------------------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:2px;margin-bottom:12px}
+.panel>.ph{display:flex;align-items:center;gap:10px;padding:7px 11px;background:var(--raise);
+  border-bottom:1px solid var(--line)}
+.panel>.ph h2{margin:0;font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--dim);font-weight:700}
+.panel>.ph .rt{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.panel>.pb{padding:11px}
+.panel>.pb.flush{padding:0}
+
+h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.01em;font-family:var(--mono)}
+h1 small{font-size:11px;color:var(--faint);font-weight:400;font-family:var(--mono)}
+h2{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);
+  margin:16px 0 7px;font-weight:700}
+/* the side column starts on the map panel's top edge, not 16px under it */
+#side>h2:first-child{margin-top:0}
+/* the transmitted file is the point of this pane: room enough not to wrap mid-token */
+#pane-down .cols{grid-template-columns:1.4fr 1fr}
+
+/* -- the metric strip ----------------------------------------------------- */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(4,1fr);margin:0 0 12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:10px 12px}
+.kpi .lab{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin-bottom:6px}
+.kpi .val{font-size:23px;font-weight:600;font-family:var(--mono);line-height:1.1;
+  color:#eef4fb;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .sub{font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.4}
+/* One instrument of four readings, not four cards: a single frame with hairlines
+   so the figures sit on a common baseline and can be read across. */
+#kpis{gap:0;border:1px solid var(--line);border-radius:2px;background:var(--panel)}
+#kpis .kpi{border:0;border-left:1px solid var(--line);border-radius:0;padding:11px 14px}
+#kpis .kpi:first-child{border-left:0}
+
+/* -- badges --------------------------------------------------------------- */
+.tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.1em;padding:2px 6px;
+  border-radius:2px;text-transform:uppercase;vertical-align:middle;
+  border:1px solid transparent}
+.ok{background:#0c2f23;color:#45d19a;border-color:#15523c}
+.warn{background:#30280f;color:#e8b54a;border-color:#4e4119}
+.bad{background:#2f1717;color:#ec8585;border-color:#532525}
+.info{background:#16202c;color:#7d92ad;border-color:#243040}
+
+/* -- map ------------------------------------------------------------------ */
+.cols{display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:start}
+.map{position:relative;background:#080c12;overflow:hidden;line-height:0;
+  border-bottom:1px solid var(--line)}
 .map img{width:100%;display:block}
 .ovwrap{position:absolute;inset:0}
 svg.ov{width:100%;height:100%;display:block}
 .cas{fill:none;stroke:#080c14;stroke-width:9;vector-effect:non-scaling-stroke;
- stroke-linejoin:round;stroke-linecap:round}
-.base{fill:none;stroke:#f5f5f5;stroke-width:2.5;stroke-dasharray:9 6;
- vector-effect:non-scaling-stroke}
-.ours{fill:none;stroke:#ff2d95;stroke-width:3.5;vector-effect:non-scaling-stroke;
- stroke-linejoin:round;stroke-linecap:round}
-.nogo{fill:none;stroke:#ff2020;stroke-width:4.5;vector-effect:non-scaling-stroke;
- stroke-linecap:round}
-.nogod{fill:#ff2020;stroke:#080c14;stroke-width:1.5;vector-effect:non-scaling-stroke}
-.wp{fill:#ff2d95;stroke:#080c14;stroke-width:2;vector-effect:non-scaling-stroke}
+  stroke-linejoin:round;stroke-linecap:round}
+.base{fill:none;stroke:var(--c-base);stroke-width:2.5;stroke-dasharray:9 6;
+  vector-effect:non-scaling-stroke}
+.ours{fill:none;stroke:var(--c-ours);stroke-width:3.5;vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;stroke-linecap:round}
+.nogo{fill:none;stroke:var(--c-nogo);stroke-width:4.5;vector-effect:non-scaling-stroke;
+  stroke-linecap:round}
+.nogod{fill:var(--c-nogo);stroke:#080c14;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.wp{fill:var(--c-ours);stroke:#080c14;stroke-width:2;vector-effect:non-scaling-stroke}
 .end{fill:#fff;stroke:#080c14;stroke-width:2;vector-effect:non-scaling-stroke}
 body[data-mode=none] .lay-baseline,body[data-mode=none] .lay-iceroute,
 body[data-mode=baseline] .lay-iceroute,body[data-mode=iceroute] .lay-baseline{display:none}
-.legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 4px}
-.legend span{display:flex;align-items:center;gap:7px;font-size:13px;color:#9fb1c7}
-.legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
-.note{font-size:13px;color:#8397ae;margin:8px 0}
-.box{border-radius:10px;padding:13px 15px;margin:12px 0;font-size:13.5px;line-height:1.55}
-.box.i{background:#101d2e;border:1px solid #1d3450;color:#b9cde6}
-.box.w{background:#2a2410;border:1px solid #4a3d15;color:#e8cf92}
-.box.e{background:#2b1414;border:1px solid #4d2020;color:#f0a8a8}
-.box.g{background:#0e2a1e;border:1px solid #17482f;color:#94e0b8}
-.tabs{display:flex;gap:4px;margin:26px 0 0;border-bottom:1px solid #1d2633}
-.tabs button{background:none;border:0;border-bottom:2px solid transparent;color:#6b7f99;
- padding:9px 15px;font-size:14px;cursor:pointer;font-family:inherit}
-.tabs button.on{color:#ff2d95;border-bottom-color:#ff2d95}
-.pane{display:none;padding-top:18px} .pane.on{display:block}
-table{border-collapse:collapse;font-size:13.5px} td{padding:4px 16px 4px 0;color:#9fb1c7}
-td.n{text-align:right;font-family:ui-monospace,Menlo,monospace;color:#eaf1fa}
-pre{background:#0d131c;border:1px solid #1d2633;border-radius:8px;padding:13px;
- font-size:11.5px;color:#8fd6a8;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
-input[type=range]{width:100%;accent-color:#ff2d95}
-.dial{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin:14px 0 4px}
-.dial label{font-size:12.5px;color:#9fb1c7}
-.dial b{color:#eaf1fa;font-family:ui-monospace,Menlo,monospace}
-footer{color:#55677d;font-size:12.5px;border-top:1px solid #1d2633;padding-top:14px;
- margin-top:34px}
-@media(max-width:900px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto}
- .grid{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 7px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dim);
+  font-family:var(--mono)}
+.legend i{width:11px;height:11px;border-radius:2px;display:inline-block;
+  border:1px solid #00000066}
+.note{font-size:11.5px;color:var(--dim);margin:7px 0;line-height:1.5}
+
+.box{border-radius:2px;padding:10px 12px;margin:9px 0;font-size:12px;line-height:1.55;
+  border-left-width:2px;border-left-style:solid}
+.box.i{background:#101a28;border:1px solid var(--line);border-left-color:var(--accent);
+  color:#b4c8de}
+.box.w{background:#231e0f;border:1px solid #3c3414;border-left-color:#e8b54a;color:#e0c589}
+.box.e{background:#241212;border:1px solid #401d1d;border-left-color:#ec8585;color:#eaa2a2}
+.box.g{background:#0c2219;border:1px solid #16402c;border-left-color:#45d19a;color:#8ed6b0}
+
+/* -- tabs ----------------------------------------------------------------- */
+.tabs{display:flex;gap:0;margin:0;background:var(--raise);border:1px solid var(--line);
+  border-bottom:0;border-radius:2px 2px 0 0}
+.tabs button{background:none;border:0;border-right:1px solid var(--line);
+  border-bottom:2px solid transparent;color:var(--faint);padding:8px 16px;font-size:10px;
+  cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.13em;
+  font-weight:700}
+.tabs button:hover{color:var(--dim);background:#172231}
+.tabs button.on{color:#eef4fb;border-bottom-color:var(--accent);background:var(--panel)}
+.panes{border:1px solid var(--line);border-top:0;border-radius:0 0 2px 2px;
+  background:var(--panel)}
+.pane{display:none;padding:13px} .pane.on{display:block}
+
+table{border-collapse:collapse;font-size:12px;width:100%}
+td{padding:6px 14px 6px 0;color:var(--dim);border-bottom:1px solid var(--rule)}
+tr:last-child td{border-bottom:0}
+td.n{text-align:right;font-family:var(--mono);color:#eef4fb;font-variant-numeric:tabular-nums;
+  white-space:nowrap;padding-right:0}
+pre{background:#080c12;border:1px solid var(--line);border-radius:2px;padding:11px;
+  font-size:11px;color:#8fd6a8;overflow-x:auto;white-space:pre-wrap;word-break:break-all;
+  font-family:var(--mono);line-height:1.5;max-height:360px;overflow-y:auto}
+
+input[type=range]{width:100%;accent-color:var(--accent);height:3px}
+.dial{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:12px 0 4px}
+.dial label{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.13em;
+  font-weight:700;display:block;margin-bottom:7px}
+.dial b{color:#eef4fb;font-family:var(--mono);font-size:13px;text-transform:none;
+  letter-spacing:0;font-variant-numeric:tabular-nums}
+
+/* -- status line ---------------------------------------------------------- */
+#status{position:fixed;left:0;right:0;bottom:0;height:26px;z-index:20;display:flex;
+  align-items:center;gap:0;background:var(--raise);border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:10.5px;color:var(--faint);overflow:hidden}
+#status div{padding:0 12px;border-right:1px solid var(--line);white-space:nowrap;
+  line-height:25px}
+#status div:last-child{border-right:0;margin-left:auto;color:#3f4e60}
+#status b{color:var(--text);font-weight:500}
+
+footer{color:var(--faint);font-size:11px;border-top:1px solid var(--line);padding-top:12px;
+  margin-top:18px;line-height:1.6}
+
+@media(max-width:1000px){
+  .wrap{grid-template-columns:1fr}
+  aside{position:static;height:auto}
+  .grid,#kpis{grid-template-columns:repeat(2,1fr)}
+  #kpis .kpi:nth-child(3){border-left:0}
+  .cols{grid-template-columns:1fr}
+  #top .meta div:nth-child(n+2){display:none}
+}
 """
 
 JS = r"""
 const $ = s => document.querySelector(s);
 const st = {scene: 0, cls: null, layer: 'rio', mode: 'both', tab: 'down'};
-const fmt = (v, d = 1) => (typeof v === 'number') ? v.toFixed(d) : 'non misurato';
+// Italian decimals. The page already grouped thousands with toLocaleString
+// ("94.220 B") while printing decimals with a dot ("15.6 h") — two conventions
+// in the same card. Every displayed figure goes through here.
+const fmt = (v, d = 1) => (typeof v === 'number') ? v.toFixed(d).replace('.', ',')
+                                                  : 'non misurato';
 const B = n => (typeof n === 'number') ? n.toLocaleString('it-IT') + ' B' : 'non misurato';
 
 function scene() { return D.scenes[st.scene]; }
@@ -367,8 +522,9 @@ function render() {
   $('#notroutable').style.display = routable ? 'none' : '';
   radios($('#r-mode'), D.modes, 'mode', st.mode);
 
-  $('#head').innerHTML = `IceRoute <small>${s.id} · ${s.acquired} · copertura carta
-      ${Math.round(100 * (s.coverage || 0))}%</small>`;
+  $('#head').textContent = s.id;
+  $('#headrt').textContent = `${s.acquired} · copertura carta `
+      + Math.round(100 * (s.coverage || 0)) + '%';
   $('#worst').innerHTML = s.worst_case ? `<div class="box w"><b>Questa è la scena su cui il
       modello sbaglia di più</b>, fra le 20 del test ufficiale. È qui apposta: serve a
       rispondere a «e quando sbaglia?» invece di far finta che non succeda. La rotta qui
@@ -379,7 +535,7 @@ function render() {
       '<span style="color:#f08a8a">nessuna rotta</span>', (e && e.message) || '');
   else if (typeof c.time_saved_hours === 'number' && c.time_saved_hours > 0)
     transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
-      `<span style="color:#4ade9b">${c.time_saved_hours.toFixed(1)} h
+      `<span style="color:#4ade9b">${fmt(c.time_saved_hours)} h
        (${Math.round(c.time_saved_percent)}%)</span> contro ${fmt(base.time_hours)} h della diretta`);
   else if (base.blocked_by_ice) transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
       `<span class="tag ok">la rotta diretta è vietata dal ghiaccio</span>
@@ -398,7 +554,7 @@ function render() {
           `<span class="tag ${band[0]}">${band[1]}</span> soglie IMO MSC.1/Circ.1519`)
     + kpi('Volume di downlink', D.compression ? Math.round(D.compression) + ':1' : 'non misurato',
           'mediana · numeratore: SAR compresso senza perdita')
-    + kpi('Inferenza a bordo', D.quant.int8_mb ? D.quant.int8_mb.toFixed(2) + ' MB' : 'non misurata',
+    + kpi('Inferenza a bordo', D.quant.int8_mb ? fmt(D.quant.int8_mb, 2) + ' MB' : 'non misurata',
           'INT8, 1 thread CPU');
 
   const n = imgName();
@@ -407,19 +563,21 @@ function render() {
   $('#svg').innerHTML = (routable && e) ? e.svg : '';
 
   const L = {
-    rio: [[['Navigazione normale', '#2ecc71'], ['Rischio elevato', '#f1c40f'],
-           ['Considerazione speciale', '#e74c3c']],
+    rio: [[['Navigazione normale', D.palette.rio[0]], ['Rischio elevato', D.palette.rio[1]],
+           ['Considerazione speciale', D.palette.rio[2]]],
           'Risk Index Outcome per una nave ' + st.cls + '. <b>È questo il livello che decide</b> dove la nave può andare.'],
-    mask_geo: [[['Acqua libera', '#0a2859'], ['Ghiaccio sottile', '#00c8ff'],
-                ['Ghiaccio spesso', '#ffffff']],
+    mask_geo: [[['Acqua libera', D.palette.classes[0]],
+                ['Ghiaccio sottile', D.palette.classes[1]],
+                ['Ghiaccio spesso', D.palette.classes[2]]],
           'Maschera <b>predetta dal modello</b>, non la carta dell\'analista.'],
     sic: [D.sic_legend, 'Frazione di mare coperta da ghiaccio, in decimi. È <b>l\'altra metà</b> della decisione POLARIS: <code>RIO = C × RIV(tipo) + (10−C) × RIV(acqua libera)</code>.'],
     sar: [[], 'Banda HV, stiramento per percentili. È l\'ingresso del modello.'],
     mask_truth: [[], 'La carta disegnata dall\'analista, solo per confronto. Non entra nel calcolo.'],
   }[st.layer] || [[], ''];
   const routeLeg = routable && st.mode !== 'none' ? [
-    ...(st.mode !== 'iceroute' ? [['Rotta diretta', '#f5f5f5'], ['Cella vietata da POLARIS', '#ff2020']] : []),
-    ...(st.mode !== 'baseline' ? [['IceRoute', '#ff2d95']] : [])] : [];
+    ...(st.mode !== 'iceroute' ? [['Rotta diretta', D.palette.base],
+                                 ['Cella vietata da POLARIS', D.palette.nogo]] : []),
+    ...(st.mode !== 'baseline' ? [['IceRoute', D.palette.ours]] : [])] : [];
   const chip = a => a.map(([t, col]) => `<span><i style="background:${col}"></i>${t}</span>`).join('');
   $('#legend').innerHTML = (routeLeg.length ? `<div class="legend">${chip(routeLeg)}</div>` : '')
       + (L[0].length ? `<div class="legend">${chip(L[0])}</div>` : '')
@@ -450,6 +608,16 @@ function render() {
            ${fmt(c.detour_km)} km.</div>`
         : `<div class="box i">Fuori dalla copertura della carta: non è il ghiaccio a fermarla.</div>`);
 
+  // Chrome, not data: what is on screen, named. No value appears here that is
+  // not already shown, formatted, somewhere else on the page.
+  $('#maptitle').textContent = (D.layers.find(l => l[0] === st.layer) || [0, st.layer])[1];
+  $('#mapmeta').textContent = routable ? 'griglia geocodificata · rotte disegnabili'
+                                       : 'griglia della scena · rotte non disegnabili';
+  $('#st-scene').textContent = s.id;
+  $('#st-cls').textContent = st.cls;
+  $('#st-layer').textContent = st.layer;
+  $('#st-mode').textContent = routable ? st.mode : 'n/d';
+
   renderPanes();
 }
 
@@ -463,7 +631,7 @@ function renderPanes() {
         ${p.total && p.sar ? `<div class="kpi" style="margin-top:14px">
           <div class="lab">Totale trasmesso, su questa scena</div>
           <div class="val">${Math.round(p.total / 1024)} KB</div>
-          <div class="sub">contro ${(p.sar / 1048576).toFixed(1)} MB di SAR compresso senza
+          <div class="sub">contro ${fmt(p.sar / 1048576)} MB di SAR compresso senza
           perdita — <b>${Math.round(p.ratio)}:1</b>. La scheda in alto riporta la
           <b>mediana</b>.</div></div>` : `<div class="note">${p.note || ''}</div>`}
         ${p.link ? `<div class="kpi" style="margin-top:12px">
@@ -485,22 +653,22 @@ function renderPanes() {
       '<div class="box i">Nessuna rotta: niente da stimare.</div>'; return; }
   const i = +$('#sp').value, v = D.speeds[i], h = t.values[i], bh = t.baseline[i],
         burn = +$('#bu').value, c = (e.comparison || {}), base = c.baseline || {};
-  $('#spv').textContent = v.toFixed(1) + ' kn';
+  $('#spv').textContent = fmt(v) + ' kn';
   $('#buv').textContent = burn ? burn + ' t/giorno' : 'non impostato';
   const fuel = (h != null && burn) ? h / D.hours_per_day * burn : null;
   $('#cards-time').innerHTML =
       (h == null ? kpi('Transito IceRoute', 'non riscalabile', t.note)
-                 : kpi('Transito IceRoute', h.toFixed(1) + ' h',
-                       `a ${v.toFixed(1)} kn · ${Math.round((c.iceroute || {}).distance_km)} km`))
+                 : kpi('Transito IceRoute', fmt(h) + ' h',
+                       `a ${fmt(v)} kn · ${Math.round((c.iceroute || {}).distance_km)} km`))
     + (base.blocked_by_ice
         ? kpi('Rotta diretta', 'vietata', `${base.n_no_go_cells} celle oltre il limite POLARIS.
              <b>Nessun tempo di riferimento</b>: non esiste un viaggio più lento da cui risparmiare.`)
-        : bh != null ? kpi('Rotta diretta', bh.toFixed(1) + ' h', 'percorribile: IceRoute la segue')
+        : bh != null ? kpi('Rotta diretta', fmt(bh) + ' h', 'percorribile: IceRoute la segue')
         : kpi('Rotta diretta', 'fuori copertura', 'non è il ghiaccio a fermarla'))
-    + kpi('Carburante', fuel == null ? 'non impostato' : fuel.toFixed(1) + ' t',
+    + kpi('Carburante', fuel == null ? 'non impostato' : fmt(fuel) + ' t',
         fuel == null ? 'serve un consumo, e non ne abbiamo uno con una fonte (P-09)'
         : `<span class="tag warn">assunzione tua</span> ${burn} t/giorno ×
-           ${(h / D.hours_per_day).toFixed(2)} giorni`);
+           ${fmt(h / D.hours_per_day, 2)} giorni`);
 }
 
 function tab(which) {
@@ -519,12 +687,18 @@ render(); tab('down');
 """
 
 
+def dec(v: float | None, places: int = 3) -> str | None:
+    """Italian decimal separator, to match the digit grouping already in use."""
+    return None if v is None else f"{v:.{places}f}".replace(".", ",")
+
+
 def build_page(ctx: dict) -> str:
     agg = ctx["aggregate"]
+    pal = palette()
     foot = " · ".join(x for x in [
         f"schema: {ctx['scheme']}" if ctx["scheme"] else "",
-        f"mIoU {agg['miou']:.3f}" if isinstance(agg.get("miou"), float) else "",
-        f"ghiaccio/acqua {agg['binary_accuracy']:.3f}"
+        f"mIoU {dec(agg.get('miou'))}" if isinstance(agg.get("miou"), float) else "",
+        f"ghiaccio/acqua {dec(agg.get('binary_accuracy'))}"
         if isinstance(agg.get("binary_accuracy"), float) else "",
         f"{ctx['n_eval_scenes']} scene di test ufficiali" if ctx.get("n_eval_scenes") else "",
     ] if x)
@@ -532,39 +706,76 @@ def build_page(ctx: dict) -> str:
     data = dict(ctx)
     data["layers"] = LAYERS
     data["modes"] = MODES
-    data["sic_legend"] = [["0/10 — acqua libera", "#181626"], ["3/10", "#7c2a68"],
-                          ["6/10", "#de5c42"], ["10/10 — copertura totale", "#fff078"]]
+    data["palette"] = pal
+    data["sic_legend"] = [["0/10 — acqua libera", pal["sic"]["0"]], ["3/10", pal["sic"]["3"]],
+                          ["6/10", pal["sic"]["6"]], ["10/10 — copertura totale",
+                                                      pal["sic"]["10"]]]
+
+    # The command bar carries provenance, not measurements: which checkpoint, which
+    # scheme, how many held-out scenes. The numbers live in the strip below, where
+    # they can be compared; up here is the answer to "what am I looking at".
+    def cell(k: str, v: str | None) -> str:
+        return (f'<div><span class="k">{html.escape(k)}</span>'
+                f'<span class="v">{html.escape(v)}</span></div>') if v else ""
+
+    ckpt = Path(str(ctx.get("checkpoint") or "")).name
+    meta = (cell("modello", ckpt or None)
+            + cell("schema", ctx.get("scheme") or None)
+            + cell("test", f"{ctx['n_eval_scenes']} scene" if ctx.get("n_eval_scenes") else None)
+            + cell("miou", dec(agg.get("miou")) if isinstance(agg.get("miou"), float) else None))
+
+    root = (f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};--c-nogo:{pal['nogo']};"
+            f"--ours:{pal['ours']}}}")
 
     return f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
 <title>IceRoute — demo</title><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>{CSS}</style></head><body data-mode="both">
+<style>{CSS}{root}</style></head><body data-mode="both">
+
+<div id="top">
+  <div class="mark"><i></i>IceRoute</div>
+  <div class="what">instradamento fra i ghiacci · console</div>
+  <div class="sp"></div>
+  <div class="meta">{meta}</div>
+</div>
+
 <div class="wrap">
 <aside>
   <h3>Scena</h3><div id="r-scene"></div>
   <h3>Classe della nave</h3><div id="r-cls"></div>
   <h3>Livelli</h3><div id="r-layer"></div>
   <div id="modes"><h3>Rotte sulla mappa</h3><div id="r-mode"></div></div>
-  <div id="notroutable" class="note" style="display:none">Su questo livello le rotte non sono
-   disegnabili: è il raster della scena grezza, mentre la rotta è calcolata sulla griglia
-   geocodificata a 500 m.</div>
+  <div id="notroutable" class="note" style="display:none;padding:10px 12px">Su questo livello
+   le rotte non sono disegnabili: è il raster della scena grezza, mentre la rotta è calcolata
+   sulla griglia geocodificata a 500 m.</div>
 </aside>
+
 <main>
-  <h1 id="head"></h1>
+  <div class="panel"><div class="ph">
+    <h1 id="head"></h1>
+    <span class="rt" id="headrt"></span>
+  </div></div>
+
   <div id="worst"></div>
   <div class="grid" id="kpis"></div>
+
   <div class="cols">
     <div>
-      <div class="map"><img id="img" alt="livello"><div id="svg" class="ovwrap"></div></div>
-      <div id="legend"></div>
+      <div class="panel">
+        <div class="ph"><h2 id="maptitle">Vista</h2><span class="rt" id="mapmeta"></span></div>
+        <div class="map"><img id="img" alt="livello"><div id="svg" class="ovwrap"></div></div>
+        <div class="pb"><div id="legend"></div></div>
+      </div>
       <div id="cond"></div>
     </div>
     <div id="side"></div>
   </div>
+
   <div class="tabs">
     <button data-t="down" class="on">Cosa scende a terra</button>
     <button data-t="time">Tempo e carburante</button>
     <button data-t="live">Calcola ora</button>
   </div>
+  <div class="panes">
   <div class="pane on" id="pane-down"></div>
   <div class="pane" id="pane-time">
     <div class="box w"><b>Questi due valori non sono nostre misure.</b> La velocità in acqua
@@ -592,6 +803,8 @@ def build_page(ctx: dict) -> str:
      scena grezza e confronta il risultato con quello precalcolato — finora identico cella per
      cella. Questa pagina è la <b>rete di sicurezza</b>: serve quando la demo vera non parte.</div>
   </div>
+  </div>
+
   <footer>{html.escape(foot)}<br>
    Pagina autonoma generata da <code>make demo-static</code>: nessuna risorsa esterna, nessun
    server, funziona con la rete staccata. Ogni numero viene da
@@ -599,10 +812,18 @@ def build_page(ctx: dict) -> str:
    che legge la demo vera.<br>Modello: <code>{html.escape(str(ctx.get('checkpoint') or '—'))}</code>
   </footer>
 </main></div>
+
+<div id="status">
+  <div>scena <b id="st-scene">—</b></div>
+  <div>classe <b id="st-cls">—</b></div>
+  <div>livello <b id="st-layer">—</b></div>
+  <div>rotte <b id="st-mode">—</b></div>
+  <div>data/demo/index.json · artifacts/metrics.json</div>
+</div>
+
 <script>const D = {json.dumps(data, ensure_ascii=False)};</script>
 <script>{JS}</script>
 </body></html>"""
-
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Congela la demo in un solo file HTML. SPEC §10.4.")
