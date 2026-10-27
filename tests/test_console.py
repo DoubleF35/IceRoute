@@ -484,3 +484,87 @@ def test_the_ground_track_has_two_distinct_ends_the_satellite_can_fly_between():
         assert a != b, f"{s['id']}: estremi coincidenti"
         assert co.great_circle_km(tuple(a), tuple(b)) == pytest.approx(
             f["along_km"], rel=0.01), f"{s['id']}: la traccia non è lunga quanto dichiarato"
+
+
+# ---------------------------------------------------------------------------
+# The palette, and the one thing a palette can get wrong
+# ---------------------------------------------------------------------------
+
+
+def _tokens() -> dict[str, str]:
+    root = re.search(r":root\{(.*?)\n\}", co.CSS, re.S).group(1)
+    root = re.sub(r"/\*.*?\*/", "", root, flags=re.S)
+    out = {}
+    for decl in root.split(";"):
+        if ":" in decl and decl.strip().startswith("--"):
+            k, v = decl.split(":", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def _lum(hex_colour: str) -> float:
+    h = hex_colour.lstrip("#")
+    parts = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    f = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in parts]
+    return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]
+
+
+def _contrast(a: str, b: str) -> float:
+    la, lb = _lum(a), _lum(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+def test_the_palette_is_blueprints_and_not_an_approximation_of_it():
+    """Read from palantir/blueprint's own _colors.scss rather than eyeballed.
+    If one drifts, it stopped being Blueprint's and became a near-miss."""
+    tok = _tokens()
+    assert tok["--bg"] == "#1c2127"        # dark-gray1
+    assert tok["--panel"] == "#252a31"     # dark-gray2
+    assert tok["--raise"] == "#2f343c"     # dark-gray3
+    assert tok["--text"] == "#f6f7f9"      # light-gray5
+    assert tok["--accent"] == "#2d72d2"    # blue3
+    assert tok["--accent-text"] == "#8abbff"   # blue5
+
+
+def test_every_text_tier_clears_45_on_every_surface_it_sits_on():
+    """The labels on this page are 8-10px, below the 12px Blueprint's muted
+    grey is drawn for. Measured rather than assumed: `gray3` is 4.35:1 on the
+    elevated panel and `blue3` 3.43:1 as text, which is why neither is used
+    for type."""
+    tok = _tokens()
+    grounds = [tok["--bg"], tok["--panel"], tok["--raise"]]
+    for name in ("--text", "--dim", "--faint", "--accent-text",
+                 "--ok-t", "--bad-t", "--warn-t", "--info-t"):
+        for ground in grounds:
+            r = _contrast(tok[name], ground)
+            assert r >= 4.5, f"{name} su {ground}: {r:.2f}:1"
+
+
+def test_a_tag_reads_the_same_whether_its_row_is_selected_or_not():
+    """Translucent tag backgrounds borrow whatever is under them, so the same
+    "vietata" measured 4.37:1 on a selected row and 4.9:1 elsewhere. Opaque
+    grounds, and the contrast is a property of the tag alone."""
+    tok = _tokens()
+    for kind, text_token in [("ok", "--ok-t"), ("bad", "--bad-t"),
+                             ("warn", "--warn-t"), ("info", "--info-t")]:
+        rule = re.search(rf"\.pill\.{kind}\{{background:(#[0-9a-f]{{3,8}});", co.CSS)
+        assert rule, f"regola .pill.{kind} non trovata"
+        bg = rule.group(1)
+        assert len(bg) == 7, f".pill.{kind} ha un fondo traslucido: {bg}"
+        r = _contrast(tok[text_token], bg)
+        assert r >= 4.5, f".pill.{kind}: {r:.2f}:1"
+
+
+def test_no_interface_colour_is_typed_by_hand_outside_the_token_block():
+    """Twelve of the console's colours were hand-picked against a near-black
+    ground; on Blueprint's charcoal two of them fell to 1.2:1. They are tokens
+    now, and the legend swatches use the same tokens, so a swatch can no longer
+    disagree with the line it describes."""
+    body = co.CSS.split("\n}", 1)[1]          # tutto dopo il blocco :root
+    data_colours = {"#ff2d95", "#f5f5f5", "#ff2020", "#fff"}
+    stray = {m.group(0).lower() for m in re.finditer(r"#[0-9a-fA-F]{3,8}\b", body)}
+    stray -= data_colours
+    # i fondi opachi delle pastiglie sono miscele risolte una volta sola
+    stray -= {"#304241", "#3c5a51", "#453b41", "#654c51",
+              "#453e38", "#66533f", "#393e46", "#4d535c"}
+    assert not stray, f"colori a mano fuori dai token: {sorted(stray)}"

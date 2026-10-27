@@ -637,16 +637,52 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
     return ctx
 
 
+# Palette and type scale taken from Blueprint (palantir/blueprint,
+# @blueprintjs/core 6.21.0, Apache-2.0), read from `packages/colors/src/_colors.scss`
+# and `packages/core/src/common/_variables.scss` rather than eyeballed. The
+# components are not Blueprint's — only its tokens are — so nothing here claims
+# to be a Blueprint app.
+#
+# Two choices came out of measuring contrast rather than taste. `gray3` is
+# 4.35:1 on the elevated surface, under the 4.5 threshold, and that is exactly
+# where the nine-pixel labels sit: so the faint tier steps up to `gray4` on
+# anything raised. And `blue3` is 3.43:1 as text, fine as a fill behind white
+# and not fine as a label, so links and accents use `blue5` while `blue3` is
+# only ever a background.
 CSS = """
 :root{
-  --bg:#060a10; --panel:#0b1118; --raise:#0f1620; --line:#1b2633; --rule:#141c26;
-  --text:#d7e3f0; --dim:#7b8da3; --faint:#55677d; --accent:#4a9eff; --good:#45d19a;
+  /* dark-gray1 / dark-gray2 / dark-gray3 — app, panel, elevated */
+  --bg:#1c2127; --panel:#252a31; --raise:#2f343c;
+  /* dark-gray5 / dark-gray4 — borders and inner rules */
+  --line:#404854; --rule:#383e47;
+  /* light-gray5 / gray5 / gray4. Blueprint's muted tier is gray4 and its
+     small type is 12px; these labels are 8-10px, where gray4 falls to 4.3:1
+     on a raised panel and gray3 to 3.4:1. Measured, so both tiers step up one
+     stop and every piece of text on this page clears 4.5:1. */
+  --text:#f6f7f9; --dim:#c5cbd3; --faint:#abb3bf; --strong:#ffffff;
+  /* blue3 fills, blue5 text; green5 reads on every surface here */
+  --accent:#2d72d2; --accent-text:#8abbff; --good:#72ca9b;
+  --sel:#2d72d238; --glow:#2d72d233;
+  /* Cromie del globo. Stanno qui e non nei fogli di stile dei singoli pezzi
+     perche' la legenda usa gli stessi token: un campione e la linea che
+     descrive non possono piu' divergere. */
+  --geo-scene:#4c90f0; --geo-scene-fill:#4c90f01f;   /* blue4 */
+  --geo-track:#ec9a3c; --geo-track-dim:#ec9a3c66;    /* orange4 */
+  --geo-arc:#5f6b7c; --geo-grid:#404854;             /* gray1, dark-gray5 */
+  --geo-limb:#5f6b7c;
+  /* L'alone dietro i marcatori e' il fondo dell'app: su un grigio piu' chiaro
+     un alone quasi nero smette di separare e diventa un contorno. */
+  --halo:#1c2127;
+  --ok-t:#72ca9b; --bad-t:#fa999c; --warn-t:#fbb360; --info-t:#abb3bf;
+  --radius:4px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,
+    "Open Sans","Helvetica Neue",sans-serif;
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
-  overflow:auto hidden;font:12px/1.4 var(--mono);-webkit-font-smoothing:antialiased}
-b,strong{color:#eaf2fb;font-weight:600}
+  overflow:auto hidden;font:14px/1.28581 var(--sans);-webkit-font-smoothing:antialiased}
+b,strong{color:var(--strong);font-weight:600}
 
 /* Below this the four columns would start eating each other's content; a
    horizontal scrollbar is honest about running out of room, clipping is not. */
@@ -657,7 +693,7 @@ b,strong{color:#eaf2fb;font-weight:600}
 #foot{grid-column:1/-1;background:var(--raise);display:flex;align-items:center;
   font-size:10px;color:var(--faint);overflow:hidden}
 #foot div{padding:0 10px;border-right:1px solid var(--line);line-height:21px;white-space:nowrap}
-#foot div:last-child{border-right:0;margin-left:auto;color:#33404f}
+#foot div:last-child{border-right:0;margin-left:auto;color:var(--faint)}
 #foot b{color:var(--dim);font-weight:500}
 
 .pane{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -670,51 +706,55 @@ b,strong{color:#eaf2fb;font-weight:600}
 .bd.flush{padding:0;overflow:hidden}
 
 #bar .mark{display:flex;align-items:center;gap:7px;padding:0 12px;font-weight:700;
-  letter-spacing:.2em;font-size:12px;color:#eaf2fb}
+  letter-spacing:.2em;font-size:12px;color:var(--text)}
 #bar .mark i{width:8px;height:8px;background:var(--accent);display:block;
-  box-shadow:0 0 0 3px #4a9eff22}
+  box-shadow:0 0 0 3px var(--glow)}
 #bar .cell{padding:0 11px;border-left:1px solid var(--line);height:100%;display:flex;
   flex-direction:column;justify-content:center;gap:1px}
 #bar .k{font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
 #bar .v{font-size:11px;color:var(--text)}
 #bar .sp{flex:1}
 #clock{padding:0 14px;border-left:1px solid var(--line);font-size:18px;font-weight:600;
-  letter-spacing:.06em;color:#eaf2fb;height:100%;display:flex;align-items:center}
+  letter-spacing:.06em;color:var(--text);height:100%;display:flex;align-items:center}
 
 .row{display:flex;align-items:center;gap:7px;padding:4px 9px;cursor:pointer;
   border-left:2px solid transparent;border-bottom:1px solid var(--rule);color:var(--dim);
   font-size:11px}
-.row:hover{background:#121b27;color:var(--text)}
-.row.on{background:#13203200;background:#122033;color:#eaf2fb;border-left-color:var(--accent)}
+.row:hover{background:var(--raise);color:var(--text)}
+.row.on{background:var(--sel);background:var(--sel);color:var(--text);border-left-color:var(--accent)}
 .row .id{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sub{font-size:9px;color:var(--faint);letter-spacing:.04em}
-.pill{font-size:8px;font-weight:700;letter-spacing:.1em;padding:2px 5px;border-radius:2px;
+.pill{font-size:8px;font-weight:700;letter-spacing:.1em;padding:2px 5px;border-radius:var(--radius);
   text-transform:uppercase;border:1px solid transparent;flex-shrink:0}
-.pill.ok{background:#0c2f23;color:var(--good);border-color:#15523c}
-.pill.bad{background:#2f1717;color:#ec8585;border-color:#532525}
-.pill.warn{background:#30280f;color:#e8b54a;border-color:#4e4119}
-.pill.info{background:#16202c;color:#7d92ad;border-color:#243040}
+/* Opaque, not a tint. A translucent tag borrows whatever is under it, so the
+   same "vietata" read 4.37:1 on a selected row and 4.9:1 on an unselected one
+   — a label that changes legibility with the selection. These are the same
+   15%/30% blends, resolved once over the panel. */
+.pill.ok{background:#304241;color:var(--ok-t);border-color:#3c5a51}
+.pill.bad{background:#453b41;color:var(--bad-t);border-color:#654c51}
+.pill.warn{background:#453e38;color:var(--warn-t);border-color:#66533f}
+.pill.info{background:#393e46;color:var(--info-t);border-color:#4d535c}
 
 #globe{width:100%;height:100%;display:block;cursor:grab;overflow:hidden}
 #globe:active{cursor:grabbing}
-.gr{fill:none;stroke:#18425e;stroke-width:.5}
-.limb{fill:#070d14;stroke:#20506e;stroke-width:1}
-.arc{fill:none;stroke:#2f7fae;stroke-width:.9;stroke-dasharray:3 3}
-.fp{fill:#4a9eff14;stroke:#4a9eff88;stroke-width:1}
-.fp.on{fill:#ff2d9522;stroke:var(--c-ours);stroke-width:1.6}
-.dot{fill:#4a9eff;stroke:#060a10;stroke-width:.7}
+.gr{fill:none;stroke:var(--geo-grid);stroke-width:.5}
+.limb{fill:var(--bg);stroke:var(--geo-limb);stroke-width:1}
+.arc{fill:none;stroke:var(--geo-arc);stroke-width:.9;stroke-dasharray:3 3}
+.fp{fill:var(--geo-scene-fill);stroke:var(--geo-scene);stroke-width:1}
+.fp.on{fill:var(--c-ours-fill);stroke:var(--c-ours);stroke-width:1.6}
+.dot{fill:var(--geo-scene);stroke:var(--halo);stroke-width:.7}
 .dot.on{fill:var(--c-ours);stroke-width:1}
-.trk{fill:none;stroke:#ffd166;stroke-width:1.8}
-.orb{fill:none;stroke:#ffd16655;stroke-width:.8;stroke-dasharray:2 5}
-.orb.moving{stroke:#ffd166cc;stroke-width:1.3}
-.satg .body{fill:#ffd166;stroke:#10141c;stroke-width:.6}
-.satg .pan{fill:#5b7fa6;stroke:#10141c;stroke-width:.5}
-.satg .ant{stroke:#ffd166;stroke-width:.7;fill:none}
+.trk{fill:none;stroke:var(--geo-track);stroke-width:1.8}
+.orb{fill:none;stroke:var(--geo-track-dim);stroke-width:.8;stroke-dasharray:2 5}
+.orb.moving{stroke:var(--geo-track);stroke-width:1.3}
+.satg .body{fill:var(--geo-track);stroke:var(--halo);stroke-width:.6}
+.satg .pan{fill:var(--geo-limb);stroke:var(--halo);stroke-width:.5}
+.satg .ant{stroke:var(--geo-track);stroke-width:.7;fill:none}
 .rt{fill:none;stroke:var(--c-ours);stroke-width:1.6}
-.sat{fill:#ffd166;stroke:#1a1203;stroke-width:1}
-.lbl{fill:#89a3bd;font-size:8.5px;letter-spacing:.08em}
+.sat{fill:var(--geo-track);stroke:var(--halo);stroke-width:1}
+.lbl{fill:var(--dim);font-size:8.5px;letter-spacing:.08em}
 
-.map{position:relative;line-height:0;background:#060a10;height:100%;
+.map{position:relative;line-height:0;background:var(--halo);height:100%;
   display:flex;align-items:center;justify-content:center;overflow:hidden}
 /* Rotating the stack turns the raster and its overlay together, so the routes
    stay on the pixels they were computed for. */
@@ -723,7 +763,7 @@ b,strong{color:#eaf2fb;font-weight:600}
 .mapin img{max-width:100%;max-height:100%;display:block}
 .ovwrap{position:absolute;inset:0}
 svg.ov{width:100%;height:100%;display:block;overflow:visible}
-.cas{fill:none;stroke:#060a10;stroke-width:9;vector-effect:non-scaling-stroke;
+.cas{fill:none;stroke:var(--halo);stroke-width:9;vector-effect:non-scaling-stroke;
   stroke-linejoin:round;stroke-linecap:round}
 .base{fill:none;stroke:var(--c-base);stroke-width:2.5;stroke-dasharray:9 6;
   vector-effect:non-scaling-stroke}
@@ -731,16 +771,16 @@ svg.ov{width:100%;height:100%;display:block;overflow:visible}
   stroke-linejoin:round;stroke-linecap:round}
 .nogo{fill:none;stroke:var(--c-nogo);stroke-width:4.5;vector-effect:non-scaling-stroke;
   stroke-linecap:round}
-.nogod{fill:var(--c-nogo);stroke:#060a10;stroke-width:1.5;vector-effect:non-scaling-stroke}
-.wp{fill:var(--c-ours);stroke:#060a10;stroke-width:2;vector-effect:non-scaling-stroke}
-.end{fill:#fff;stroke:#060a10;stroke-width:2;vector-effect:non-scaling-stroke}
+.nogod{fill:var(--c-nogo);stroke:var(--halo);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.wp{fill:var(--c-ours);stroke:var(--halo);stroke-width:2;vector-effect:non-scaling-stroke}
+.end{fill:#fff;stroke:var(--halo);stroke-width:2;vector-effect:non-scaling-stroke}
 body[data-mode=none] .lay-baseline,body[data-mode=none] .lay-iceroute,
 body[data-mode=baseline] .lay-iceroute,body[data-mode=iceroute] .lay-baseline{display:none}
 
 dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0}
 dt{color:var(--faint);font-size:10px;letter-spacing:.07em;text-transform:uppercase;
   white-space:nowrap}
-dd{margin:0;text-align:right;color:#eaf2fb;font-variant-numeric:tabular-nums;
+dd{margin:0;text-align:right;color:var(--text);font-variant-numeric:tabular-nums;
   overflow:hidden;text-overflow:ellipsis}
 dd.sm{font-size:10.5px;color:var(--dim)}
 .sep{height:1px;background:var(--rule);margin:8px -9px}
@@ -748,53 +788,53 @@ dd.sm{font-size:10.5px;color:var(--dim)}
 .meter{margin:6px 0}
 .meter .t{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);
   margin-bottom:3px;letter-spacing:.06em}
-.meter .t b{color:#eaf2fb;font-variant-numeric:tabular-nums}
-.track{height:7px;background:#0a121b;border:1px solid var(--rule);display:flex;overflow:hidden}
+.meter .t b{color:var(--text);font-variant-numeric:tabular-nums}
+.track{height:7px;background:var(--bg);border:1px solid var(--rule);display:flex;overflow:hidden}
 .track i{display:block;height:100%}
 
 #dump{font-size:10.5px;line-height:1.75}
 #dump .ln{display:flex;gap:13px}
-#dump .off{color:#2d3a49;flex-shrink:0;user-select:none;letter-spacing:.05em}
-#dump .hx{color:#6f8299;word-break:break-all;white-space:pre-wrap}
+#dump .off{color:var(--faint);flex-shrink:0;user-select:none;letter-spacing:.05em}
+#dump .hx{color:var(--dim);word-break:break-all;white-space:pre-wrap}
 #dump i{font-style:normal}
-#dump i.s{color:#8fd6a8}
-#dump i.n{color:#ffd166}
+#dump i.s{color:var(--ok-t)}
+#dump i.n{color:var(--geo-track)}
 #dump .hdr{display:flex;gap:10px;align-items:baseline;margin-bottom:7px;
   padding-bottom:6px;border-bottom:1px solid var(--rule)}
-#dump .hdr b{color:#eaf2fb;font-size:13px}
+#dump .hdr b{color:var(--text);font-size:13px}
 #dump .hdr span{color:var(--faint);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase}
 
 #log{font-size:10.5px;line-height:1.65}
 #log .l{display:flex;gap:9px;white-space:nowrap}
-#log .n{color:#33404f}
+#log .n{color:var(--faint)}
 #log .t{color:var(--accent);width:74px;flex-shrink:0;letter-spacing:.08em}
 #log .m{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
-#log .l.w .t{color:#e8b54a}
+#log .l.w .t{color:var(--warn-t)}
 
 .legend{display:flex;gap:11px;flex-wrap:wrap;padding:6px 9px;border-top:1px solid var(--rule);
   flex-shrink:0}
 .legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--dim)}
-.legend i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.legend i{width:9px;height:9px;border-radius:var(--radius);display:inline-block}
 .legend i.ln{height:3px;width:17px;border-radius:1px}
 
 .tabs{display:flex;flex-shrink:0;background:var(--raise);border-bottom:1px solid var(--line)}
 .tabs button{background:none;border:0;border-right:1px solid var(--line);color:var(--faint);
   padding:5px 11px;font:inherit;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
   cursor:pointer;font-weight:700}
-.tabs button.on{color:#eaf2fb;background:var(--panel);box-shadow:inset 0 -2px 0 var(--accent)}
+.tabs button.on{color:var(--text);background:var(--panel);box-shadow:inset 0 -2px 0 var(--accent)}
 .tabs button:hover{color:var(--dim)}
 .tabs .rt{margin-left:auto;padding:0 10px;align-self:center;font-size:9.5px;
   color:var(--faint);letter-spacing:.06em}
 
 .bars{display:flex;align-items:flex-end;gap:1px;height:56px;padding-top:4px}
-.bars i{flex:1;min-width:1px;background:#1d3348;align-self:flex-end}
+.bars i{flex:1;min-width:1px;background:var(--line);align-self:flex-end}
 .bars i.g{background:var(--c-nogo)}
-.bars i.d{background:#4a5a6e}
+.bars i.d{background:var(--geo-limb)}
 .note{font-size:9.5px;color:var(--faint);line-height:1.5;margin-top:7px}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:var(--panel)}
-::-webkit-scrollbar-thumb{background:#1c2938}
+::-webkit-scrollbar-thumb{background:var(--line)}
 """
 
 JS = r"""
@@ -1047,7 +1087,7 @@ function render() {
   const br = P.bridge;
   $('#dump').innerHTML = !br ? '<div class="note">Nessuna rotta: niente da trasmettere.</div>'
     : br.mismatch
-    ? `<div class="note" style="color:#e8b54a">Il file ricostruito pesa ${br.rebuilt} B
+    ? `<div class="note" style="color:var(--warn-t)">Il file ricostruito pesa ${br.rebuilt} B
        ma il conteggio dice ${br.declared} B: non mostro un dump che contraddice
        il numero accanto.</div>`
     : `<div class="hdr"><b>${br.head}</b>
@@ -1136,7 +1176,8 @@ render(); tick();
 def build_page(ctx: dict) -> str:
     pal = ctx["palette"]
     agg = ctx["aggregate"]
-    root = (f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};--c-nogo:{pal['nogo']}}}")
+    root = (f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};"
+            f"--c-nogo:{pal['nogo']};--c-ours-fill:{pal['ours']}22}}")
 
     def cell(k: str, v: str, eid: str = "") -> str:
         i = f' id="{eid}"' if eid else ""
@@ -1153,7 +1194,7 @@ def build_page(ctx: dict) -> str:
 
     warn = ""
     if ctx["missing_raw"]:
-        warn = ('<div class="note" style="color:#e8b54a">Scene grezze assenti: '
+        warn = ('<div class="note" style="color:var(--warn-t)">Scene grezze assenti: '
                 + html.escape(", ".join(s[:14] for s in ctx["missing_raw"]))
                 + " — niente impronta sul globo per queste.</div>")
 
@@ -1193,12 +1234,12 @@ def build_page(ctx: dict) -> str:
     <div class="bd flush"><svg id="globe" viewBox="0 0 300 300"
       preserveAspectRatio="xMidYMid meet"></svg></div>
     <div class="legend">
-      <span><i style="background:#4a9eff;border-radius:50%"></i>scene</span>
-      <span><i class="ln" style="background:#4a9eff"></i>impronta swath</span>
-      <span><i class="ln" style="background:#ffd166"></i>acquisizione (60&#8239;s)</span>
-      <span><i class="ln" style="background:#ffd16688"></i>cerchio massimo del passaggio</span>
+      <span><i style="background:var(--geo-scene);border-radius:50%"></i>scene</span>
+      <span><i class="ln" style="background:var(--geo-scene)"></i>impronta swath</span>
+      <span><i class="ln" style="background:var(--geo-track)"></i>acquisizione (60&#8239;s)</span>
+      <span><i class="ln" style="background:var(--geo-track-dim)"></i>cerchio massimo del passaggio</span>
       <span><i class="ln" style="background:{pal['ours']}"></i>rotta</span>
-      <span><i class="ln" style="background:#2f7fae"></i>Circolo Polare Artico</span>
+      <span><i class="ln" style="background:var(--geo-arc)"></i>Circolo Polare Artico</span>
     </div>
     <div class="bd" style="flex:0 0 auto;border-top:1px solid var(--rule)">
       <div class="note">Reticolato ogni 30°/20° e Circolo Polare Artico a
