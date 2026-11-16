@@ -136,6 +136,8 @@ def _confusion(truth: np.ndarray, pred: np.ndarray, n_classes: int, ignore: int)
 
 
 def plot_curve(points: list[dict], ice_class: str, path: Path) -> bool:
+    """Two panels sharing the x axis (unsafe pixels): what the map loses (mIoU)
+    and what the ship pays (over-cautious pixels, in POLARIS terms)."""
     try:
         import matplotlib
 
@@ -144,44 +146,58 @@ def plot_curve(points: list[dict], ice_class: str, path: Path) -> bool:
     except ImportError:  # pragma: no cover
         return False
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    fig, (ax_map, ax_ship) = plt.subplots(1, 2, figsize=(10.5, 4.4), sharex=True)
     styles = {
-        "argmax": dict(color="#1a202c", marker="*", s=180, zorder=5),
-        "relative": dict(color="#718096", marker="o"),
-        "chance": dict(color="#2b6cb0", marker="s"),
+        "argmax": dict(color="#1a202c", marker="*", s=200, zorder=5),
+        "relative": dict(color="#718096", marker="o", s=34, zorder=3),
+        "chance": dict(color="#2b6cb0", marker="s", s=34, zorder=4),
     }
     labels = {
         "argmax": "argmax (deployed)",
         "relative": "relative rule (τ)",
         "chance": "chance-constrained (α, calibrated)",
     }
-    for rule in ("relative", "chance", "argmax"):
-        pts = [p for p in points if p["rule"] == rule]
-        if not pts:
-            continue
-        x = [100 * p["per_ship_class"][ice_class]["unsafe_fraction"] for p in pts]
-        y = [p["miou"] for p in pts]
-        st = dict(styles[rule])
-        size = st.pop("s", 40)
-        if rule != "argmax":
-            ax.plot(x, y, color=st["color"], lw=1.2, alpha=0.7)
-        ax.scatter(x, y, s=size, label=labels[rule], **st)
-        if rule != "argmax":
-            sym = "τ" if rule == "relative" else "α"
-            for p, xi, yi in zip(pts, x, y, strict=True):
-                ax.annotate(
-                    f"{sym}={p['threshold']:g}",
-                    (xi, yi),
-                    textcoords="offset points",
-                    xytext=(5, 4),
-                    fontsize=7,
-                    color=st["color"],
-                )
-    ax.set_xlabel(f"unsafe pixels for a {ice_class} vessel (%)  ← safer")
-    ax.set_ylabel("mIoU (3 classes)")
-    ax.set_title("Safety vs. map accuracy on the official test set, same model, no retraining")
-    ax.grid(alpha=0.25)
-    ax.legend(frameon=False, fontsize=8)
+    # Only the chance-constrained points are labelled; the relative curve lies
+    # on the same frontier and its labels would only overlap.
+    labelled = {0.3, 0.2, 0.1, 0.05}
+
+    def unsafe(p: dict) -> float:
+        return 100 * p["per_ship_class"][ice_class]["unsafe_fraction"]
+
+    def cautious(p: dict) -> float:
+        return 100 * p["per_ship_class"][ice_class]["overcautious_fraction"]
+
+    for ax, yfun in ((ax_map, lambda p: p["miou"]), (ax_ship, cautious)):
+        for rule in ("relative", "chance", "argmax"):
+            pts = sorted((p for p in points if p["rule"] == rule), key=unsafe)
+            if not pts:
+                continue
+            x = [unsafe(p) for p in pts]
+            y = [yfun(p) for p in pts]
+            st = dict(styles[rule])
+            if rule != "argmax":
+                ax.plot(x, y, color=st["color"], lw=1.2, alpha=0.6, zorder=2)
+            ax.scatter(x, y, label=labels[rule], **st)
+            if rule == "chance":
+                for p, xi, yi in zip(pts, x, y, strict=True):
+                    if p["threshold"] in labelled:
+                        ax.annotate(
+                            f"α={p['threshold']:g}",
+                            (xi, yi),
+                            textcoords="offset points",
+                            xytext=(6, -12),
+                            fontsize=8,
+                            color=st["color"],
+                        )
+        ax.grid(alpha=0.25)
+        ax.set_xlabel(f"unsafe pixels, {ice_class} vessel (%)   ← safer")
+
+    ax_map.set_ylabel("mIoU, 3 classes")
+    ax_map.set_title("What the map loses", fontsize=10)
+    ax_ship.set_ylabel(f"over-cautious pixels, {ice_class} vessel (%)")
+    ax_ship.set_title("What the ship pays (POLARIS)", fontsize=10)
+    ax_map.legend(frameon=False, fontsize=8, loc="lower right")
+    fig.suptitle("Decision rules on the official test set: same model, no retraining", fontsize=11)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=160)
@@ -202,9 +218,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", type=Path, default=Path("artifacts/risk_curve.json"))
     ap.add_argument("--figure", type=Path, default=Path("docs/img/risk_curve.png"))
+    ap.add_argument("--plot-class", default="PC6", help="ship class shown in the figure")
+    ap.add_argument(
+        "--replot",
+        action="store_true",
+        help="redraw the figure from an existing --out file, without inference",
+    )
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
+
+    if args.replot:
+        curves = json.loads(args.out.read_text())["curves"]
+        plot_curve(curves[args.plot_class], args.plot_class, args.figure)
+        log.info("Redrawn %s from %s", args.figure, args.out)
+        return 0
 
     import torch
     import yaml
@@ -327,8 +355,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(out, indent=2))
-    strictest = ice_classes[-1]
-    plot_curve(results[strictest], strictest, args.figure)
+    plot_class = args.plot_class if args.plot_class in results else ice_classes[0]
+    plot_curve(results[plot_class], plot_class, args.figure)
 
     log.info("=" * 72)
     for ic in ice_classes:
