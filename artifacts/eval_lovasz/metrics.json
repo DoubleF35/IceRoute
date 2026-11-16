@@ -2,8 +2,8 @@
   "evaluation": {
     "checkpoint": "artifacts/models/unet3lov_fp32.pt",
     "checkpoint_epoch": 19,
-    "split": "test_ufficiale",
-    "split_bias": "Stima NON DISTORTA: set di test ufficiale AI4Arctic, mai usato per training, selezione del modello o scelta delle scene. \u00c8 il numero da citare nel pitch.",
+    "split": "official_test",
+    "split_bias": "UNBIASED estimate: official AI4Arctic test set, never used for training, model selection or scene choice. This is the number to quote.",
     "device": "cuda",
     "n_parameters": 1964131,
     "channels": [
@@ -20,19 +20,19 @@
         "binary_accuracy": 0.9059047128567453,
         "binary_iou": 0.8052770941859089,
         "per_class": {
-          "Acqua libera": {
+          "Open water": {
             "iou": 0.8459647897028117,
             "f1": 0.9165557159289117,
             "accuracy": 0.9281036356917002,
             "support_px": 168151799
           },
-          "Ghiaccio sottile": {
+          "Thin ice": {
             "iou": 0.13646230629348297,
             "f1": 0.24015280671920952,
             "accuracy": 0.19988507525557014,
             "support_px": 24779694
           },
-          "Ghiaccio spesso": {
+          "Thick ice": {
             "iou": 0.61469466222722,
             "f1": 0.761375728311809,
             "accuracy": 0.7755917872021919,
@@ -114,7 +114,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "PC7": {
@@ -154,7 +154,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "IA": {
@@ -194,13 +194,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.0,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.47435545061858003,
           "binary_accuracy": 0.9439749534826422
@@ -261,7 +261,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -301,7 +301,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -341,13 +341,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.41292,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.30350580382264086,
           "binary_accuracy": 0.6490864585978434
@@ -408,7 +408,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -448,7 +448,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -488,13 +488,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.07963,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.7065095400620878,
           "binary_accuracy": 0.8836692309675137
@@ -555,7 +555,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -595,7 +595,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -635,13 +635,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.03494,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.8164352195175723,
           "binary_accuracy": 0.9374197244168042
@@ -702,7 +702,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 42.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 42.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -742,7 +742,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 42.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 42.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -782,13 +782,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 56.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 56.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00424,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.7380998853945362,
           "binary_accuracy": 0.8406462184701105
@@ -849,7 +849,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -889,7 +889,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -929,13 +929,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00295,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.7753783494406559,
           "binary_accuracy": 0.9131023705516632
@@ -996,7 +996,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1036,7 +1036,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1076,13 +1076,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.15556,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.44105293014074703,
           "binary_accuracy": 0.9715082469992735
@@ -1143,7 +1143,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "PC7": {
@@ -1183,7 +1183,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "IA": {
@@ -1223,13 +1223,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.0,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.9291977380465013,
           "binary_accuracy": 0.9291977380465013
@@ -1290,7 +1290,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1330,7 +1330,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1370,13 +1370,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.0005,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.3707378777923845,
           "binary_accuracy": 0.8772310571095201
@@ -1437,7 +1437,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 54.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1477,7 +1477,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 54.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1517,13 +1517,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 72.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 72.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.01583,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.43722616338999604,
           "binary_accuracy": 0.9543731416525238
@@ -1584,7 +1584,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1624,7 +1624,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1664,13 +1664,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.06767,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.5356145219726048,
           "binary_accuracy": 0.9526847682334321
@@ -1731,7 +1731,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1771,7 +1771,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1811,13 +1811,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.13116,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.7145564642933633,
           "binary_accuracy": 0.8935415292442009
@@ -1878,7 +1878,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -1918,7 +1918,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -1958,13 +1958,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.13928,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.622888891720647,
           "binary_accuracy": 0.8240736556639774
@@ -2025,7 +2025,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2065,7 +2065,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2105,13 +2105,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.01335,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.5872405278354675,
           "binary_accuracy": 0.9650138572075496
@@ -2172,7 +2172,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2212,7 +2212,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2252,13 +2252,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00369,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.5352456179116339,
           "binary_accuracy": 0.9111525606357506
@@ -2319,7 +2319,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 54.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2359,7 +2359,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 54.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 54.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2399,13 +2399,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 72.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 72.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00362,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.7053925916482873,
           "binary_accuracy": 0.9719498057318838
@@ -2466,7 +2466,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2506,7 +2506,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2546,13 +2546,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00161,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.5275025813364256,
           "binary_accuracy": 0.8285505932197929
@@ -2613,7 +2613,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2653,7 +2653,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2693,13 +2693,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.03511,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.9011068093255317,
           "binary_accuracy": 0.972885718953472
@@ -2760,7 +2760,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "PC7": {
@@ -2800,7 +2800,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 60.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 60.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               },
               "IA": {
@@ -2840,13 +2840,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nel caso peggiore il modello sovrastima il RIO di 80.0 punti: \u00e8 la distanza fra una cella dichiarata percorribile e la realt\u00e0."
+                  "In the worst case the model overestimates the RIO by 80.0 points: that is the distance between a cell declared navigable and reality."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.00358,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.6079905847592039,
           "binary_accuracy": 0.9670645593145909
@@ -2907,7 +2907,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "PC7": {
@@ -2947,7 +2947,7 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               },
               "IA": {
@@ -2987,13 +2987,13 @@
                   ]
                 ],
                 "notes": [
-                  "Nessun pixel \u00e8 stato classificato come meno pericoloso del vero."
+                  "No pixel was classified as less dangerous than the truth."
                 ]
               }
             },
             "worst_unsafe_fraction": 0.0,
             "operationally_free_confusions": [],
-            "note": "unsafe_fraction = frazione di pixel che il modello colloca in un livello operativo MENO restrittivo del vero. \u00c8 l'errore che porta una nave dentro ghiaccio che POLARIS le vieta, ed \u00e8 l'unico asimmetrico: essere troppo cauti costa tempo, essere troppo permissivi costa la nave."
+            "note": "unsafe_fraction = fraction of pixels the model places in an operational level LESS restrictive than the truth. It is the error that takes a ship into ice POLARIS forbids for it, and the only asymmetric one: being too cautious costs time, being too permissive costs the ship."
           },
           "miou": 0.46731466998596277,
           "binary_accuracy": 0.9526212901558992
@@ -3003,7 +3003,7 @@
       "worst_unsafe_fraction": 0.41292
     },
     "warnings": [
-      "mIoU 0.532 sullo schema RIDOTTO a 3 classi. Non confrontabile con la soglia \u00a77.4 di 0.6, che vale per le 6 classi SOD. Il ripiego \u00a77.4 \u00e8 gi\u00e0 attivo."
+      "mIoU 0.532 on the REDUCED 3-class scheme. Not comparable with the acceptance threshold of 0.6, which applies to the 6 SOD classes. The 3-class fallback (D-020) is already active."
     ],
     "gate_2_metrics_pass": false
   }

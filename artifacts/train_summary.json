@@ -12,19 +12,19 @@
     "binary_accuracy": 0.9724404652947837,
     "binary_iou": 0.9264056153311336,
     "per_class": {
-      "Acqua libera": {
+      "Open water": {
         "iou": 0.9578007250764966,
         "f1": 0.9784455719200663,
         "accuracy": 0.9861947269553344,
         "support_px": 160059710
       },
-      "Ghiaccio sottile": {
+      "Thin ice": {
         "iou": 0.15898141594332077,
         "f1": 0.2743467906496538,
         "accuracy": 0.2639571792813854,
         "support_px": 12346173
       },
-      "Ghiaccio spesso": {
+      "Thick ice": {
         "iou": 0.7514012724095871,
         "f1": 0.8580572416460623,
         "accuracy": 0.8494695888169245,
