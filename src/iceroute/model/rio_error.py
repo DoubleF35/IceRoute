@@ -117,12 +117,22 @@ def rio_error(
         raise ValueError("Nessun pixel annotato: l'errore su RIO non è definito.")
 
     rio_true = compute_rio(
-        truth_sod, ice_class, sod_to_polaris, table=table, sic=sic,
-        mask_valid=valid, n_classes=n_classes,
+        truth_sod,
+        ice_class,
+        sod_to_polaris,
+        table=table,
+        sic=sic,
+        mask_valid=valid,
+        n_classes=n_classes,
     )
     rio_pred = compute_rio(
-        pred_sod, ice_class, sod_to_polaris, table=table, sic=sic,
-        mask_valid=valid, n_classes=n_classes,
+        pred_sod,
+        ice_class,
+        sod_to_polaris,
+        table=table,
+        sic=sic,
+        mask_valid=valid,
+        n_classes=n_classes,
     )
 
     both = valid & np.isfinite(rio_true) & np.isfinite(rio_pred)
@@ -218,8 +228,14 @@ def evaluate_all_classes(
     for ic in ice_classes:
         try:
             per_class[ic] = rio_error(
-                truth_sod, pred_sod, ic, sod_to_polaris, table=table, sic=sic,
-                mask_valid=mask_valid, n_classes=n_classes,
+                truth_sod,
+                pred_sod,
+                ic,
+                sod_to_polaris,
+                table=table,
+                sic=sic,
+                mask_valid=mask_valid,
+                n_classes=n_classes,
             ).as_dict()
         except ValueError as exc:
             per_class[ic] = {"error": str(exc)}

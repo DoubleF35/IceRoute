@@ -67,10 +67,9 @@ def test_a_free_confusion_costs_nothing_in_rio():
 def test_a_costly_confusion_shows_up():
     """Old ice called Thick FYI: -3 becomes -1, six points of RIO at full
     concentration."""
-    err = rio_error(_field(OLD_ICE), _field(THICK_FYI), "PC6", MAPPING,
-                    table=TABLE, sic=_sic(10))
+    err = rio_error(_field(OLD_ICE), _field(THICK_FYI), "PC6", MAPPING, table=TABLE, sic=_sic(10))
     assert err.rio_mae > 10
-    assert err.rio_bias > 0        # predicted safer than reality
+    assert err.rio_bias > 0  # predicted safer than reality
 
 
 # ---------------------------------------------------------------------------
@@ -124,12 +123,12 @@ def test_unsafe_and_overcautious_are_not_averaged_together():
     not cancel: one costs time, the other costs a ship.
     """
     truth = np.empty((32, 32), dtype="uint8")
-    truth[:16] = OLD_ICE          # genuinely dangerous
-    truth[16:] = OPEN_WATER       # genuinely safe
+    truth[:16] = OLD_ICE  # genuinely dangerous
+    truth[16:] = OPEN_WATER  # genuinely safe
 
     pred = np.empty((32, 32), dtype="uint8")
-    pred[:16] = OPEN_WATER        # UNSAFE: danger called safe
-    pred[16:] = OLD_ICE           # cautious: safe called dangerous
+    pred[:16] = OPEN_WATER  # UNSAFE: danger called safe
+    pred[16:] = OLD_ICE  # cautious: safe called dangerous
 
     err = rio_error(truth, pred, "IA", MAPPING, table=TABLE, sic=_sic(10))
     assert err.unsafe_fraction > 0
@@ -140,16 +139,14 @@ def test_unsafe_and_overcautious_are_not_averaged_together():
 
 
 def test_predicting_danger_where_there_is_none_is_not_unsafe():
-    err = rio_error(_field(OPEN_WATER), _field(OLD_ICE), "IA", MAPPING,
-                    table=TABLE, sic=_sic(10))
+    err = rio_error(_field(OPEN_WATER), _field(OLD_ICE), "IA", MAPPING, table=TABLE, sic=_sic(10))
     assert err.unsafe_fraction == 0.0
     assert err.overcautious_fraction > 0.0
     assert err.rio_bias < 0
 
 
 def test_predicting_safety_where_there_is_danger_is_unsafe():
-    err = rio_error(_field(OLD_ICE), _field(OPEN_WATER), "IA", MAPPING,
-                    table=TABLE, sic=_sic(10))
+    err = rio_error(_field(OLD_ICE), _field(OPEN_WATER), "IA", MAPPING, table=TABLE, sic=_sic(10))
     assert err.unsafe_fraction > 0.0
     assert err.overcautious_fraction == 0.0
     assert err.worst_unsafe_delta > 0
@@ -166,10 +163,10 @@ def test_level_confusion_rows_sum_to_the_pixel_count():
 def test_low_concentration_dilutes_the_error():
     """RIO weights by concentration, so the same class error at 2/10 matters
     less than at 10/10. A metric that ignored SIC would overstate thin ice."""
-    strong = rio_error(_field(OLD_ICE), _field(OPEN_WATER), "PC6", MAPPING,
-                       table=TABLE, sic=_sic(10))
-    weak = rio_error(_field(OLD_ICE), _field(OPEN_WATER), "PC6", MAPPING,
-                     table=TABLE, sic=_sic(2))
+    strong = rio_error(
+        _field(OLD_ICE), _field(OPEN_WATER), "PC6", MAPPING, table=TABLE, sic=_sic(10)
+    )
+    weak = rio_error(_field(OLD_ICE), _field(OPEN_WATER), "PC6", MAPPING, table=TABLE, sic=_sic(2))
     assert weak.rio_mae < strong.rio_mae
 
 
@@ -199,8 +196,7 @@ def test_the_weakest_vessel_is_never_the_most_forgiving():
 
 
 def test_summary_names_both_directions():
-    err = rio_error(_field(OLD_ICE), _field(THICK_FYI), "PC6", MAPPING,
-                    table=TABLE, sic=_sic(10))
+    err = rio_error(_field(OLD_ICE), _field(THICK_FYI), "PC6", MAPPING, table=TABLE, sic=_sic(10))
     text = err.summary()
     assert "PERMISSIVA" in text
     assert "cauta" in text

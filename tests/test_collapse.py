@@ -157,7 +157,7 @@ def test_summing_beats_maximum_when_mass_is_spread():
     under-reported — which is what taking the max would do."""
     p = np.zeros((6, 1, 1), dtype="float32")
     p[OPEN_WATER] = 0.4
-    p[NEW_ICE] = p[YOUNG_ICE] = p[THIN_FYI] = 0.2   # 0.6 together, 0.2 each
+    p[NEW_ICE] = p[YOUNG_ICE] = p[THIN_FYI] = 0.2  # 0.6 together, 0.2 each
     out = collapse_proba(p)
     assert out[1, 0, 0] > out[0, 0, 0]
 
@@ -199,9 +199,20 @@ def test_class_weights_use_the_collapsed_frequencies(tmp_path):
     from iceroute.model.losses import load_class_weights
 
     stats = tmp_path / "s.json"
-    stats.write_text(json.dumps({"class_frequency": {
-        "0": 0.70, "1": 0.01, "2": 0.02, "3": 0.03, "4": 0.15, "5": 0.09,
-    }}))
+    stats.write_text(
+        json.dumps(
+            {
+                "class_frequency": {
+                    "0": 0.70,
+                    "1": 0.01,
+                    "2": 0.02,
+                    "3": 0.03,
+                    "4": 0.15,
+                    "5": 0.09,
+                }
+            }
+        )
+    )
 
     w = load_class_weights(stats, N_CLASSES, collapse=True, normalize=False, clip_max=100.0)
     assert w is not None
@@ -254,8 +265,19 @@ def test_collapsed_weights_still_respect_the_clip(tmp_path):
     from iceroute.model.losses import load_class_weights
 
     stats = tmp_path / "s.json"
-    stats.write_text(json.dumps({"class_frequency": {
-        "0": 0.94, "1": 0.001, "2": 0.002, "3": 0.003, "4": 0.03, "5": 0.024,
-    }}))
+    stats.write_text(
+        json.dumps(
+            {
+                "class_frequency": {
+                    "0": 0.94,
+                    "1": 0.001,
+                    "2": 0.002,
+                    "3": 0.003,
+                    "4": 0.03,
+                    "5": 0.024,
+                }
+            }
+        )
+    )
     w = load_class_weights(stats, N_CLASSES, collapse=True, normalize=False, clip_max=10.0)
     assert float(w.max()) <= 10.0

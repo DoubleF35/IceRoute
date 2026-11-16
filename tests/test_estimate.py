@@ -27,12 +27,22 @@ def _collection(n_baseline_points=1000):
     return {
         "type": "FeatureCollection",
         "features": [
-            {"type": "Feature", "properties": {"kind": "iceroute", "ice_class": "PC6"},
-             "geometry": {"type": "LineString",
-                          "coordinates": [[0.0, 70.0], [1.0, 71.0], [2.0, 72.0]]}},
-            {"type": "Feature", "properties": {"kind": "baseline", "ice_class": "PC6"},
-             "geometry": {"type": "LineString",
-                          "coordinates": [[i / 100, 70.0] for i in range(n_baseline_points)]}},
+            {
+                "type": "Feature",
+                "properties": {"kind": "iceroute", "ice_class": "PC6"},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[0.0, 70.0], [1.0, 71.0], [2.0, 72.0]],
+                },
+            },
+            {
+                "type": "Feature",
+                "properties": {"kind": "baseline", "ice_class": "PC6"},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[i / 100, 70.0] for i in range(n_baseline_points)],
+                },
+            },
         ],
     }
 
@@ -58,9 +68,10 @@ def test_stripping_the_baseline_shrinks_the_payload_by_orders_of_magnitude():
 
 
 def test_a_collection_with_only_a_baseline_yields_no_payload():
-    only_base = {"type": "FeatureCollection",
-                 "features": [f for f in _collection()["features"]
-                              if f["properties"]["kind"] == "baseline"]}
+    only_base = {
+        "type": "FeatureCollection",
+        "features": [f for f in _collection()["features"] if f["properties"]["kind"] == "baseline"],
+    }
     assert downlink_route(only_base) is None
 
 
@@ -85,11 +96,17 @@ def test_payload_uses_the_measured_mask_and_sar_when_they_exist(tmp_path):
     routes = tmp_path / "routes"
     routes.mkdir()
     (routes / "r.geojson").write_text(json.dumps(_collection()))
-    metrics = {"compression": {"per_scene": [{
-        "scene_id": "SCENA.nc",
-        "denominator": {"mask_png": 100_000, "metadata": 60},
-        "numerator": {"sar_channels_png": 50_000_000},
-    }]}}
+    metrics = {
+        "compression": {
+            "per_scene": [
+                {
+                    "scene_id": "SCENA.nc",
+                    "denominator": {"mask_png": 100_000, "metadata": 60},
+                    "numerator": {"sar_channels_png": 50_000_000},
+                }
+            ]
+        }
+    }
 
     p = payload({"geojson": "r.geojson"}, routes, metrics, "SCENA.nc")
     assert p.measured
@@ -154,8 +171,10 @@ def test_an_unknown_min_rio_blocks_the_rescale():
 
 @pytest.mark.parametrize("hours,chosen", [(None, 12.0), (20.0, 0.0), (20.0, -3.0)])
 def test_nonsense_inputs_produce_nothing(hours, chosen):
-    assert rescale_transit(hours, 5.0, nominal_kn=12.0,
-                           chosen_kn=chosen, ice_class="PC6").hours is None
+    assert (
+        rescale_transit(hours, 5.0, nominal_kn=12.0, chosen_kn=chosen, ice_class="PC6").hours
+        is None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +198,13 @@ def test_no_consumption_means_no_fuel_figure_and_never_a_zero():
 # What the payload costs on the link — A-10
 # ---------------------------------------------------------------------------
 
-ASM_LINK = {"link": {"iridium_certus_100_kbps": 88, "inmarsat_fleetbroadband_kbps": 432,
-                     "iridium_sbd_message_bytes": 300}}
+ASM_LINK = {
+    "link": {
+        "iridium_certus_100_kbps": 88,
+        "inmarsat_fleetbroadband_kbps": 432,
+        "iridium_sbd_message_bytes": 300,
+    }
+}
 
 
 def test_no_link_rate_means_no_number():
@@ -222,6 +246,7 @@ def test_the_real_assumptions_put_the_payload_in_seconds_not_minutes():
     from pathlib import Path
 
     import yaml
+
     if not Path("configs/assumptions.yaml").exists():
         pytest.skip("assumptions.yaml assente")
     a = yaml.safe_load(Path("configs/assumptions.yaml").read_text())

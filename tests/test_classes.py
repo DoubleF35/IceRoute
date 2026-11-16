@@ -17,31 +17,40 @@ import yaml
 from iceroute.report import classes as cl
 
 ASM = {
-    "segmentation": {"scheme": "3 classi", "classes": {
-        0: {"name": "Acqua libera", "polaris_type": "ice_free"},
-        1: {"name": "Ghiaccio sottile", "polaris_type": "thin_fyi_2nd_stage"},
-        2: {"name": "Ghiaccio spesso", "polaris_type": "heavy_multi_year_ice"},
-    }},
+    "segmentation": {
+        "scheme": "3 classi",
+        "classes": {
+            0: {"name": "Acqua libera", "polaris_type": "ice_free"},
+            1: {"name": "Ghiaccio sottile", "polaris_type": "thin_fyi_2nd_stage"},
+            2: {"name": "Ghiaccio spesso", "polaris_type": "heavy_multi_year_ice"},
+        },
+    },
     "vessel": {"classes_shown": ["PC6", "IA"]},
 }
 
 
 def _metrics(cm=None):
-    return {"evaluation": {"scenes": {
-        "n_scenes": 20,
-        "aggregate": {
-            "miou": 0.5324, "binary_accuracy": 0.9059,
-            "per_class": {
-                "Acqua libera": {"iou": 0.846, "support_px": 168_151_799},
-                "Ghiaccio sottile": {"iou": 0.136, "support_px": 24_779_694},
-                "Ghiaccio spesso": {"iou": 0.615, "support_px": 109_062_176},
-            },
-            # rows = truth, columns = predicted
-            "confusion_matrix": cm or [[928, 12, 60], [56, 200, 745], [137, 87, 776]],
-        },
-        "per_scene": [{"rio": {"worst_unsafe_fraction": f}}
-                      for f in (0.004, 0.009, 0.02, 0.413)],
-    }}}
+    return {
+        "evaluation": {
+            "scenes": {
+                "n_scenes": 20,
+                "aggregate": {
+                    "miou": 0.5324,
+                    "binary_accuracy": 0.9059,
+                    "per_class": {
+                        "Acqua libera": {"iou": 0.846, "support_px": 168_151_799},
+                        "Ghiaccio sottile": {"iou": 0.136, "support_px": 24_779_694},
+                        "Ghiaccio spesso": {"iou": 0.615, "support_px": 109_062_176},
+                    },
+                    # rows = truth, columns = predicted
+                    "confusion_matrix": cm or [[928, 12, 60], [56, 200, 745], [137, 87, 776]],
+                },
+                "per_scene": [
+                    {"rio": {"worst_unsafe_fraction": f}} for f in (0.004, 0.009, 0.02, 0.413)
+                ],
+            }
+        }
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +146,12 @@ def test_the_generated_file_matches_the_current_measurements():
     if not (out.exists() and Path("artifacts/metrics.json").exists()):
         pytest.skip("class_table.md o metrics.json assenti")
     import json
-    c = cl.collect(json.loads(Path("artifacts/metrics.json").read_text()),
-                   yaml.safe_load(Path("configs/assumptions.yaml").read_text()),
-                   cl.RV_TABLE)
+
+    c = cl.collect(
+        json.loads(Path("artifacts/metrics.json").read_text()),
+        yaml.safe_load(Path("configs/assumptions.yaml").read_text()),
+        cl.RV_TABLE,
+    )
     assert out.read_text() == cl.render(c), "pitch/class_table.md è indietro: make report"
 
 

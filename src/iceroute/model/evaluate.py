@@ -72,7 +72,9 @@ def load_checkpoint(path: Path, device: str = "cpu") -> tuple[torch.nn.Module, d
     model.eval().to(device)
     log.info(
         "checkpoint %s: epoca %s, val_miou %.4f, %s parametri",
-        path.name, ckpt.get("epoch", "?"), ckpt.get("val_miou", float("nan")),
+        path.name,
+        ckpt.get("epoch", "?"),
+        ckpt.get("val_miou", float("nan")),
         f"{model.param_count():,}",
     )
     return model, ckpt
@@ -151,8 +153,8 @@ def _binary_accuracy_at(hv: np.ndarray, is_ice: np.ndarray, thresholds: np.ndarr
     # For a cut at index k: pixels [0, k) are predicted water, [k, n) ice.
     cum_ice = np.concatenate([[0], np.cumsum(ice_sorted)])
     k = np.searchsorted(hv_sorted, thresholds, side="right")
-    correct_water = k - cum_ice[k]              # water-labelled pixels below the cut
-    correct_ice = n_ice - cum_ice[k]            # ice-labelled pixels above it
+    correct_water = k - cum_ice[k]  # water-labelled pixels below the cut
+    correct_ice = n_ice - cum_ice[k]  # ice-labelled pixels above it
     return (correct_water + correct_ice) / max(total, 1)
 
 
@@ -282,8 +284,13 @@ def evaluate_scene(
     x = scene.channels(channels)
 
     labels, _, stats = predict_scene(
-        model, x, n_classes=n_classes, tile_size=tile_size, overlap=overlap,
-        batch_size=batch_size, device=device,
+        model,
+        x,
+        n_classes=n_classes,
+        tile_size=tile_size,
+        overlap=overlap,
+        batch_size=batch_size,
+        device=device,
     )
 
     # The chart is always six-class on disk. If the model emits the collapsed
@@ -315,8 +322,13 @@ def evaluate_scene(
     if ice_classes:
         try:
             info["rio"] = evaluate_all_classes(
-                truth, labels, ice_classes, mapping,
-                sic=scene.sic, mask_valid=scene.mask_valid, n_classes=n_classes,
+                truth,
+                labels,
+                ice_classes,
+                mapping,
+                sic=scene.sic,
+                mask_valid=scene.mask_valid,
+                n_classes=n_classes,
             )
         except (ValueError, KeyError) as exc:
             log.warning("  errore RIO non calcolabile: %s", exc)
@@ -345,6 +357,7 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
     """Row-normalised confusion matrix as a PNG. Returns False if unplottable."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -372,16 +385,27 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
                 continue
             v = norm[i, j]
             ax.text(
-                j, i, f"{v:.2f}", ha="center", va="center",
-                color="white" if v > 0.55 else "black", fontsize=8,
+                j,
+                i,
+                f"{v:.2f}",
+                ha="center",
+                va="center",
+                color="white" if v > 0.55 else "black",
+                fontsize=8,
             )
     # A class with no ground truth has an empty row; say so instead of showing
     # a band of zeros that reads as "the model got everything wrong here".
     for i in range(cm.n_classes):
         if support[i] == 0:
             ax.text(
-                cm.n_classes / 2 - 0.5, i, "nessun pixel di verità in questo split",
-                ha="center", va="center", fontsize=7, style="italic", color="0.35",
+                cm.n_classes / 2 - 0.5,
+                i,
+                "nessun pixel di verità in questo split",
+                ha="center",
+                va="center",
+                fontsize=7,
+                style="italic",
+                color="0.35",
             )
 
     fig.colorbar(im, ax=ax, label="frazione della classe vera")
@@ -462,9 +486,7 @@ def report_bias(split: str) -> str:
     )
 
 
-def check_thresholds(
-    cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = False
-) -> list[str]:
+def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = False) -> list[str]:
     """Compare against the SPEC §7.4 acceptance thresholds."""
     warns = []
     miou, binacc = cm.miou(), cm.binary_accuracy(WATER_CLASS)
@@ -504,9 +526,7 @@ def main(argv: list[str] | None = None) -> int:
     # SPEC §5.3 freezes train/val/demo. `test_ufficiale` is not one of them: it
     # is the AI4Arctic challenge's own held-out set, downloaded separately into
     # data/raw/test/, and it is the only unbiased option. See report_bias().
-    ap.add_argument(
-        "--split", default="test_ufficiale", choices=["test_ufficiale", "val", "demo"]
-    )
+    ap.add_argument("--split", default="test_ufficiale", choices=["test_ufficiale", "val", "demo"])
     ap.add_argument("--test-dir", type=Path, default=Path("data/raw/test"))
     ap.add_argument("--out", type=Path, default=Path("artifacts"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
@@ -514,7 +534,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--device", default=None)
     ap.add_argument("--skip-baseline", action="store_true")
     ap.add_argument(
-        "--ice-classes", nargs="*", default=["PC6", "PC7", "IA"],
+        "--ice-classes",
+        nargs="*",
+        default=["PC6", "PC7", "IA"],
         help="classi di nave per cui misurare l'errore su RIO",
     )
     args = ap.parse_args(argv)
@@ -567,10 +589,18 @@ def main(argv: list[str] | None = None) -> int:
     # -- patches ------------------------------------------------------------
     if not official:
         log.info("Valutazione su patch (%s)…", args.split)
-        ds = PatchDataset(cache_dir, split[args.split], channels=channels, augment=False,
-                          collapse_classes=collapsed)
+        ds = PatchDataset(
+            cache_dir,
+            split[args.split],
+            channels=channels,
+            augment=False,
+            collapse_classes=collapsed,
+        )
         cm = evaluate_patches(
-            model, ds, n_classes=n_classes, batch_size=int(eval_cfg.get("batch_size", 8)),
+            model,
+            ds,
+            n_classes=n_classes,
+            batch_size=int(eval_cfg.get("batch_size", 8)),
             device=device,
         )
         log.info("\n%s", cm.format_table(class_names))
@@ -591,8 +621,13 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Baseline a soglia su HV…")
         try:
             hv_tr, sod_tr = collect_patch_pixels(
-                PatchDataset(cache_dir, split["train"], channels=channels, augment=False,
-                             collapse_classes=collapsed)
+                PatchDataset(
+                    cache_dir,
+                    split["train"],
+                    channels=channels,
+                    augment=False,
+                    collapse_classes=collapsed,
+                )
             )
             thr_fit, _ = fit_hv_threshold(hv_tr, sod_tr)
             del hv_tr, sod_tr
@@ -613,8 +648,11 @@ def main(argv: list[str] | None = None) -> int:
             }
             log.info(
                 "  soglia fitted %.3f → gh/acqua %.4f · oracle %.3f → %.4f | U-Net %.4f",
-                fitted.threshold, fitted.binary_accuracy,
-                oracle.threshold, oracle.binary_accuracy, cm.binary_accuracy(),
+                fitted.threshold,
+                fitted.binary_accuracy,
+                oracle.threshold,
+                oracle.binary_accuracy,
+                cm.binary_accuracy(),
             )
             log.info("  %s", report["baseline_hv_threshold"]["comparison"]["verdict"])
         except ValueError as exc:
@@ -626,9 +664,7 @@ def main(argv: list[str] | None = None) -> int:
         # Enumerated from disk: the official set is not in the frozen split.
         # Only scenes whose reference labels are present can be scored.
         scene_dir = args.test_dir
-        scene_paths = [
-            p for p in sorted(scene_dir.glob("*_prep.nc")) if reference_path(p).exists()
-        ]
+        scene_paths = [p for p in sorted(scene_dir.glob("*_prep.nc")) if reference_path(p).exists()]
         missing = len(list(scene_dir.glob("*_prep.nc"))) - len(scene_paths)
         if missing:
             log.warning("%d scene di test senza file di etichette: saltate.", missing)
@@ -645,10 +681,15 @@ def main(argv: list[str] | None = None) -> int:
         for path in scene_paths:
             sid = path.name
             one, info = evaluate_scene(
-                model, path, data_cfg, n_classes=n_classes, channels=channels,
+                model,
+                path,
+                data_cfg,
+                n_classes=n_classes,
+                channels=channels,
                 tile_size=int(eval_cfg.get("tile_size", 256)),
                 overlap=int(eval_cfg.get("tile_overlap", 32)),
-                batch_size=int(eval_cfg.get("batch_size", 8)), device=device,
+                batch_size=int(eval_cfg.get("batch_size", 8)),
+                device=device,
                 ice_classes=ice_classes,
                 labels_from=reference_path(path) if official else None,
                 collapse_classes=collapsed,
@@ -663,9 +704,10 @@ def main(argv: list[str] | None = None) -> int:
             for ic, r in (rio.get("per_ice_class") or {}).items():
                 if "error" not in r:
                     log.info(
-                        "    %s  RIO MAE %.2f · decisione corretta %.1f%% · "
-                        "PERMISSIVA %.2f%%",
-                        ic, r["rio_mae"], 100 * r["operational_agreement"],
+                        "    %s  RIO MAE %.2f · decisione corretta %.1f%% · PERMISSIVA %.2f%%",
+                        ic,
+                        r["rio_mae"],
+                        100 * r["operational_agreement"],
                         100 * r["unsafe_fraction"],
                     )
 

@@ -39,8 +39,7 @@ def test_the_acquisition_timestamp_is_reformatted_not_reinterpreted():
 
 
 def test_a_product_name_yields_the_platform_and_the_absolute_orbit():
-    m = co.PRODUCT.match(
-        "S1B_EW_GRDM_1SDH_20180707T113313_20180707T113413_011704_015877_83D1")
+    m = co.PRODUCT.match("S1B_EW_GRDM_1SDH_20180707T113313_20180707T113413_011704_015877_83D1")
     assert m and m.group("platform") == "S1B" and int(m.group("orbit")) == 11704
     assert m.group("mode") == "EW" and m.group("pol") == "1SDH"
 
@@ -58,9 +57,13 @@ def test_a_name_that_is_not_a_sentinel_product_matches_nothing():
 
 
 def _overlay(n=100, no_go=(), no_data=()):
-    return {"baseline": {"path": [[0, i] for i in range(n)],
-                         "no_go": [[0, i] for i in no_go],
-                         "no_data": [[0, i] for i in no_data]}}
+    return {
+        "baseline": {
+            "path": [[0, i] for i in range(n)],
+            "no_go": [[0, i] for i in no_go],
+            "no_data": [[0, i] for i in no_data],
+        }
+    }
 
 
 def test_the_trace_counts_the_cells_the_overlay_actually_marks():
@@ -80,7 +83,7 @@ def test_no_baseline_path_means_no_trace_rather_than_an_empty_chart():
 
 
 def test_cells_outside_the_chart_are_a_separate_series_from_forbidden_ones():
-    """"Fuori copertura" and "vietata da POLARIS" are different statements —
+    """ "Fuori copertura" and "vietata da POLARIS" are different statements —
     one is missing data, the other is a decision — and the page must not blend
     them into one bar."""
     a = co.admissibility(_overlay(20, no_go=(0,), no_data=(10,)), buckets=20)
@@ -93,17 +96,21 @@ def test_cells_outside_the_chart_are_a_separate_series_from_forbidden_ones():
 # ---------------------------------------------------------------------------
 
 
-_PAL = {"rio": ["#2ecc71", "#f1c40f", "#e74c3c"],
-        "classes": ["#0a285a", "#00c8ff", "#ffffff"]}
+_PAL = {"rio": ["#2ecc71", "#f1c40f", "#e74c3c"], "classes": ["#0a285a", "#00c8ff", "#ffffff"]}
 
 
 def _entry():
     return {
         "route_exists": True,
         "polaris": {"rio_min": 0.0, "rio_max": 30.0},
-        "conditions": {"n_cells": 449, "fraction_normal": 1.0, "fraction_elevated": 0.0,
-                       "fraction_no_go": 0.0, "rio_median": 26.0,
-                       "by_class": {"0": 98, "1": 55, "2": 296}},
+        "conditions": {
+            "n_cells": 449,
+            "fraction_normal": 1.0,
+            "fraction_elevated": 0.0,
+            "fraction_no_go": 0.0,
+            "rio_median": 26.0,
+            "by_class": {"0": 98, "1": 55, "2": 296},
+        },
     }
 
 
@@ -111,8 +118,7 @@ def test_bar_widths_are_resolved_in_python_as_percentages():
     """A browser that turns fraction_no_go into a width is a browser deciding
     how big a risk looks."""
     p = co.panels(_entry(), None, None, None, _PAL)
-    assert p["rio_meter"]["segs"] == [[100.0, "#2ecc71"], [0.0, "#f1c40f"],
-                                      [0.0, "#e74c3c"]]
+    assert p["rio_meter"]["segs"] == [[100.0, "#2ecc71"], [0.0, "#f1c40f"], [0.0, "#e74c3c"]]
     assert sum(w for w, _ in p["mix"]["segs"]) == pytest.approx(100.0, abs=0.1)
 
 
@@ -146,23 +152,38 @@ def test_the_log_carries_no_timestamps_it_does_not_have():
     """A console log reads as a clock ticking. Nothing in data/demo records
     when a stage ran, so the sequence numbers are the honest version; a
     plausible [23:07:21] would not be."""
-    rows = co.event_log({"id": "S.nc", "shape": [10, 20], "warnings": []}, "PC6",
-                        _entry(), None, None, {}, None)
+    rows = co.event_log(
+        {"id": "S.nc", "shape": [10, 20], "warnings": []}, "PC6", _entry(), None, None, {}, None
+    )
     joined = " ".join(m for _, _, m in rows)
     assert ":" not in joined.replace("11:33", "") or "Z" in joined
     assert [n for n, _, _ in rows] == [f"{i:02d}" for i in range(len(rows))]
 
 
 def test_the_log_omits_the_stages_whose_measurements_are_missing():
-    rows = co.event_log({"id": "S.nc", "shape": None, "warnings": []}, "PC6",
-                        {"route_exists": False}, None, None, {}, None)
+    rows = co.event_log(
+        {"id": "S.nc", "shape": None, "warnings": []},
+        "PC6",
+        {"route_exists": False},
+        None,
+        None,
+        {},
+        None,
+    )
     tags = {t for _, t, _ in rows}
     assert "TILE" not in tags and "PRODOTTO" not in tags and "A*" not in tags
 
 
 def test_a_scene_warning_reaches_the_log():
-    rows = co.event_log({"id": "S.nc", "shape": None, "warnings": ["mancano dati"]},
-                        "PC6", {"route_exists": False}, None, None, {}, None)
+    rows = co.event_log(
+        {"id": "S.nc", "shape": None, "warnings": ["mancano dati"]},
+        "PC6",
+        {"route_exists": False},
+        None,
+        None,
+        {},
+        None,
+    )
     assert any(t == "AVVISO" and "mancano dati" in m for _, t, m in rows)
 
 
@@ -176,10 +197,17 @@ def _real_ctx():
     if not (demo / "index.json").exists():
         pytest.skip("data/demo assente")
     import yaml
-    metrics = (json.loads(Path("artifacts/metrics.json").read_text())
-               if Path("artifacts/metrics.json").exists() else {})
-    assumptions = (yaml.safe_load(Path("configs/assumptions.yaml").read_text())
-                   if Path("configs/assumptions.yaml").exists() else {})
+
+    metrics = (
+        json.loads(Path("artifacts/metrics.json").read_text())
+        if Path("artifacts/metrics.json").exists()
+        else {}
+    )
+    assumptions = (
+        yaml.safe_load(Path("configs/assumptions.yaml").read_text())
+        if Path("configs/assumptions.yaml").exists()
+        else {}
+    )
     return co.collect(demo, metrics, assumptions, Path("data/raw/test"))
 
 
@@ -264,17 +292,25 @@ def test_the_page_says_out_loud_that_it_has_no_coastlines():
 # ---------------------------------------------------------------------------
 
 
-_ROUTE = ('{"type":"FeatureCollection","features":[{"type":"Feature","geometry":'
-          '{"type":"LineString","coordinates":[[-76.567482,56.331759],'
-          '[-76.690202,56.200049]]},"properties":{"ice_class":"PC6"}}]}')
+_ROUTE = (
+    '{"type":"FeatureCollection","features":[{"type":"Feature","geometry":'
+    '{"type":"LineString","coordinates":[[-76.567482,56.331759],'
+    '[-76.690202,56.200049]]},"properties":{"ice_class":"PC6"}}]}'
+)
 
 
 def _paid(text=None, route=None, **extra):
     body = text if text is not None else _ROUTE
     import textwrap
-    return {"payload": {"text": textwrap.fill(body, width=78),
-                        "route": route if route is not None else len(body.encode()),
-                        "n_waypoints": 2, **extra}}
+
+    return {
+        "payload": {
+            "text": textwrap.fill(body, width=78),
+            "route": route if route is not None else len(body.encode()),
+            "n_waypoints": 2,
+            **extra,
+        }
+    }
 
 
 def test_the_dump_is_the_transmitted_file_and_nothing_else():
@@ -322,15 +358,23 @@ def test_the_colouring_marks_strings_and_numbers_and_escapes_the_rest():
 
 
 def test_the_byte_rows_quote_only_what_was_measured():
-    b = co.bridge(_paid(mask=169558, meta=60, total=170186, ratio=324.7,
-                        sar=55_300_000, link={"s": 15, "terminal": "Iridium Certus 100",
-                                              "kbps": 88, "sbd": 2}))
+    b = co.bridge(
+        _paid(
+            mask=169558,
+            meta=60,
+            total=170186,
+            ratio=324.7,
+            sar=55_300_000,
+            link={"s": 15, "terminal": "Iridium Certus 100", "kbps": 88, "sbd": 2},
+        )
+    )
     labels = {k for k, _, _ in b["rows"]}
     assert "maschera del ghiaccio" in labels and "compressione" in labels
     assert "in messaggi SBD" in labels
     b2 = co.bridge(_paid())
-    assert {k for k, _, _ in b2["rows"]} == {"rotta · 2 waypoint"}, \
+    assert {k for k, _, _ in b2["rows"]} == {"rotta · 2 waypoint"}, (
         "senza misure di compressione non si inventano righe"
+    )
 
 
 def test_every_real_packet_parses_as_the_file_it_claims_to_be():
@@ -345,8 +389,7 @@ def test_every_real_packet_parses_as_the_file_it_claims_to_be():
                 assert not e.get("route_exists"), f"{s['id']}/{ic}: rotta senza pacchetto"
                 continue
             assert not b.get("mismatch"), f"{s['id']}/{ic}: byte incoerenti"
-            joined = html.unescape(
-                "".join(re.sub(r"<[^>]+>", "", h) for _, h in b["lines"]))
+            joined = html.unescape("".join(re.sub(r"<[^>]+>", "", h) for _, h in b["lines"]))
             assert len(joined.encode()) == b["bytes"], f"{s['id']}/{ic}: byte diversi"
             assert json.loads(joined)["type"] == "FeatureCollection"
             assert e["payload"]["route"] == b["bytes"], f"{s['id']}/{ic}: conteggio diverso"
@@ -406,8 +449,9 @@ def test_the_layer_is_offered_only_when_a_scene_actually_has_it():
     has = any("sar_geo" in (s.get("files") or {}) for s in ctx["scenes"])
     assert ("sar_geo" in ids) == has
     if has:
-        assert ids.index("sar_geo") < ids.index("sar"), \
+        assert ids.index("sar_geo") < ids.index("sar"), (
             "il livello geocodificato sta accanto a quello a swath, per il confronto"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -459,8 +503,9 @@ def test_straightening_never_crops_the_scene():
         # and it really is the largest such enlargement, not a timid one.
         # The tolerance is the cost of rounding the scale down to four
         # decimals — about forty metres here — not a licence to be loose.
-        assert (w * fr["scale"] > cols * res * 0.999
-                or h * fr["scale"] > rows * res * 0.999), f"{s['id']}: ingrandimento timido"
+        assert w * fr["scale"] > cols * res * 0.999 or h * fr["scale"] > rows * res * 0.999, (
+            f"{s['id']}: ingrandimento timido"
+        )
 
 
 def test_only_scenes_on_the_routing_grid_get_a_frame():
@@ -482,8 +527,9 @@ def test_the_ground_track_has_two_distinct_ends_the_satellite_can_fly_between():
             continue
         a, b = f["track_line"]
         assert a != b, f"{s['id']}: estremi coincidenti"
-        assert co.great_circle_km(tuple(a), tuple(b)) == pytest.approx(
-            f["along_km"], rel=0.01), f"{s['id']}: la traccia non è lunga quanto dichiarato"
+        assert co.great_circle_km(tuple(a), tuple(b)) == pytest.approx(f["along_km"], rel=0.01), (
+            f"{s['id']}: la traccia non è lunga quanto dichiarato"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -504,7 +550,7 @@ def _tokens() -> dict[str, str]:
 
 def _lum(hex_colour: str) -> float:
     h = hex_colour.lstrip("#")
-    parts = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    parts = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
     f = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in parts]
     return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]
 
@@ -518,12 +564,12 @@ def test_the_palette_is_blueprints_and_not_an_approximation_of_it():
     """Read from palantir/blueprint's own _colors.scss rather than eyeballed.
     If one drifts, it stopped being Blueprint's and became a near-miss."""
     tok = _tokens()
-    assert tok["--bg"] == "#1c2127"        # dark-gray1
-    assert tok["--panel"] == "#252a31"     # dark-gray2
-    assert tok["--raise"] == "#2f343c"     # dark-gray3
-    assert tok["--text"] == "#f6f7f9"      # light-gray5
-    assert tok["--accent"] == "#2d72d2"    # blue3
-    assert tok["--accent-text"] == "#8abbff"   # blue5
+    assert tok["--bg"] == "#1c2127"  # dark-gray1
+    assert tok["--panel"] == "#252a31"  # dark-gray2
+    assert tok["--raise"] == "#2f343c"  # dark-gray3
+    assert tok["--text"] == "#f6f7f9"  # light-gray5
+    assert tok["--accent"] == "#2d72d2"  # blue3
+    assert tok["--accent-text"] == "#8abbff"  # blue5
 
 
 def test_every_text_tier_clears_45_on_every_surface_it_sits_on():
@@ -533,8 +579,16 @@ def test_every_text_tier_clears_45_on_every_surface_it_sits_on():
     for type."""
     tok = _tokens()
     grounds = [tok["--bg"], tok["--panel"], tok["--raise"]]
-    for name in ("--text", "--dim", "--faint", "--accent-text",
-                 "--ok-t", "--bad-t", "--warn-t", "--info-t"):
+    for name in (
+        "--text",
+        "--dim",
+        "--faint",
+        "--accent-text",
+        "--ok-t",
+        "--bad-t",
+        "--warn-t",
+        "--info-t",
+    ):
         for ground in grounds:
             r = _contrast(tok[name], ground)
             assert r >= 4.5, f"{name} su {ground}: {r:.2f}:1"
@@ -545,8 +599,12 @@ def test_a_tag_reads_the_same_whether_its_row_is_selected_or_not():
     "vietata" measured 4.37:1 on a selected row and 4.9:1 elsewhere. Opaque
     grounds, and the contrast is a property of the tag alone."""
     tok = _tokens()
-    for kind, text_token in [("ok", "--ok-t"), ("bad", "--bad-t"),
-                             ("warn", "--warn-t"), ("info", "--info-t")]:
+    for kind, text_token in [
+        ("ok", "--ok-t"),
+        ("bad", "--bad-t"),
+        ("warn", "--warn-t"),
+        ("info", "--info-t"),
+    ]:
         rule = re.search(rf"\.pill\.{kind}\{{background:(#[0-9a-f]{{3,8}});", co.CSS)
         assert rule, f"regola .pill.{kind} non trovata"
         bg = rule.group(1)
@@ -560,11 +618,19 @@ def test_no_interface_colour_is_typed_by_hand_outside_the_token_block():
     ground; on Blueprint's charcoal two of them fell to 1.2:1. They are tokens
     now, and the legend swatches use the same tokens, so a swatch can no longer
     disagree with the line it describes."""
-    body = co.CSS.split("\n}", 1)[1]          # tutto dopo il blocco :root
+    body = co.CSS.split("\n}", 1)[1]  # tutto dopo il blocco :root
     data_colours = {"#ff2d95", "#f5f5f5", "#ff2020", "#fff"}
     stray = {m.group(0).lower() for m in re.finditer(r"#[0-9a-fA-F]{3,8}\b", body)}
     stray -= data_colours
     # i fondi opachi delle pastiglie sono miscele risolte una volta sola
-    stray -= {"#304241", "#3c5a51", "#453b41", "#654c51",
-              "#453e38", "#66533f", "#393e46", "#4d535c"}
+    stray -= {
+        "#304241",
+        "#3c5a51",
+        "#453b41",
+        "#654c51",
+        "#453e38",
+        "#66533f",
+        "#393e46",
+        "#4d535c",
+    }
     assert not stray, f"colori a mano fuori dai token: {sorted(stray)}"

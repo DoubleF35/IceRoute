@@ -186,9 +186,7 @@ def _naive_predict(model, x, *, n_classes, tile_size, overlap):
         for r0 in ts(h, tile_size, stride):
             for c0 in ts(w, tile_size, stride):
                 crop = x[:, r0 : r0 + tile_size, c0 : c0 + tile_size][None]
-                probs = torch.softmax(
-                    model(torch.from_numpy(crop)).float(), dim=1
-                ).numpy()[0]
+                probs = torch.softmax(model(torch.from_numpy(crop)).float(), dim=1).numpy()[0]
                 acc[:, r0 : r0 + tile_size, c0 : c0 + tile_size] += probs * win
                 acc_w[r0 : r0 + tile_size, c0 : c0 + tile_size] += win
 
@@ -231,7 +229,7 @@ def test_vertical_blending_actually_happens():
     to name what broke.
     """
     rng = np.random.default_rng(11)
-    h, w = 704, 300           # three tile rows at stride 224
+    h, w = 704, 300  # three tile rows at stride 224
     x = rng.standard_normal((3, h, w)).astype("float32")
     model = TileEdgeModel()
 
@@ -240,7 +238,7 @@ def test_vertical_blending_actually_happens():
     )
     naive = _naive_predict(model, x, n_classes=N_CLASSES, tile_size=256, overlap=32)
 
-    seam = slice(224, 256)    # rows the first two tile rows share
+    seam = slice(224, 256)  # rows the first two tile rows share
     assert np.array_equal(streamed[seam], naive[seam])
 
 

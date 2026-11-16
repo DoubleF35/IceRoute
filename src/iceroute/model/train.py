@@ -127,7 +127,10 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
             train_scenes += new
             log.info(
                 "Split esteso: %d scene di training (%d dal congelato + %d aggiuntive). "
-                "Val e demo invariate.", len(train_scenes), len(split["train"]), len(new),
+                "Val e demo invariate.",
+                len(train_scenes),
+                len(split["train"]),
+                len(new),
             )
         else:
             log.warning(
@@ -135,10 +138,17 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
                 extra_path,
             )
 
-    train_ds = PatchDataset(cache, train_scenes, channels=channels, augment=True,
-                            seed=train_cfg["seed"], collapse_classes=collapse)
-    val_ds = PatchDataset(cache, split["val"], channels=channels, augment=False,
-                          collapse_classes=collapse)
+    train_ds = PatchDataset(
+        cache,
+        train_scenes,
+        channels=channels,
+        augment=True,
+        seed=train_cfg["seed"],
+        collapse_classes=collapse,
+    )
+    val_ds = PatchDataset(
+        cache, split["val"], channels=channels, augment=False, collapse_classes=collapse
+    )
 
     log.info("Patch: %d train, %d val — canali %s", len(train_ds), len(val_ds), channels)
 
@@ -161,16 +171,15 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
             "vuoto): uso lo shuffle semplice. Il %.0f%% di margine NON è garantito.",
             100 * target,
         )
-        train_loader = DataLoader(
-            train_ds, batch_size=bs, shuffle=True, drop_last=True, **common
-        )
+        train_loader = DataLoader(train_ds, batch_size=bs, shuffle=True, drop_last=True, **common)
     else:
         from torch.utils.data import WeightedRandomSampler
 
         log.info(
-            "Campionamento pesato: %d patch in cache, %.1f%% con margine → "
-            "target %.0f%% per batch",
-            len(train_ds), 100 * train_ds.margin_fraction(), 100 * target,
+            "Campionamento pesato: %d patch in cache, %.1f%% con margine → target %.0f%% per batch",
+            len(train_ds),
+            100 * train_ds.margin_fraction(),
+            100 * target,
         )
         sampler = WeightedRandomSampler(
             weights=torch.as_tensor(weights, dtype=torch.double),
@@ -183,7 +192,9 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
 
     return (
         train_loader,
-        DataLoader(val_ds, batch_size=int(train_cfg["eval"].get("batch_size", bs)), shuffle=False, **common),
+        DataLoader(
+            val_ds, batch_size=int(train_cfg["eval"].get("batch_size", bs)), shuffle=False, **common
+        ),
     )
 
 
@@ -249,11 +260,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit-batches", type=int, default=None, help="smoke test")
     args = ap.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s %(message)s", datefmt="%H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s  %(levelname)-7s %(message)s", datefmt="%H:%M:%S"
+    )
 
     cfg = yaml.safe_load(args.config.read_text())
     data_cfg = load_config(args.data_config)
-    split = yaml.safe_load(Path(data_cfg.get("split_file", "configs/split.yaml")).read_text())["split"]
+    split = yaml.safe_load(Path(data_cfg.get("split_file", "configs/split.yaml")).read_text())[
+        "split"
+    ]
 
     if args.epochs:
         cfg["train"]["epochs"] = args.epochs
@@ -288,7 +303,9 @@ def main(argv: list[str] | None = None) -> int:
         lr=float(tc["optimizer"]["lr"]),
         weight_decay=float(tc["optimizer"]["weight_decay"]),
     )
-    scaler = torch.amp.GradScaler("cuda", enabled=bool(tc.get("amp", True)) and device.type == "cuda")
+    scaler = torch.amp.GradScaler(
+        "cuda", enabled=bool(tc.get("amp", True)) and device.type == "cuda"
+    )
 
     epochs = int(tc["epochs"])
     steps_per_epoch = max(len(train_loader), 1)
@@ -311,8 +328,13 @@ def main(argv: list[str] | None = None) -> int:
             int(k): v["name"] for k, v in data_cfg["sod_classes"].items() if int(k) != 255
         }
 
-    log.info("Inizio: %d epoche, %d step/epoca, batch %d, AMP %s",
-             epochs, steps_per_epoch, tc["batch_size"], "on" if scaler.is_enabled() else "off")
+    log.info(
+        "Inizio: %d epoche, %d step/epoca, batch %d, AMP %s",
+        epochs,
+        steps_per_epoch,
+        tc["batch_size"],
+        "on" if scaler.is_enabled() else "off",
+    )
 
     step = 0
     for epoch in range(1, epochs + 1):
@@ -322,15 +344,25 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             tr_loss, tr_ce, tr_dice, step = train_one_epoch(
-                model, train_loader, criterion, opt, scaler, device,
-                base_lr=float(tc["optimizer"]["lr"]), sched=sched, step0=step,
+                model,
+                train_loader,
+                criterion,
+                opt,
+                scaler,
+                device,
+                base_lr=float(tc["optimizer"]["lr"]),
+                sched=sched,
+                step0=step,
                 grad_clip=float(tc.get("grad_clip_norm", 0)) or None,
             )
         except torch.cuda.OutOfMemoryError:
             new_bs = max(1, int(tc["batch_size"]) // 2)
-            log.error("OOM con batch %d → riduco a %d e riprovo. "
-                      "ANNOTARE in DECISIONS.md: il batch effettivo non è quello in config.",
-                      tc["batch_size"], new_bs)
+            log.error(
+                "OOM con batch %d → riduco a %d e riprovo. "
+                "ANNOTARE in DECISIONS.md: il batch effettivo non è quello in config.",
+                tc["batch_size"],
+                new_bs,
+            )
             tc["batch_size"] = new_bs
             torch.cuda.empty_cache()
             train_loader, val_loader = build_loaders(data_cfg, cfg, split)
@@ -341,10 +373,17 @@ def main(argv: list[str] | None = None) -> int:
         peak = torch.cuda.max_memory_allocated() / 1024**3 if device.type == "cuda" else 0.0
 
         res = EpochResult(
-            epoch=epoch, train_loss=tr_loss, train_ce=tr_ce, train_dice=tr_dice,
-            val_loss=val_loss, val_miou=miou, val_accuracy=cm.accuracy(),
+            epoch=epoch,
+            train_loss=tr_loss,
+            train_ce=tr_ce,
+            train_dice=tr_dice,
+            val_loss=val_loss,
+            val_miou=miou,
+            val_accuracy=cm.accuracy(),
             val_binary_accuracy=cm.binary_accuracy(),
-            lr=opt.param_groups[0]["lr"], seconds=time.monotonic() - t0, peak_vram_gb=peak,
+            lr=opt.param_groups[0]["lr"],
+            seconds=time.monotonic() - t0,
+            peak_vram_gb=peak,
         )
         logger.append(res)
 
@@ -368,8 +407,17 @@ def main(argv: list[str] | None = None) -> int:
         log.info(
             "epoca %3d/%d  loss %.4f  val %.4f  mIoU %.4f  acc %.4f  gh/acqua %.4f  "
             "lr %.2e  %.0fs  VRAM %.1f GB%s",
-            epoch, epochs, tr_loss, val_loss, miou, cm.accuracy(),
-            cm.binary_accuracy(), res.lr, res.seconds, peak, marker,
+            epoch,
+            epochs,
+            tr_loss,
+            val_loss,
+            miou,
+            cm.accuracy(),
+            cm.binary_accuracy(),
+            res.lr,
+            res.seconds,
+            peak,
+            marker,
         )
 
         if args.limit_batches:
@@ -377,8 +425,12 @@ def main(argv: list[str] | None = None) -> int:
             break
 
         if since_best >= patience:
-            log.info("Early stopping: %d epoche senza miglioramento (best %.4f all'epoca %d).",
-                     patience, best_miou, best_epoch)
+            log.info(
+                "Early stopping: %d epoche senza miglioramento (best %.4f all'epoca %d).",
+                patience,
+                best_miou,
+                best_epoch,
+            )
             break
 
     # --- final report -----------------------------------------------------
@@ -402,27 +454,38 @@ def main(argv: list[str] | None = None) -> int:
             "soglia SPEC §7.4 di %.2f, che vale per le 6 classi SOD: questo è un "
             "problema diverso e più facile. Il ripiego §7.4 è già stato attivato, "
             "quindi il numero da ridimensionare è quello nel pitch, non questo.",
-            best_miou, min_miou,
+            best_miou,
+            min_miou,
         )
     elif best_miou < min_miou:
         log.warning(
             "mIoU %.3f sotto la soglia SPEC di %.2f. SPEC §7.4: se dopo 3 giorni non si "
             "arriva, ridurre a binario ghiaccio/acqua + una classe di ghiaccio spesso, e "
             "ridimensionare le affermazioni nel pitch. Non aggiustare il numero.",
-            best_miou, min_miou,
+            best_miou,
+            min_miou,
         )
     if cm.binary_accuracy() < min_bin:
-        log.warning("Accuratezza ghiaccio/acqua %.3f sotto la soglia di %.2f.", cm.binary_accuracy(), min_bin)
+        log.warning(
+            "Accuratezza ghiaccio/acqua %.3f sotto la soglia di %.2f.",
+            cm.binary_accuracy(),
+            min_bin,
+        )
 
     summary_path = Path("artifacts/train_summary.json")
-    summary_path.write_text(json.dumps({
-        "best_val_miou": best_miou,
-        "best_epoch": best_epoch,
-        "seed": cfg["seed"],
-        "batch_size_effective": tc["batch_size"],
-        "n_parameters": model.param_count(),
-        "final": cm.as_dict(class_names),
-    }, indent=2))
+    summary_path.write_text(
+        json.dumps(
+            {
+                "best_val_miou": best_miou,
+                "best_epoch": best_epoch,
+                "seed": cfg["seed"],
+                "batch_size_effective": tc["batch_size"],
+                "n_parameters": model.param_count(),
+                "final": cm.as_dict(class_names),
+            },
+            indent=2,
+        )
+    )
     log.info("Riepilogo in %s", summary_path)
     return 0
 

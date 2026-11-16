@@ -66,11 +66,7 @@ def process_scene(
     # Hand-picked waypoints win over automatic ones; see waypoints.py.
     entry = (routing_cfg.get("waypoints") or {}).get(scene.meta.scene_id)
     try:
-        wp = (
-            waypoints_from_config(geo.grid, entry)
-            if entry
-            else choose_waypoints(geo.grid, costs)
-        )
+        wp = waypoints_from_config(geo.grid, entry) if entry else choose_waypoints(geo.grid, costs)
     except ValueError as exc:
         log.warning("%s: waypoint non selezionabili — %s", scene.meta.scene_id, exc)
         return {
@@ -119,9 +115,7 @@ def process_scene(
         except NoRouteFound as exc:
             # An expected outcome, not a failure: SPEC §8.4 wants this shown.
             log.info("  %s: nessuna rotta (%s)", ice_class, exc.reason)
-            entry_out.update(
-                {"route_exists": False, "reason": exc.reason, "message": str(exc)}
-            )
+            entry_out.update({"route_exists": False, "reason": exc.reason, "message": str(exc)})
             result["classes"][ice_class] = entry_out
             continue
 
@@ -146,11 +140,17 @@ def process_scene(
         collection = {
             "type": "FeatureCollection",
             "features": [
-                simple.as_geojson({"kind": "iceroute", "ice_class": ice_class,
-                                   "transit_time_hours": round(route.time_hours, 3),
-                                   "distance_km": round(route.distance_km, 3),
-                                   "min_rio_on_route": None if route.min_rio is None
-                                   else round(route.min_rio, 2)}),
+                simple.as_geojson(
+                    {
+                        "kind": "iceroute",
+                        "ice_class": ice_class,
+                        "transit_time_hours": round(route.time_hours, 3),
+                        "distance_km": round(route.distance_km, 3),
+                        "min_rio_on_route": None
+                        if route.min_rio is None
+                        else round(route.min_rio, 2),
+                    }
+                ),
                 base.as_geojson(),
             ],
         }
@@ -161,7 +161,8 @@ def process_scene(
             {
                 "route_exists": True,
                 "geojson": str(path.relative_to(out_dir.parent.parent))
-                if out_dir.is_absolute() else str(path),
+                if out_dir.is_absolute()
+                else str(path),
                 "comparison": compare(route, base),
                 "n_waypoints": len(simple),
                 "simplify_warnings": simple.warnings,
@@ -172,7 +173,10 @@ def process_scene(
         result["classes"][ice_class] = entry_out
         log.info(
             "  %s: %s  (%d waypoint, A* %.1fs)",
-            ice_class, entry_out["comparison"]["headline"], len(simple), elapsed,
+            ice_class,
+            entry_out["comparison"]["headline"],
+            len(simple),
+            elapsed,
         )
 
     return result
@@ -202,9 +206,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.scenes:
         scenes = list(args.scenes)
     else:
-        split = yaml.safe_load(
-            Path(data_cfg.get("split_file", "configs/split.yaml")).read_text()
-        )["split"]
+        split = yaml.safe_load(Path(data_cfg.get("split_file", "configs/split.yaml")).read_text())[
+            "split"
+        ]
         scenes = list(split["demo"])
 
     present = [s for s in scenes if (args.raw_dir / s).exists()]
@@ -247,13 +251,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     usable = [r for r in results if r.get("usable")]
-    n_routes = sum(
-        1 for r in usable for c in r["classes"].values() if c.get("route_exists")
-    )
+    n_routes = sum(1 for r in usable for c in r["classes"].values() if c.get("route_exists"))
     log.info("=" * 66)
     log.info("Scene utilizzabili: %d/%d", len(usable), len(present))
-    log.info("Rotte trovate: %d su %d combinazioni", n_routes,
-             len(usable) * len(routing_cfg["vessel"]["classes"]))
+    log.info(
+        "Rotte trovate: %d su %d combinazioni",
+        n_routes,
+        len(usable) * len(routing_cfg["vessel"]["classes"]),
+    )
     log.info("Indice in %s", index_path)
     return 0 if usable else 1
 

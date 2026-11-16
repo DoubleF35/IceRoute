@@ -69,10 +69,16 @@ h1,h2,h3 {color:#eaf1fa !important}
 </style>
 """
 
-CLASS_COLOURS = {"Acqua libera": "#0a2859", "Ghiaccio sottile": "#00c8ff",
-                 "Ghiaccio spesso": "#ffffff"}
-RIO_LEVELS = [("Navigazione normale", "#2ecc71"), ("Rischio elevato", "#f1c40f"),
-              ("Considerazione speciale", "#e74c3c")]
+CLASS_COLOURS = {
+    "Acqua libera": "#0a2859",
+    "Ghiaccio sottile": "#00c8ff",
+    "Ghiaccio spesso": "#ffffff",
+}
+RIO_LEVELS = [
+    ("Navigazione normale", "#2ecc71"),
+    ("Rischio elevato", "#f1c40f"),
+    ("Considerazione speciale", "#e74c3c"),
+]
 
 # Which raster each layer shows, and whether a route can be drawn on it.
 #
@@ -97,13 +103,23 @@ LAYERS = {
 # only the type. Leading with the layer that carries the actual decision, and
 # naming the other two for what they each are, stops the demo from inviting an
 # objection it then has to talk its way out of.
-SIC_LEGEND = [("0/10 — acqua libera", "#181626"), ("3/10", "#7c2a68"),
-              ("6/10", "#de5c42"), ("10/10 — copertura totale", "#fff078")]
-ROUTE_MODES = {"Rotta diretta": "baseline", "IceRoute": "iceroute",
-               "Entrambe": "both", "Nessuna": "none"}
+SIC_LEGEND = [
+    ("0/10 — acqua libera", "#181626"),
+    ("3/10", "#7c2a68"),
+    ("6/10", "#de5c42"),
+    ("10/10 — copertura totale", "#fff078"),
+]
+ROUTE_MODES = {
+    "Rotta diretta": "baseline",
+    "IceRoute": "iceroute",
+    "Entrambe": "both",
+    "Nessuna": "none",
+}
 ROUTE_LEGEND = {
-    "baseline": [("Rotta diretta (carta nautica)", "#f5f5f5"),
-                 ("Cella vietata da POLARIS", "#ff2020")],
+    "baseline": [
+        ("Rotta diretta (carta nautica)", "#f5f5f5"),
+        ("Cella vietata da POLARIS", "#ff2020"),
+    ],
     "iceroute": [("IceRoute", "#ff2d95"), ("Waypoint trasmessi a terra", "#ff2d95")],
 }
 
@@ -152,8 +168,10 @@ def scene_scores(metrics: dict, scene_id: str) -> tuple[float | None, float | No
 
 
 def kpi(label: str, value: str, sub: str = "") -> str:
-    return (f'<div class="kpi"><div class="lab">{label}</div>'
-            f'<div class="val">{value}</div><div class="sub">{sub}</div></div>')
+    return (
+        f'<div class="kpi"><div class="lab">{label}</div>'
+        f'<div class="val">{value}</div><div class="sub">{sub}</div></div>'
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -202,45 +220,57 @@ def composite(img_path: str, ov_path: str, show: str) -> tuple[bytes | None, str
 def transit_card(entry: dict, provisional_speed: bool) -> str:
     """Transit time, and the delta only when there is an honest one."""
     if not entry.get("route_exists"):
-        return kpi("Tempo di transito",
-                   '<span style="color:#f08a8a">nessuna rotta</span>',
-                   entry.get("message", "")[:90])
+        return kpi(
+            "Tempo di transito",
+            '<span style="color:#f08a8a">nessuna rotta</span>',
+            entry.get("message", "")[:90],
+        )
 
     cmp_ = entry["comparison"]
     ours = cmp_["iceroute"]["time_hours"]
     # Points at the tab that recomputes this, because otherwise the page shows
     # two different transit times for the same route and neither says why.
-    note = ("assume 12 kn in acqua libera (senza fonte) — cambiala in "
-            "«Tempo e carburante»") if provisional_speed else ""
+    note = (
+        ("assume 12 kn in acqua libera (senza fonte) — cambiala in «Tempo e carburante»")
+        if provisional_speed
+        else ""
+    )
 
     if cmp_.get("time_saved_hours") is not None:
         saved = cmp_["time_saved_hours"]
         pct = cmp_.get("time_saved_percent")
         base_h = fmt(cmp_["baseline"]["time_hours"])
         if saved > 0:
-            body = (f'<span style="color:#4ade9b">{saved:+.1f} h ({pct:+.0f}%)</span> '
-                    f"contro {base_h} h della rotta diretta")
+            body = (
+                f'<span style="color:#4ade9b">{saved:+.1f} h ({pct:+.0f}%)</span> '
+                f"contro {base_h} h della rotta diretta"
+            )
         else:
             # The direct route is legal and IceRoute all but follows it. There
             # is nothing to win here, and dressing a 1% loss in warning colours
             # would be editorialising a non-event. The honest reading is the
             # better one anyway: no detour was invented where none was needed.
-            body = ('<span class="tag info">la rotta diretta è percorribile</span> '
-                    f"IceRoute la segue: {cmp_['detour_km']:+.1f} km e "
-                    f"{abs(saved):.1f} h in più su {base_h} h")
-        return kpi("Tempo di transito", f"{fmt(ours)} h",
-                   body + (f"<br>{note}" if note else ""))
+            body = (
+                '<span class="tag info">la rotta diretta è percorribile</span> '
+                f"IceRoute la segue: {cmp_['detour_km']:+.1f} km e "
+                f"{abs(saved):.1f} h in più su {base_h} h"
+            )
+        return kpi("Tempo di transito", f"{fmt(ours)} h", body + (f"<br>{note}" if note else ""))
 
     # No comparable baseline. Say which of the two reasons applies — they mean
     # completely different things and conflating them would be a false claim.
     base = cmp_["baseline"]
     if base.get("blocked_by_ice"):
-        sub = ('<span class="tag ok">la rotta diretta è vietata dal ghiaccio</span> '
-               f'{base["n_no_go_cells"]} celle oltre il limite POLARIS')
+        sub = (
+            '<span class="tag ok">la rotta diretta è vietata dal ghiaccio</span> '
+            f"{base['n_no_go_cells']} celle oltre il limite POLARIS"
+        )
     else:
-        sub = ('<span class="tag info">confronto non disponibile</span> '
-               "la rotta diretta esce dalla copertura della carta: non è il ghiaccio "
-               "a fermarla")
+        sub = (
+            '<span class="tag info">confronto non disponibile</span> '
+            "la rotta diretta esce dalla copertura della carta: non è il ghiaccio "
+            "a fermarla"
+        )
     return kpi("Tempo di transito", f"{fmt(ours)} h", sub + (f"<br>{note}" if note else ""))
 
 
@@ -256,18 +286,20 @@ def rio_card(entry: dict) -> str:
         tag, txt = "warn", "rischio elevato — limite di velocità POLARIS"
     else:
         tag, txt = "bad", "considerazione speciale"
-    return kpi("RIO minimo sulla rotta", f"{rio:+.1f}",
-               f'<span class="tag {tag}">{txt}</span> soglie IMO MSC.1/Circ.1519')
+    return kpi(
+        "RIO minimo sulla rotta",
+        f"{rio:+.1f}",
+        f'<span class="tag {tag}">{txt}</span> soglie IMO MSC.1/Circ.1519',
+    )
 
 
 def downlink_card(metrics: dict) -> str:
     comp = metrics.get("compression") or {}
     ratio = comp.get("ratio_median")
     if not ratio:
-        return kpi("Volume di downlink", "non misurato",
-                   "serve <code>make report</code>")
+        return kpi("Volume di downlink", "non misurato", "serve <code>make report</code>")
     prov = comp.get("provisional")
-    sub = (f"{comp.get('n_scenes', 0)} scene · numeratore: SAR compresso senza perdita")
+    sub = f"{comp.get('n_scenes', 0)} scene · numeratore: SAR compresso senza perdita"
     if prov:
         sub = '<span class="tag warn">limite superiore</span> ' + sub
     return kpi("Volume di downlink", f"{ratio:.0f}:1", sub)
@@ -282,10 +314,16 @@ def onboard_card(metrics: dict) -> str:
         return kpi("Inferenza a bordo", "non misurata", "serve <code>make quantize</code>")
     acc = q.get("accuracy") or {}
     drop = acc.get("miou_drop")
-    extra = (f" · INT8 costa {abs(drop):.3f} di mIoU" if isinstance(drop, float) and drop > 0
-             else " · INT8 non degrada in modo misurabile")
-    return kpi("Inferenza a bordo", f"{size:.2f} MB",
-               f"{fmt(ms, '{:.0f}')} ms per tile, 1 thread CPU{extra}")
+    extra = (
+        f" · INT8 costa {abs(drop):.3f} di mIoU"
+        if isinstance(drop, float) and drop > 0
+        else " · INT8 non degrada in modo misurabile"
+    )
+    return kpi(
+        "Inferenza a bordo",
+        f"{size:.2f} MB",
+        f"{fmt(ms, '{:.0f}')} ms per tile, 1 thread CPU{extra}",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -294,8 +332,7 @@ def onboard_card(metrics: dict) -> str:
 
 
 def main() -> None:
-    st.set_page_config(page_title="IceRoute", layout="wide",
-                       initial_sidebar_state="expanded")
+    st.set_page_config(page_title="IceRoute", layout="wide", initial_sidebar_state="expanded")
     st.markdown(CSS, unsafe_allow_html=True)
 
     index = load_index()
@@ -372,8 +409,9 @@ def main() -> None:
 
     if scene.get("worst_case"):
         miou, unsafe = scene_scores(metrics, scene["scene_id"])
-        agg = (((metrics.get("evaluation") or {}).get("scenes") or {})
-               .get("aggregate") or {}).get("miou")
+        agg = (((metrics.get("evaluation") or {}).get("scenes") or {}).get("aggregate") or {}).get(
+            "miou"
+        )
         unsafe_pct = 100 * unsafe if isinstance(unsafe, int | float) else None
         st.warning(
             "**Questa è la scena su cui il modello sbaglia di più**, fra le 20 del "
@@ -389,8 +427,12 @@ def main() -> None:
     cols = st.columns(4, gap="small")
     for col, html_ in zip(
         cols,
-        [transit_card(entry, prov_speed), rio_card(entry),
-         downlink_card(metrics), onboard_card(metrics)],
+        [
+            transit_card(entry, prov_speed),
+            rio_card(entry),
+            downlink_card(metrics),
+            onboard_card(metrics),
+        ],
         strict=True,
     ):
         col.markdown(html_, unsafe_allow_html=True)
@@ -416,16 +458,25 @@ def main() -> None:
             shown = [x for m, x in ROUTE_LEGEND.items() if mode in (m, "both")]
             st.markdown(
                 '<div class="legend">'
-                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
-                          for group in shown for n, c in group)
-                + "</div>", unsafe_allow_html=True)
+                + "".join(
+                    f'<span><i style="background:{c}"></i>{n}</span>'
+                    for group in shown
+                    for n, c in group
+                )
+                + "</div>",
+                unsafe_allow_html=True,
+            )
 
         if layer == "Tipo di ghiaccio":
             st.markdown(
                 '<div class="legend">'
-                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
-                          for n, c in CLASS_COLOURS.items())
-                + "</div>", unsafe_allow_html=True)
+                + "".join(
+                    f'<span><i style="background:{c}"></i>{n}</span>'
+                    for n, c in CLASS_COLOURS.items()
+                )
+                + "</div>",
+                unsafe_allow_html=True,
+            )
             st.caption(
                 "Maschera **predetta dal modello**, non la carta dell'analista, "
                 "riproiettata in EPSG:3413 a 500 m."
@@ -434,9 +485,10 @@ def main() -> None:
         elif layer.startswith("RIO"):
             st.markdown(
                 '<div class="legend">'
-                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
-                          for n, c in RIO_LEVELS)
-                + "</div>", unsafe_allow_html=True)
+                + "".join(f'<span><i style="background:{c}"></i>{n}</span>' for n, c in RIO_LEVELS)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
             st.caption(
                 f"Risk Index Outcome per una nave {ice_class}, soglie IMO "
                 f"MSC.1/Circ.1519. **È questo il livello che decide** dove la nave "
@@ -445,9 +497,10 @@ def main() -> None:
         elif layer == "Concentrazione":
             st.markdown(
                 '<div class="legend">'
-                + "".join(f'<span><i style="background:{c}"></i>{n}</span>'
-                          for n, c in SIC_LEGEND)
-                + "</div>", unsafe_allow_html=True)
+                + "".join(f'<span><i style="background:{c}"></i>{n}</span>' for n, c in SIC_LEGEND)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
             st.caption(
                 "Frazione di mare coperta da ghiaccio, in decimi. È **l'altra metà** "
                 "della decisione POLARIS: `RIO = C × RIV(tipo) + (10−C) × RIV(acqua "
@@ -465,28 +518,41 @@ def main() -> None:
         if entry.get("route_exists"):
             cmp_ = entry["comparison"]
             st.metric("Distanza", f"{cmp_['iceroute']['distance_km']:.0f} km")
-            st.metric("Waypoint", entry.get("n_waypoints", "—"),
-                      help="I soli punti che scendono a terra: la linea sulla mappa "
-                           "è il percorso completo, i pallini sono ciò che si trasmette.")
+            st.metric(
+                "Waypoint",
+                entry.get("n_waypoints", "—"),
+                help="I soli punti che scendono a terra: la linea sulla mappa "
+                "è il percorso completo, i pallini sono ciò che si trasmette.",
+            )
 
             # The direct route's verdict, in words, next to the map that just
             # drew it. Three outcomes, and they are not interchangeable.
             base = cmp_["baseline"]
             st.markdown("#### Rotta diretta")
             if base.get("blocked_by_ice"):
-                st.error(f"Vietata: {base['n_no_go_cells']} celle oltre il limite "
-                         f"POLARIS per una nave {ice_class}.")
+                st.error(
+                    f"Vietata: {base['n_no_go_cells']} celle oltre il limite "
+                    f"POLARIS per una nave {ice_class}."
+                )
             elif base.get("feasible"):
-                st.success(f"Percorribile in {fmt(base['time_hours'])} h. "
-                           f"IceRoute devia di {cmp_['detour_km']:+.1f} km.")
+                st.success(
+                    f"Percorribile in {fmt(base['time_hours'])} h. "
+                    f"IceRoute devia di {cmp_['detour_km']:+.1f} km."
+                )
             else:
-                st.info("Fuori dalla copertura della carta: non è il ghiaccio a "
-                        "fermarla, lì non abbiamo una mappa.")
+                st.info(
+                    "Fuori dalla copertura della carta: non è il ghiaccio a "
+                    "fermarla, lì non abbiamo una mappa."
+                )
 
             gj = DEMO_DIR / "routes" / entry.get("geojson", "")
             if gj.exists():
-                st.download_button("Scarica GeoJSON", gj.read_bytes(),
-                                   file_name=gj.name, mime="application/geo+json")
+                st.download_button(
+                    "Scarica GeoJSON",
+                    gj.read_bytes(),
+                    file_name=gj.name,
+                    mime="application/geo+json",
+                )
         else:
             st.error(entry.get("message", "Nessuna rotta trovata.")[:200])
 
@@ -563,37 +629,50 @@ def downlink_panel(scene: dict, entry: dict) -> None:
         st.warning("File della rotta assente: lancia `make precompute`.")
         return
 
-    rows = [("Maschera del ghiaccio (PNG)", p.mask_bytes),
-            (f"Rotta ({p.n_waypoints} waypoint, GeoJSON)", p.route_bytes),
-            ("Metadati", p.metadata_bytes)]
+    rows = [
+        ("Maschera del ghiaccio (PNG)", p.mask_bytes),
+        (f"Rotta ({p.n_waypoints} waypoint, GeoJSON)", p.route_bytes),
+        ("Metadati", p.metadata_bytes),
+    ]
     body = "".join(
         f'<tr><td style="padding:3px 14px 3px 0;color:#9fb1c7">{n}</td>'
         f'<td style="text-align:right;font-family:ui-monospace">'
-        f'{"non misurato" if v is None else f"{v:,} B".replace(",", ".")}</td></tr>'
+        f"{'non misurato' if v is None else f'{v:,} B'.replace(',', '.')}</td></tr>"
         for n, v in rows
     )
     left, right = st.columns([1, 1], gap="medium")
     with left:
-        st.markdown(f'<table>{body}</table>', unsafe_allow_html=True)
+        st.markdown(f"<table>{body}</table>", unsafe_allow_html=True)
         if p.total_bytes and p.sar_bytes:
             # "su questa scena", because the card at the top of the page shows
             # the median across scenes and the two numbers differ.
             st.markdown(
-                kpi("Totale trasmesso, su questa scena", f"{p.total_bytes / 1024:.0f} KB",
+                kpi(
+                    "Totale trasmesso, su questa scena",
+                    f"{p.total_bytes / 1024:.0f} KB",
                     f"contro {p.sar_bytes / 1024**2:.1f} MB di SAR compresso senza perdita "
                     f"— <b>{p.ratio:.0f}:1</b>. La scheda in alto riporta la "
-                    f"<b>mediana</b> sulle scene misurate."),
-                unsafe_allow_html=True)
+                    f"<b>mediana</b> sulle scene misurate.",
+                ),
+                unsafe_allow_html=True,
+            )
         lt = link_time(p.total_bytes, p.route_bytes, load_assumptions())
         if lt.seconds is not None:
-            sbd = (f" La sola rotta sta in <b>{lt.sbd_messages} messaggi Iridium SBD</b>."
-                   if lt.sbd_messages else "")
+            sbd = (
+                f" La sola rotta sta in <b>{lt.sbd_messages} messaggi Iridium SBD</b>."
+                if lt.sbd_messages
+                else ""
+            )
             st.markdown(
-                kpi("Tempo sul collegamento", f"≈ {lt.seconds:.0f} s",
+                kpi(
+                    "Tempo sul collegamento",
+                    f"≈ {lt.seconds:.0f} s",
                     f"su {lt.terminal} a {lt.kbps} kbps, il terminale più lento fra quelli "
                     f"in configs/assumptions.yaml.{sbd} Derivato dalla velocità di picco "
-                    f"dichiarata dall'operatore: il throughput reale è più basso."),
-                unsafe_allow_html=True)
+                    f"dichiarata dall'operatore: il throughput reale è più basso.",
+                ),
+                unsafe_allow_html=True,
+            )
         if p.note:
             st.caption(p.note)
         st.caption(
@@ -629,48 +708,86 @@ def assumptions_panel(entry: dict, ice_class: str, index: dict) -> None:
     )
     c1, c2 = st.columns(2)
     speed = c1.slider("Velocità in acqua libera (nodi)", 8.0, 20.0, nominal, 0.5)
-    burn = c2.slider("Consumo a velocità piena (t/giorno)", 0.0, 120.0, 0.0, 5.0,
-                     help="0 = non impostato: senza un consumo non mostriamo carburante.")
+    burn = c2.slider(
+        "Consumo a velocità piena (t/giorno)",
+        0.0,
+        120.0,
+        0.0,
+        5.0,
+        help="0 = non impostato: senza un consumo non mostriamo carburante.",
+    )
 
-    t = rescale_transit(ours.get("time_hours"), ours.get("min_rio"),
-                        nominal_kn=nominal, chosen_kn=speed, ice_class=ice_class)
+    t = rescale_transit(
+        ours.get("time_hours"),
+        ours.get("min_rio"),
+        nominal_kn=nominal,
+        chosen_kn=speed,
+        ice_class=ice_class,
+    )
     base = entry["comparison"]["baseline"]
 
     cols = st.columns(3)
     if t.hours is None:
-        cols[0].markdown(kpi("Transito IceRoute", "non riscalabile", t.reason[:150]),
-                         unsafe_allow_html=True)
+        cols[0].markdown(
+            kpi("Transito IceRoute", "non riscalabile", t.reason[:150]), unsafe_allow_html=True
+        )
     else:
         cols[0].markdown(
-            kpi("Transito IceRoute", f"{t.hours:.1f} h",
-                f"a {speed:.1f} kn · {ours['distance_km']:.0f} km"), unsafe_allow_html=True)
+            kpi(
+                "Transito IceRoute",
+                f"{t.hours:.1f} h",
+                f"a {speed:.1f} kn · {ours['distance_km']:.0f} km",
+            ),
+            unsafe_allow_html=True,
+        )
 
     if base.get("blocked_by_ice"):
         cols[1].markdown(
-            kpi("Rotta diretta", "vietata",
-                f'{base["n_no_go_cells"]} celle oltre il limite POLARIS per una nave '
-                f'{ice_class}. <b>Nessun tempo di riferimento</b>: non esiste un viaggio '
-                f'più lento da cui risparmiare.'), unsafe_allow_html=True)
+            kpi(
+                "Rotta diretta",
+                "vietata",
+                f"{base['n_no_go_cells']} celle oltre il limite POLARIS per una nave "
+                f"{ice_class}. <b>Nessun tempo di riferimento</b>: non esiste un viaggio "
+                f"più lento da cui risparmiare.",
+            ),
+            unsafe_allow_html=True,
+        )
     elif base.get("feasible"):
-        bt = rescale_transit(base.get("time_hours"), ours.get("min_rio"),
-                             nominal_kn=nominal, chosen_kn=speed, ice_class=ice_class)
+        bt = rescale_transit(
+            base.get("time_hours"),
+            ours.get("min_rio"),
+            nominal_kn=nominal,
+            chosen_kn=speed,
+            ice_class=ice_class,
+        )
         delta = (bt.hours - t.hours) if (bt.hours and t.hours) else None
         cols[1].markdown(
-            kpi("Rotta diretta", f"{fmt(bt.hours)} h",
+            kpi(
+                "Rotta diretta",
+                f"{fmt(bt.hours)} h",
                 "percorribile: IceRoute la segue"
-                + (f", {delta:+.1f} h" if delta is not None else "")),
-            unsafe_allow_html=True)
+                + (f", {delta:+.1f} h" if delta is not None else ""),
+            ),
+            unsafe_allow_html=True,
+        )
     else:
-        cols[1].markdown(kpi("Rotta diretta", "fuori copertura",
-                             "non è il ghiaccio a fermarla"), unsafe_allow_html=True)
+        cols[1].markdown(
+            kpi("Rotta diretta", "fuori copertura", "non è il ghiaccio a fermarla"),
+            unsafe_allow_html=True,
+        )
 
     f = fuel_tonnes(t.hours, burn)
     cols[2].markdown(
-        kpi("Carburante", "non impostato" if f is None else f"{f:.1f} t",
+        kpi(
+            "Carburante",
+            "non impostato" if f is None else f"{f:.1f} t",
             "serve un consumo, e non ne abbiamo uno con una fonte (P-09)"
-            if f is None else
-            f'<span class="tag warn">assunzione tua</span> {burn:.0f} t/giorno × '
-            f'{t.hours / 24:.2f} giorni'), unsafe_allow_html=True)
+            if f is None
+            else f'<span class="tag warn">assunzione tua</span> {burn:.0f} t/giorno × '
+            f"{t.hours / 24:.2f} giorni",
+        ),
+        unsafe_allow_html=True,
+    )
 
     from iceroute.demo.estimate import ELEVATED_CAP_KN
 
@@ -679,8 +796,11 @@ def assumptions_panel(entry: dict, ice_class: str, index: dict) -> None:
         "Il riscalamento è **esatto**, non approssimato, e solo quando la rotta resta "
         "tutta in operazione normale (RIO ≥ 0): lì ogni tratto va a velocità piena e il "
         "tempo è proporzionale a 1/v. Se la rotta entra in rischio elevato, POLARIS fissa "
-        + (f"un limite di {cap:.0f} kn (Tabella 1.2) che questo cursore non muove"
-           if cap else "che per questa classe la fascia è già impraticabile")
+        + (
+            f"un limite di {cap:.0f} kn (Tabella 1.2) che questo cursore non muove"
+            if cap
+            else "che per questa classe la fascia è già impraticabile"
+        )
         + ", e il numero non viene mostrato invece di essere inventato."
     )
 
@@ -715,8 +835,10 @@ def live_panel(scene: dict, ice_class: str) -> None:
         "buono e la demo continua."
     )
     if not raw.exists():
-        st.info(f"Scena grezza non presente in `{raw.parent}`: il calcolo dal vivo "
-                f"richiede il NetCDF originale.")
+        st.info(
+            f"Scena grezza non presente in `{raw.parent}`: il calcolo dal vivo "
+            f"richiede il NetCDF originale."
+        )
         return
 
     if not st.button("Calcola ora dalla scena grezza", type="primary"):
@@ -725,17 +847,23 @@ def live_panel(scene: dict, ice_class: str) -> None:
     slot, out = st.empty(), Path(tempfile.mkdtemp(prefix="iceroute_live_"))
     with st.spinner("…"):
         model, device = _model(picked)
-        run = live.compute(raw, model=model, device=device, out_dir=out,
-                           train_config=Path(picked),
-                           on_stage=lambda st_: slot.markdown(_stages_md(st_)))
+        run = live.compute(
+            raw,
+            model=model,
+            device=device,
+            out_dir=out,
+            train_config=Path(picked),
+            on_stage=lambda st_: slot.markdown(_stages_md(st_)),
+        )
     slot.markdown(_stages_md(run.stages))
 
     if not run.ok:
         st.error(f"Calcolo dal vivo non riuscito: {run.error}")
         return
 
-    st.success(f"**{run.total_seconds:.1f} s** su {run.device.upper()}, "
-               f"dalla scena grezza al waypoint.")
+    st.success(
+        f"**{run.total_seconds:.1f} s** su {run.device.upper()}, dalla scena grezza al waypoint."
+    )
 
     stem = scene["scene_id"].replace(".nc", "")
     verdict = live.agreement(
@@ -743,15 +871,17 @@ def live_panel(scene: dict, ice_class: str) -> None:
         ov.load(DEMO_DIR / "overlays" / f"{stem}__{ice_class}.json"),
     )
     (st.success if verdict.get("identical") else st.warning)(
-        f"Confronto col precomputato: {verdict['note']}")
+        f"Confronto col precomputato: {verdict['note']}"
+    )
 
     png = out / "images" / f"{stem}_maskgeo.png"
     live_ov = out / "overlays" / f"{stem}__{ice_class}.json"
     if png.exists() and live_ov.exists():
         img, problem = composite(str(png), str(live_ov), "both")
         if img:
-            st.image(img, caption="Calcolata adesso, non caricata da disco.",
-                     use_container_width=True)
+            st.image(
+                img, caption="Calcolata adesso, non caricata da disco.", use_container_width=True
+            )
         else:
             st.warning(problem)
 
@@ -811,14 +941,16 @@ def run_live_inference() -> None:
         n_ch = int(cfg["model"]["in_channels"])
         x = np.random.default_rng(0).standard_normal((1, n_ch, 256, 256)).astype("float32")
 
-        sess.run(None, {name: x})          # warm-up, excluded from the timing
+        sess.run(None, {name: x})  # warm-up, excluded from the timing
         t0 = time.perf_counter()
         sess.run(None, {name: x})
         ms = (time.perf_counter() - t0) * 1000
 
-        st.success(f"Una tile 256×256 in **{ms:.0f} ms** · modello "
-                   f"{path.stat().st_size / 1024**2:.2f} MB, INT8, 1 thread CPU "
-                   f"({name_cfg})")
+        st.success(
+            f"Una tile 256×256 in **{ms:.0f} ms** · modello "
+            f"{path.stat().st_size / 1024**2:.2f} MB, INT8, 1 thread CPU "
+            f"({name_cfg})"
+        )
     except Exception as exc:  # noqa: BLE001 — must never break the demo
         st.warning(f"Inferenza dal vivo non riuscita: {exc}")
 
@@ -847,9 +979,7 @@ def render_footer(metrics: dict, index: dict, assumptions: dict) -> None:
         )
         econ = assumptions.get("economics", {})
         if not econ.get("show_dollar_savings", False):
-            st.info(
-                "**Nessun risparmio in dollari.** " + econ.get("reason", "").strip()
-            )
+            st.info("**Nessun risparmio in dollari.** " + econ.get("reason", "").strip())
         if ASSUMPTIONS.exists():
             st.code(ASSUMPTIONS.read_text(), language="yaml")
 

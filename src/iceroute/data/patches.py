@@ -62,7 +62,9 @@ class PatchStats:
         return d
 
 
-def is_margin_patch(labels: np.ndarray, valid: np.ndarray, *, min_classes: int, min_fraction: float) -> bool:
+def is_margin_patch(
+    labels: np.ndarray, valid: np.ndarray, *, min_classes: int, min_fraction: float
+) -> bool:
     """True if the patch straddles an ice boundary.
 
     Criterion: at least ``min_classes`` distinct SOD classes present, each
@@ -148,7 +150,10 @@ def scan_scene(path: Path, cfg: dict) -> SceneScan:
             continue
         ywin = sod[r : r + size, c : c + size]
         if is_margin_patch(
-            ywin, vwin, min_classes=int(crit["min_classes"]), min_fraction=float(crit["min_class_fraction"])
+            ywin,
+            vwin,
+            min_classes=int(crit["min_classes"]),
+            min_fraction=float(crit["min_class_fraction"]),
         ):
             margin.append((r, c))
         else:
@@ -382,9 +387,7 @@ class PatchDataset:
         if missing:
             log.warning("%d scene senza cache: %s", len(missing), ", ".join(missing[:5]))
 
-        self.is_margin = (
-            np.concatenate(margin) if margin else np.zeros(0, dtype="bool")
-        )
+        self.is_margin = np.concatenate(margin) if margin else np.zeros(0, dtype="bool")
         if not self._index:
             raise RuntimeError(
                 f"Nessuna patch in {self.cache_dir} per le {len(scene_ids)} scene richieste. "
@@ -468,7 +471,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=None, help="processa solo le prime N scene")
     args = ap.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s %(message)s", datefmt="%H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s  %(levelname)-7s %(message)s", datefmt="%H:%M:%S"
+    )
 
     cfg = load_config(args.config)
     import yaml
@@ -483,7 +488,9 @@ def main(argv: list[str] | None = None) -> int:
     present = [s for s in wanted if (args.raw_dir / s).exists()]
     absent = len(wanted) - len(present)
     if absent:
-        log.warning("%d scene non ancora scaricate: le salto (rilancia dopo 'make download')", absent)
+        log.warning(
+            "%d scene non ancora scaricate: le salto (rilancia dopo 'make download')", absent
+        )
     if not present:
         log.error("Nessuna scena disponibile in %s. Lancia prima 'make download'.", args.raw_dir)
         return 1
@@ -574,9 +581,9 @@ def main(argv: list[str] | None = None) -> int:
         "patch_size": cfg["patches"]["size"],
         "channels": CHANNELS,
         "class_pixel_counts": {str(k): v for k, v in sorted(total_counts.items())},
-        "class_frequency": {
-            str(k): v / grand for k, v in sorted(total_counts.items())
-        } if grand else {},
+        "class_frequency": {str(k): v / grand for k, v in sorted(total_counts.items())}
+        if grand
+        else {},
         "class_names": {str(k): v for k, v in names.items()},
         "per_scene": [s.as_dict() for s in all_stats],
     }

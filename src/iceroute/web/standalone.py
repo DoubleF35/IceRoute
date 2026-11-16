@@ -53,7 +53,7 @@ log = logging.getLogger("standalone")
 # The dial positions, resolved in Python. Matches the live UI's slider range.
 SPEEDS = [round(8.0 + 0.5 * i, 1) for i in range(25)]
 
-MAX_PX = 900          # longest edge of an embedded raster
+MAX_PX = 900  # longest edge of an embedded raster
 JPEG_QUALITY = 78
 
 LAYERS = [
@@ -63,8 +63,12 @@ LAYERS = [
     ("sar", "SAR", False),
     ("mask_truth", "Carta di riferimento", False),
 ]
-MODES = [("both", "Entrambe"), ("baseline", "Rotta diretta"),
-         ("iceroute", "IceRoute"), ("none", "Nessuna")]
+MODES = [
+    ("both", "Entrambe"),
+    ("baseline", "Rotta diretta"),
+    ("iceroute", "IceRoute"),
+    ("none", "Nessuna"),
+]
 
 
 def data_uri(path: Path, *, photographic: bool, max_px: int = MAX_PX) -> str:
@@ -112,8 +116,10 @@ def svg_overlay(data: dict) -> str:
     def pts(cells) -> str:
         return " ".join(f"{c + 0.5},{r + 0.5}" for r, c in cells)
 
-    parts = [f'<svg viewBox="0 0 {cols} {rows}" preserveAspectRatio="none" class="ov">',
-             '<g class="lay-baseline">']
+    parts = [
+        f'<svg viewBox="0 0 {cols} {rows}" preserveAspectRatio="none" class="ov">',
+        '<g class="lay-baseline">',
+    ]
     if base.get("path"):
         parts.append(f'<polyline points="{pts(base["path"])}" class="cas"/>')
         parts.append(f'<polyline points="{pts(base["path"])}" class="base"/>')
@@ -150,13 +156,22 @@ def transit_table(entry: dict, ice_class: str, nominal: float) -> dict:
     base = (entry.get("comparison") or {}).get("baseline") or {}
     values, baseline, note = [], [], ""
     for v in SPEEDS:
-        t = rescale_transit(ours.get("time_hours"), ours.get("min_rio"),
-                            nominal_kn=nominal, chosen_kn=v, ice_class=ice_class)
+        t = rescale_transit(
+            ours.get("time_hours"),
+            ours.get("min_rio"),
+            nominal_kn=nominal,
+            chosen_kn=v,
+            ice_class=ice_class,
+        )
         values.append(None if t.hours is None else round(t.hours, 2))
         note = note or t.reason
-        b = rescale_transit(base.get("time_hours") if base.get("feasible") else None,
-                            ours.get("min_rio"), nominal_kn=nominal,
-                            chosen_kn=v, ice_class=ice_class)
+        b = rescale_transit(
+            base.get("time_hours") if base.get("feasible") else None,
+            ours.get("min_rio"),
+            nominal_kn=nominal,
+            chosen_kn=v,
+            ice_class=ice_class,
+        )
         baseline.append(None if b.hours is None else round(b.hours, 2))
     return {"values": values, "baseline": baseline, "note": note}
 
@@ -186,8 +201,11 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict | None = None) -> d
             if rio_name and rp.is_file() and rio_name not in images:
                 images[rio_name] = data_uri(rp, photographic=False)
 
-            pay = payload(e, demo_dir / "routes", metrics, s["scene_id"]) if e.get(
-                "route_exists") else None
+            pay = (
+                payload(e, demo_dir / "routes", metrics, s["scene_id"])
+                if e.get("route_exists")
+                else None
+            )
             classes[ic] = {
                 "route_exists": bool(e.get("route_exists")),
                 "message": (e.get("message") or "")[:220],
@@ -198,28 +216,47 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict | None = None) -> d
                 "polaris": e.get("polaris") or {},
                 "conditions": e.get("conditions") or {},
                 "transit": transit_table(e, ic, nominal) if e.get("route_exists") else [],
-                "payload": None if pay is None else {
-                    "route": pay.route_bytes, "mask": pay.mask_bytes,
-                    "meta": pay.metadata_bytes, "sar": pay.sar_bytes,
-                    "total": pay.total_bytes, "ratio": pay.ratio,
-                    "n_waypoints": pay.n_waypoints, "text": pay.route_text,
+                "payload": None
+                if pay is None
+                else {
+                    "route": pay.route_bytes,
+                    "mask": pay.mask_bytes,
+                    "meta": pay.metadata_bytes,
+                    "sar": pay.sar_bytes,
+                    "total": pay.total_bytes,
+                    "ratio": pay.ratio,
+                    "n_waypoints": pay.n_waypoints,
+                    "text": pay.route_text,
                     "note": pay.note,
                     # Computed here, not in the browser: same rule as the transit
                     # table. If assumptions.yaml has no link rate, this is null and
                     # the page shows nothing rather than a plausible number.
-                    "link": (lambda lt: None if lt.seconds is None else {
-                        "s": round(lt.seconds), "terminal": lt.terminal,
-                        "kbps": lt.kbps, "sbd": lt.sbd_messages,
-                    })(link_time(pay.total_bytes, pay.route_bytes, assumptions or {})),
+                    "link": (
+                        lambda lt: (
+                            None
+                            if lt.seconds is None
+                            else {
+                                "s": round(lt.seconds),
+                                "terminal": lt.terminal,
+                                "kbps": lt.kbps,
+                                "sbd": lt.sbd_messages,
+                            }
+                        )
+                    )(link_time(pay.total_bytes, pay.route_bytes, assumptions or {})),
                 },
             }
 
-        out_scenes.append({
-            "id": s["scene_id"], "region": s.get("region", ""),
-            "acquired": (s.get("acquired") or "")[:10],
-            "coverage": s.get("coverage"), "worst_case": bool(s.get("worst_case")),
-            "files": files, "classes": classes,
-        })
+        out_scenes.append(
+            {
+                "id": s["scene_id"],
+                "region": s.get("region", ""),
+                "acquired": (s.get("acquired") or "")[:10],
+                "coverage": s.get("coverage"),
+                "worst_case": bool(s.get("worst_case")),
+                "files": files,
+                "classes": classes,
+            }
+        )
 
     ev = (metrics.get("evaluation") or {}).get("scenes") or {}
     return {
@@ -695,37 +732,55 @@ def dec(v: float | None, places: int = 3) -> str | None:
 def build_page(ctx: dict) -> str:
     agg = ctx["aggregate"]
     pal = palette()
-    foot = " · ".join(x for x in [
-        f"schema: {ctx['scheme']}" if ctx["scheme"] else "",
-        f"mIoU {dec(agg.get('miou'))}" if isinstance(agg.get("miou"), float) else "",
-        f"ghiaccio/acqua {dec(agg.get('binary_accuracy'))}"
-        if isinstance(agg.get("binary_accuracy"), float) else "",
-        f"{ctx['n_eval_scenes']} scene di test ufficiali" if ctx.get("n_eval_scenes") else "",
-    ] if x)
+    foot = " · ".join(
+        x
+        for x in [
+            f"schema: {ctx['scheme']}" if ctx["scheme"] else "",
+            f"mIoU {dec(agg.get('miou'))}" if isinstance(agg.get("miou"), float) else "",
+            f"ghiaccio/acqua {dec(agg.get('binary_accuracy'))}"
+            if isinstance(agg.get("binary_accuracy"), float)
+            else "",
+            f"{ctx['n_eval_scenes']} scene di test ufficiali" if ctx.get("n_eval_scenes") else "",
+        ]
+        if x
+    )
 
     data = dict(ctx)
     data["layers"] = LAYERS
     data["modes"] = MODES
     data["palette"] = pal
-    data["sic_legend"] = [["0/10 — acqua libera", pal["sic"]["0"]], ["3/10", pal["sic"]["3"]],
-                          ["6/10", pal["sic"]["6"]], ["10/10 — copertura totale",
-                                                      pal["sic"]["10"]]]
+    data["sic_legend"] = [
+        ["0/10 — acqua libera", pal["sic"]["0"]],
+        ["3/10", pal["sic"]["3"]],
+        ["6/10", pal["sic"]["6"]],
+        ["10/10 — copertura totale", pal["sic"]["10"]],
+    ]
 
     # The command bar carries provenance, not measurements: which checkpoint, which
     # scheme, how many held-out scenes. The numbers live in the strip below, where
     # they can be compared; up here is the answer to "what am I looking at".
     def cell(k: str, v: str | None) -> str:
-        return (f'<div><span class="k">{html.escape(k)}</span>'
-                f'<span class="v">{html.escape(v)}</span></div>') if v else ""
+        return (
+            (
+                f'<div><span class="k">{html.escape(k)}</span>'
+                f'<span class="v">{html.escape(v)}</span></div>'
+            )
+            if v
+            else ""
+        )
 
     ckpt = Path(str(ctx.get("checkpoint") or "")).name
-    meta = (cell("modello", ckpt or None)
-            + cell("schema", ctx.get("scheme") or None)
-            + cell("test", f"{ctx['n_eval_scenes']} scene" if ctx.get("n_eval_scenes") else None)
-            + cell("miou", dec(agg.get("miou")) if isinstance(agg.get("miou"), float) else None))
+    meta = (
+        cell("modello", ckpt or None)
+        + cell("schema", ctx.get("scheme") or None)
+        + cell("test", f"{ctx['n_eval_scenes']} scene" if ctx.get("n_eval_scenes") else None)
+        + cell("miou", dec(agg.get("miou")) if isinstance(agg.get("miou"), float) else None)
+    )
 
-    root = (f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};--c-nogo:{pal['nogo']};"
-            f"--ours:{pal['ours']}}}")
+    root = (
+        f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};--c-nogo:{pal['nogo']};"
+        f"--ours:{pal['ours']}}}"
+    )
 
     return f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
 <title>IceRoute — demo</title><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -809,7 +864,7 @@ def build_page(ctx: dict) -> str:
    Pagina autonoma generata da <code>make demo-static</code>: nessuna risorsa esterna, nessun
    server, funziona con la rete staccata. Ogni numero viene da
    <code>data/demo/index.json</code> e <code>artifacts/metrics.json</code>, gli stessi file
-   che legge la demo vera.<br>Modello: <code>{html.escape(str(ctx.get('checkpoint') or '—'))}</code>
+   che legge la demo vera.<br>Modello: <code>{html.escape(str(ctx.get("checkpoint") or "—"))}</code>
   </footer>
 </main></div>
 
@@ -824,6 +879,7 @@ def build_page(ctx: dict) -> str:
 <script>const D = {json.dumps(data, ensure_ascii=False)};</script>
 <script>{JS}</script>
 </body></html>"""
+
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Congela la demo in un solo file HTML. SPEC §10.4.")
@@ -843,8 +899,13 @@ def main(argv: list[str] | None = None) -> int:
     ctx = collect(args.demo_dir, metrics, assumptions)
     args.out.write_text(build_page(ctx), encoding="utf-8")
     mb = args.out.stat().st_size / 1e6
-    log.info("%s — %.1f MB, %d scene, %d immagini incorporate",
-             args.out, mb, len(ctx["scenes"]), len(ctx["images"]))
+    log.info(
+        "%s — %.1f MB, %d scene, %d immagini incorporate",
+        args.out,
+        mb,
+        len(ctx["scenes"]),
+        len(ctx["images"]),
+    )
     log.info("Apribile con doppio clic. Nessun server, nessuna rete, nessun Python.")
     return 0
 

@@ -141,9 +141,7 @@ def geodesic_baseline(
         raise ValueError("La rotta geodetica non interseca la griglia.")
 
     blocked = [(r, c) for r, c in cells if not cost.passable[r, c]]
-    on_land = (
-        bool(any(land_mask[r, c] for r, c in cells)) if land_mask is not None else False
-    )
+    on_land = bool(any(land_mask[r, c] for r, c in cells)) if land_mask is not None else False
 
     # Split "blocked" into its two causes. Without coverage information we
     # cannot tell them apart, so everything counts as ice — the conservative
@@ -158,9 +156,7 @@ def geodesic_baseline(
     n_no_data, n_no_go = len(no_data_cells), len(no_go_cells)
 
     n_slow = sum(
-        1
-        for r, c in cells
-        if cost.passable[r, c] and cost.speed_kn[r, c] < open_water_speed_kn
+        1 for r, c in cells if cost.passable[r, c] and cost.speed_kn[r, c] < open_water_speed_kn
     )
 
     time_hours = (total_m / (open_water_speed_kn * KNOT_TO_MS)) / 3600.0

@@ -69,9 +69,7 @@ def test_fitted_threshold_is_actually_optimal():
     thr, acc = fit_hv_threshold(hv, sod)
 
     is_ice = sod != WATER_CLASS
-    brute = max(
-        float(((hv > t) == is_ice).mean()) for t in np.unique(hv)
-    )
+    brute = max(float(((hv > t) == is_ice).mean()) for t in np.unique(hv))
     assert acc == pytest.approx(brute, abs=1e-3)
 
 
@@ -115,9 +113,7 @@ def test_scored_baseline_is_strong_on_binary_and_weak_on_six_classes():
     rng = np.random.default_rng(1)
     n = 6000
     hv = np.concatenate([rng.normal(0, 0.7, n), rng.normal(5, 0.7, 4 * n)]).astype("float32")
-    sod = np.concatenate(
-        [np.zeros(n), np.repeat([1, 2, 4, 5], n)]
-    ).astype("int64")
+    sod = np.concatenate([np.zeros(n), np.repeat([1, 2, 4, 5], n)]).astype("int64")
 
     thr, _ = fit_hv_threshold(hv, sod)
     res = score_hv_threshold(hv, sod, thr, n_classes=N_CLASSES, fitted_on="test")
@@ -147,7 +143,10 @@ def test_verdict_is_honest_when_the_threshold_wins_on_binary():
 
     strong = score_hv_threshold(
         np.array([-1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype="float32"),
-        truth, 0.0, n_classes=N_CLASSES, fitted_on="test",
+        truth,
+        0.0,
+        n_classes=N_CLASSES,
+        fitted_on="test",
     )
     out = threshold_verdict(cm, strong)
     assert set(out) >= {"delta_binary_accuracy", "delta_miou", "verdict"}
@@ -215,8 +214,9 @@ def test_missing_reference_file_raises_a_useful_error(tmp_path):
     scene = tmp_path / "s_prep.nc"
     scene.touch()
     with pytest.raises((FileNotFoundError, OSError)) as exc:
-        load_scene(scene, load_config("configs/data.yaml"),
-                   labels_from=tmp_path / "s_prep_reference.nc")
+        load_scene(
+            scene, load_config("configs/data.yaml"), labels_from=tmp_path / "s_prep_reference.nc"
+        )
     assert exc.value is not None
 
 
@@ -283,8 +283,11 @@ def _tiny_model(seed: int = 0):
     to put the decision boundaries.
     """
     torch.manual_seed(seed)
-    return UNet(UNetConfig(in_channels=2, n_classes=3, encoder_channels=[8, 16],
-                           bottleneck_channels=16, groups=4))
+    return UNet(
+        UNetConfig(
+            in_channels=2, n_classes=3, encoder_channels=[8, 16], bottleneck_channels=16, groups=4
+        )
+    )
 
 
 def test_onnx_export_is_faithful(tmp_path):
@@ -301,7 +304,7 @@ def test_parity_check_is_not_fooled_by_a_different_model(tmp_path):
     exported = _tiny_model(seed=0)
     path = export_onnx(exported, tmp_path / "m.onnx", in_channels=2, tile_size=64)
 
-    other = _tiny_model(seed=1)    # same shape, different weights
+    other = _tiny_model(seed=1)  # same shape, different weights
     report = check_parity(other, path, in_channels=2, tile_size=64, n_samples=2)
     assert not report.passed
     assert "NON fedele" in report.note

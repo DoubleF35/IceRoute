@@ -41,8 +41,14 @@ NEIGHBOURS_8 = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1
 # 16-connected adds the eight (1,2)-type steps, which allow headings at
 # multiples of ~26.6 degrees and cut the digitisation error from ~8% to ~2%.
 NEIGHBOURS_16 = NEIGHBOURS_8 + [
-    (-1, -2), (-1, 2), (1, -2), (1, 2),
-    (-2, -1), (-2, 1), (2, -1), (2, 1),
+    (-1, -2),
+    (-1, 2),
+    (1, -2),
+    (1, 2),
+    (-2, -1),
+    (-2, 1),
+    (2, -1),
+    (2, 1),
 ]
 
 
@@ -165,8 +171,7 @@ def find_route(
 
     offsets = NEIGHBOURS_16 if connectivity == 16 else NEIGHBOURS_8
     steps = [
-        (dr, dc, float(np.hypot(dr, dc)) * res, _intermediate_cells(dr, dc))
-        for dr, dc in offsets
+        (dr, dc, float(np.hypot(dr, dc)) * res, _intermediate_cells(dr, dc)) for dr, dc in offsets
     ]
 
     # Admissible: nothing moves faster than open water, so this never
@@ -265,13 +270,15 @@ def find_route(
         vals = [rio[r, c] for r, c in cells if np.isfinite(rio[r, c])]
         min_rio = float(min(vals)) if vals else None
 
-    mean_speed = (
-        distance_m / (time_hours * 3600.0) / KNOT_TO_MS if time_hours > 0 else None
-    )
+    mean_speed = distance_m / (time_hours * 3600.0) / KNOT_TO_MS if time_hours > 0 else None
 
     log.info(
         "rotta %s: %.1f h, %.0f km, %d celle, %d nodi espansi",
-        cost.ice_class, time_hours, distance_m / 1000, len(cells), expanded,
+        cost.ice_class,
+        time_hours,
+        distance_m / 1000,
+        len(cells),
+        expanded,
     )
 
     return Route(

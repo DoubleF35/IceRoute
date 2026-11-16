@@ -262,14 +262,13 @@ def straighten(
                 if leg is None:
                     continue
                 _, t_leg, worst, unknown, _ = leg
-                sub = _straight_chain(anchors[i:j + 1], spm, rio, inv_scale, res)
+                sub = _straight_chain(anchors[i : j + 1], spm, rio, inv_scale, res)
                 if sub is None:
                     continue
                 _, t_sub, worst_sub, unknown_sub = sub
                 # Never buy speed with risk: not with a lower RIO, and not by
                 # crossing ice nobody classified that the old stretch avoided.
-                if rio is not None and (worst < worst_sub
-                                        or (unknown and not unknown_sub)):
+                if rio is not None and (worst < worst_sub or (unknown and not unknown_sub)):
                     continue
                 if t_leg >= t_sub * (1.0 - REL_GAIN):
                     continue
@@ -290,15 +289,25 @@ def straighten(
     if not touched:
         # Nothing qualified. Returning the input untouched is exact; recomputing
         # it through a different summation would report a saved nanosecond.
-        return Straightened(route=route, n_legs=max(1, len(nodes) - 1),
-                            n_cells_before=n_before, seconds_saved=0.0,
-                            metres_saved=0.0, anchors=list(nodes))
+        return Straightened(
+            route=route,
+            n_legs=max(1, len(nodes) - 1),
+            n_cells_before=n_before,
+            seconds_saved=0.0,
+            metres_saved=0.0,
+            anchors=list(nodes),
+        )
 
     chain = _straight_chain(anchors, spm, rio, inv_scale, res)
-    if chain is None:                      # non dovrebbe accadere: ogni tratta e' stata verificata
+    if chain is None:  # non dovrebbe accadere: ogni tratta e' stata verificata
         log.warning("raddrizzamento %s: catena non percorribile, tengo A*", route.ice_class)
-        return Straightened(route=route, n_legs=len(route.cells),
-                            n_cells_before=n_before, seconds_saved=0.0, metres_saved=0.0)
+        return Straightened(
+            route=route,
+            n_legs=len(route.cells),
+            n_cells_before=n_before,
+            seconds_saved=0.0,
+            metres_saved=0.0,
+        )
     d_after, t_after, worst_after, _ = chain
 
     # Drawn geometry: the cells each straight leg crosses, so the overlay shows
@@ -324,7 +333,11 @@ def straighten(
     saved_s, saved_m = t_before - t_after, d_before - d_after
     log.info(
         "raddrizzamento %s: %d celle -> %d tratte, %.2f km e %.1f min in meno (%.2f%% tempo)",
-        route.ice_class, n_before, len(anchors) - 1, saved_m / 1000, saved_s / 60,
+        route.ice_class,
+        n_before,
+        len(anchors) - 1,
+        saved_m / 1000,
+        saved_s / 60,
         100 * saved_s / t_before if t_before else 0.0,
     )
     return Straightened(

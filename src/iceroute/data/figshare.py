@@ -82,9 +82,7 @@ def _get_json(url: str, *, params: dict | None = None) -> object:
     last_exc: Exception | None = None
     for attempt in range(MAX_RETRIES):
         try:
-            resp = requests.get(
-                url, params=params, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)
-            )
+            resp = requests.get(url, params=params, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT))
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:  # noqa: BLE001 — retry on anything transient

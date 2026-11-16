@@ -50,8 +50,15 @@ from pathlib import Path
 
 # Table 1.2 of IMO MSC.1/Circ.1519: the speed cap in the elevated risk band.
 # Below PC7 that band is already no-go, so there is no cap to apply.
-ELEVATED_CAP_KN = {"PC1": 11.0, "PC2": 8.0, "PC3": 5.0, "PC4": 5.0,
-                   "PC5": 5.0, "PC6": 3.0, "PC7": 3.0}
+ELEVATED_CAP_KN = {
+    "PC1": 11.0,
+    "PC2": 8.0,
+    "PC3": 5.0,
+    "PC4": 5.0,
+    "PC5": 5.0,
+    "PC6": 3.0,
+    "PC7": 3.0,
+}
 
 HOURS_PER_DAY = 24.0
 
@@ -115,8 +122,10 @@ def payload(entry: dict, routes_dir: Path, metrics: dict, scene_id: str) -> Payl
     per = (metrics.get("compression") or {}).get("per_scene") or []
     row = next((r for r in per if r.get("scene_id") == scene_id), None)
     if not row:
-        out.note = ("Maschera e SAR non misurati per questa scena: "
-                    "`make report` copre solo le prime scene dell'indice.")
+        out.note = (
+            "Maschera e SAR non misurati per questa scena: "
+            "`make report` copre solo le prime scene dell'indice."
+        )
         return out
 
     den, num = row.get("denominator") or {}, row.get("numerator") or {}
@@ -145,8 +154,7 @@ class LinkTime:
     reason: str = ""
 
 
-def link_time(payload_bytes: int | None, route_bytes: int | None,
-              assumptions: dict) -> LinkTime:
+def link_time(payload_bytes: int | None, route_bytes: int | None, assumptions: dict) -> LinkTime:
     """Seconds on the *smallest* terminal a ship is likely to carry.
 
     This exists because of A-10. Stating that the downlink is 148 KB invites
@@ -163,8 +171,11 @@ def link_time(payload_bytes: int | None, route_bytes: int | None,
     seconds would be quoting the best case at someone who may not have it.
     """
     link = (assumptions or {}).get("link") or {}
-    rates = [(v, k) for k, v in link.items()
-             if k.endswith("_kbps") and isinstance(v, int | float) and v > 0]
+    rates = [
+        (v, k)
+        for k, v in link.items()
+        if k.endswith("_kbps") and isinstance(v, int | float) and v > 0
+    ]
     if not rates or not payload_bytes:
         return LinkTime(reason="Velocità del collegamento non in configs/assumptions.yaml.")
 
@@ -173,9 +184,12 @@ def link_time(payload_bytes: int | None, route_bytes: int | None,
     per_msg = link.get("iridium_sbd_message_bytes")
     if route_bytes and isinstance(per_msg, int) and per_msg > 0:
         msgs = -(-route_bytes // per_msg)
-    return LinkTime(seconds=payload_bytes * 8 / (kbps * 1000),
-                    terminal=key[:-5].replace("_", " ").title(),
-                    kbps=int(kbps), sbd_messages=msgs)
+    return LinkTime(
+        seconds=payload_bytes * 8 / (kbps * 1000),
+        terminal=key[:-5].replace("_", " ").title(),
+        kbps=int(kbps),
+        sbd_messages=msgs,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -209,16 +223,24 @@ def rescale_transit(
     if hours is None or chosen_kn <= 0 or nominal_kn <= 0:
         return Transit(reason="Nessun tempo di transito da riscalare.")
     if min_rio is None:
-        return Transit(reason="RIO minimo sulla rotta non noto: non si può "
-                              "sapere se la rotta resta in operazione normale.")
+        return Transit(
+            reason="RIO minimo sulla rotta non noto: non si può "
+            "sapere se la rotta resta in operazione normale."
+        )
     if min_rio < 0:
         cap = ELEVATED_CAP_KN.get(ice_class)
-        detail = (f"limitata a {cap:.0f} kn dalla Tabella 1.2 IMO"
-                  if cap else "già oltre il limite per questa classe")
-        return Transit(reason=(
-            f"La rotta entra in rischio elevato (RIO minimo {min_rio:+.0f}), dove la "
-            f"velocità è {detail} e non dipende da questo cursore. Riscalare il totale "
-            f"inventerebbe del tempo: il numero non viene mostrato."))
+        detail = (
+            f"limitata a {cap:.0f} kn dalla Tabella 1.2 IMO"
+            if cap
+            else "già oltre il limite per questa classe"
+        )
+        return Transit(
+            reason=(
+                f"La rotta entra in rischio elevato (RIO minimo {min_rio:+.0f}), dove la "
+                f"velocità è {detail} e non dipende da questo cursore. Riscalare il totale "
+                f"inventerebbe del tempo: il numero non viene mostrato."
+            )
+        )
     return Transit(hours=hours * nominal_kn / chosen_kn, exact=True)
 
 

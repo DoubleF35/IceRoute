@@ -47,11 +47,11 @@ class SceneMeta:
 
     scene_id: str
     acquired: datetime | None
-    ice_service: str          # 'dmi' or 'cis'
-    region: str               # e.g. 'dmi:North', 'cis:SGRDIEA', or 'unknown'
+    ice_service: str  # 'dmi' or 'cis'
+    region: str  # e.g. 'dmi:North', 'cis:SGRDIEA', or 'unknown'
     pixel_spacing_m: float
     original_id: str
-    flip: int                 # global attribute; see geocode.py
+    flip: int  # global attribute; see geocode.py
     shape: tuple[int, int]
 
     @property
@@ -68,15 +68,15 @@ class Scene:
     truth for which pixels may be used: never index the SAR without it.
     """
 
-    hh: np.ndarray            # float32, standard-scaled  (nersc_sar_primary)
-    hv: np.ndarray            # float32, standard-scaled  (nersc_sar_secondary)
-    incidence_angle: np.ndarray   # float32, standard-scaled — NOT degrees
+    hh: np.ndarray  # float32, standard-scaled  (nersc_sar_primary)
+    hv: np.ndarray  # float32, standard-scaled  (nersc_sar_secondary)
+    incidence_angle: np.ndarray  # float32, standard-scaled — NOT degrees
     distance_to_land: np.ndarray  # float32, standard-scaled
-    sod: np.ndarray           # uint8, classes 0-5, FILL_VALUE where invalid
-    sic: np.ndarray           # uint8, tenths 0-10, FILL_VALUE where invalid
-    mask_valid: np.ndarray    # bool — True where the ice chart annotates
-    lat_grid: np.ndarray      # float64, low-resolution (21x21)
-    lon_grid: np.ndarray      # float64, low-resolution (21x21)
+    sod: np.ndarray  # uint8, classes 0-5, FILL_VALUE where invalid
+    sic: np.ndarray  # uint8, tenths 0-10, FILL_VALUE where invalid
+    mask_valid: np.ndarray  # bool — True where the ice chart annotates
+    lat_grid: np.ndarray  # float64, low-resolution (21x21)
+    lon_grid: np.ndarray  # float64, low-resolution (21x21)
     meta: SceneMeta
     extras: dict[str, np.ndarray] = field(default_factory=dict)
 
@@ -103,7 +103,9 @@ class Scene:
 
     def summary(self) -> str:
         counts = class_counts(self.sod, self.mask_valid)
-        dist = " ".join(f"{k}:{100 * v / max(sum(counts.values()), 1):.0f}%" for k, v in sorted(counts.items()))
+        dist = " ".join(
+            f"{k}:{100 * v / max(sum(counts.values()), 1):.0f}%" for k, v in sorted(counts.items())
+        )
         return (
             f"{self.meta.scene_id}  {self.shape[0]}x{self.shape[1]}  "
             f"{self.meta.region}  {self.meta.acquired:%Y-%m-%d}\n"
@@ -346,6 +348,10 @@ if __name__ == "__main__":
 
     sc = load_scene(args.scene, load_config(args.config))
     print(sc.summary())
-    print(f"  piattaforma: {sc.meta.platform}  ·  spacing: {sc.meta.pixel_spacing_m:.0f} m  ·  flip: {sc.meta.flip}")
-    print(f"  griglia geo: {sc.lat_grid.shape}  lat {sc.lat_grid.min():.2f}..{sc.lat_grid.max():.2f}  "
-          f"lon {sc.lon_grid.min():.2f}..{sc.lon_grid.max():.2f}")
+    print(
+        f"  piattaforma: {sc.meta.platform}  ·  spacing: {sc.meta.pixel_spacing_m:.0f} m  ·  flip: {sc.meta.flip}"
+    )
+    print(
+        f"  griglia geo: {sc.lat_grid.shape}  lat {sc.lat_grid.min():.2f}..{sc.lat_grid.max():.2f}  "
+        f"lon {sc.lon_grid.min():.2f}..{sc.lon_grid.max():.2f}"
+    )

@@ -130,20 +130,31 @@ def collect(metrics: dict, assumptions: dict, rv_path: Path) -> dict:
         scores = per_class.get(name) or {}
         english, meaning = MEANING.get(name, (name, ""))
         other, pct = worst.get(name, ("", None))
-        rows.append(Row(
-            name=name, english=english, meaning=meaning,
-            polaris_type=entry.get("polaris_type", ""),
-            iou=scores.get("iou"), support_px=scores.get("support_px"),
-            riv=riv.get(entry.get("polaris_type", ""), {}),
-            mistaken_for=other, mistaken_pct=pct,
-        ))
+        rows.append(
+            Row(
+                name=name,
+                english=english,
+                meaning=meaning,
+                polaris_type=entry.get("polaris_type", ""),
+                iou=scores.get("iou"),
+                support_px=scores.get("support_px"),
+                riv=riv.get(entry.get("polaris_type", ""), {}),
+                mistaken_for=other,
+                mistaken_pct=pct,
+            )
+        )
 
-    per_scene = [r for r in (ev.get("per_scene") or [])
-                 if isinstance((r.get("rio") or {}).get("worst_unsafe_fraction"), float)]
+    per_scene = [
+        r
+        for r in (ev.get("per_scene") or [])
+        if isinstance((r.get("rio") or {}).get("worst_unsafe_fraction"), float)
+    ]
     fr = [r["rio"]["worst_unsafe_fraction"] for r in per_scene]
     return {
-        "rows": rows, "vessels": vessels,
-        "miou": agg.get("miou"), "binary": agg.get("binary_accuracy"),
+        "rows": rows,
+        "vessels": vessels,
+        "miou": agg.get("miou"),
+        "binary": agg.get("binary_accuracy"),
         "n_scenes": ev.get("n_scenes"),
         "permissive_thick_as_water": permissive,
         "unsafe_median": float(np.median(fr)) if fr else None,
@@ -162,17 +173,22 @@ def render(c: dict) -> str:
     head = " | ".join(f"RIV {v}" for v in vessels)
     sep = "|".join(["---"] * len(vessels))
 
-    deck = [f"| Class | What it means to a bridge | {head} |",
-            f"|---|---|{sep}|"]
-    detail = ["| Classe | IoU misurata | pixel | quando sbaglia, la chiama | tipo POLARIS |",
-              "|---|---:|---:|---|---|"]
+    deck = [f"| Class | What it means to a bridge | {head} |", f"|---|---|{sep}|"]
+    detail = [
+        "| Classe | IoU misurata | pixel | quando sbaglia, la chiama | tipo POLARIS |",
+        "|---|---:|---:|---|---|",
+    ]
     for r in c["rows"]:
-        rivs = " | ".join(f"{r.riv.get(v, '—'):+d}" if isinstance(r.riv.get(v), int) else "—"
-                          for v in vessels)
+        rivs = " | ".join(
+            f"{r.riv.get(v, '—'):+d}" if isinstance(r.riv.get(v), int) else "—" for v in vessels
+        )
         deck.append(f"| **{r.english}** | {r.meaning} | {rivs} |")
         px = f"{r.support_px / 1e6:.0f} M" if isinstance(r.support_px, int) else "—"
-        mis = (f"{r.mistaken_for.lower()} nel {r.mistaken_pct:.0f}% dei casi"
-               if r.mistaken_pct is not None else "—")
+        mis = (
+            f"{r.mistaken_for.lower()} nel {r.mistaken_pct:.0f}% dei casi"
+            if r.mistaken_pct is not None
+            else "—"
+        )
         detail.append(f"| {r.name} | {_n(r.iou)} | {px} | {mis} | `{r.polaris_type}` |")
 
     perm = c["permissive_thick_as_water"]
@@ -183,8 +199,8 @@ def render(c: dict) -> str:
 > Chiude **A-11** di §98, che nei deck di giugno dichiarava cinque classi di cui una
 > — *Deformed Ice / Ridges* — non esiste in nessuna etichetta AI4Arctic.
 
-Schema attivo: **{c['scheme']}**. mIoU **{_n(c['miou'])}**, ghiaccio/acqua
-**{_n(c['binary'])}**, su **{c['n_scenes']}** scene del test set ufficiale.
+Schema attivo: **{c["scheme"]}**. mIoU **{_n(c["miou"])}**, ghiaccio/acqua
+**{_n(c["binary"])}**, su **{c["n_scenes"]}** scene del test set ufficiale.
 
 ## Tabella per la slide
 
@@ -207,13 +223,13 @@ Ma la domanda giusta non è quanto sbaglia: è **da che parte**. Il ghiaccio sot
 preso male, e quasi sempre viene chiamato **spesso** — cioè più pericoloso di quello che è.
 Costa una rotta più lunga e nient'altro.
 
-L'errore che conta è l'opposto: **ghiaccio spesso chiamato acqua libera, {_n(perm, '{:.1f}%')}
+L'errore che conta è l'opposto: **ghiaccio spesso chiamato acqua libera, {_n(perm, "{:.1f}%")}
 dei suoi pixel.** È l'unico che potrebbe mandare una nave dove non può andare, ed è il numero
 da pubblicare.
 
 Sull'intera scena, la frazione di mappa in cui siamo **più permissivi** della carta
-dell'analista ha mediana **{_n(c['unsafe_median'], '{:.1%}')}** e caso peggiore
-**{_n(c['unsafe_max'], '{:.1%}')}** su {c['n_unsafe_scenes']} scene.
+dell'analista ha mediana **{_n(c["unsafe_median"], "{:.1%}")}** e caso peggiore
+**{_n(c["unsafe_max"], "{:.1%}")}** su {c["n_unsafe_scenes"]} scene.
 
 **E il caso peggiore è nella demo, marcato.** Non è un dato che nascondiamo in una nota: è
 una delle scene che si possono scegliere sul palco. Mostrare da soli il proprio caso peggiore
@@ -224,8 +240,8 @@ per primo.
 
 Perché sei è oltre il punto in cui il dato etichettato regge. Il modello a sei classi si è
 fermato a **mIoU 0,272** sbagliando con sicurezza (registrato in D-018; l'artefatto di quella
-valutazione non è più nel repo, la voce sì). A tre classi fa {_n(c['miou'])}, e sulla
-distinzione che decide la sicurezza — ghiaccio sì o no — fa **{_n(c['binary'])}**.
+valutazione non è più nel repo, la voce sì). A tre classi fa {_n(c["miou"])}, e sulla
+distinzione che decide la sicurezza — ghiaccio sì o no — fa **{_n(c["binary"])}**.
 
 Il ripiego a tre classi è previsto dalla SPEC §7.4 ed è documentato in D-020. **Attenzione:**
 questi numeri non vanno confrontati con la soglia 0,60, che era definita sulle sei classi SOD.
@@ -261,8 +277,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render(c), encoding="utf-8")
-    log.info("%s — %d classi, permissivo %s",
-             args.out, len(c["rows"]), _n(c["permissive_thick_as_water"], "{:.1f}%"))
+    log.info(
+        "%s — %d classi, permissivo %s",
+        args.out,
+        len(c["rows"]),
+        _n(c["permissive_thick_as_water"], "{:.1f}%"),
+    )
     return 0
 
 

@@ -211,8 +211,8 @@ def test_route_prefers_open_water_over_slow_ice():
     """
     n = 41
     rio = np.full((n, n), 30.0)
-    rio[18:23, :] = -5.0          # elevated band: PC6 capped at 3 kn
-    rio[18:23, 0:3] = 30.0        # a gap at the left edge
+    rio[18:23, :] = -5.0  # elevated band: PC6 capped at 3 kn
+    rio[18:23, 0:3] = 30.0  # a gap at the left edge
     grid = make_grid(n, n)
     cost = build_cost_grid(rio, SpeedModel("PC6", 12.0))
 
@@ -233,7 +233,7 @@ def test_long_step_cannot_jump_a_one_cell_barrier():
     n = 21
     rio = np.full((n, n), 30.0)
     land = np.zeros((n, n), dtype=bool)
-    land[:, 10] = True            # a wall one cell thick, fully closed
+    land[:, 10] = True  # a wall one cell thick, fully closed
     grid = make_grid(n, n)
     cost = build_cost_grid(rio, SpeedModel("PC6", 12.0), land_mask=land)
 
@@ -247,7 +247,7 @@ def test_route_passes_through_a_gap_in_the_barrier():
     rio = np.full((n, n), 30.0)
     land = np.zeros((n, n), dtype=bool)
     land[:, 10] = True
-    land[3, 10] = False           # one gate
+    land[3, 10] = False  # one gate
     grid = make_grid(n, n)
     cost = build_cost_grid(rio, SpeedModel("PC6", 12.0), land_mask=land)
 
@@ -317,7 +317,9 @@ def test_min_rio_is_reported():
     rio = np.full((n, n), 30.0)
     rio[10, :] = 5.0
     grid = make_grid(n, n)
-    route = find_route(build_cost_grid(rio, SpeedModel("PC6", 12.0)), grid, (2, 10), (18, 10), rio=rio)
+    route = find_route(
+        build_cost_grid(rio, SpeedModel("PC6", 12.0)), grid, (2, 10), (18, 10), rio=rio
+    )
     assert route.min_rio == pytest.approx(5.0)
 
 

@@ -50,8 +50,8 @@ def measure(proba: np.ndarray, pred: np.ndarray, truth: np.ndarray) -> dict:
         return {"n_scored": int(scored.sum()), "n_wrong": 0}
 
     rows, cols = np.nonzero(wrong)
-    p_pred = proba[pred[rows, cols], rows, cols]     # mass on the wrong winner
-    p_true = proba[truth[rows, cols], rows, cols]    # mass on the right answer
+    p_pred = proba[pred[rows, cols], rows, cols]  # mass on the wrong winner
+    p_true = proba[truth[rows, cols], rows, cols]  # mass on the right answer
 
     return {
         "n_scored": int(scored.sum()),
@@ -82,8 +82,14 @@ def combine(per_scene: list[dict]) -> dict:
         return {"n_wrong": 0}
     w = np.array([r["n_wrong"] for r in usable], dtype=float)
     out = {"n_scenes": len(usable), "n_wrong": int(w.sum())}
-    for key in ("median_p_predicted", "median_p_true", "mean_p_true",
-                "frac_true_below_1pct", "frac_true_below_10pct", "frac_near_tie"):
+    for key in (
+        "median_p_predicted",
+        "median_p_true",
+        "mean_p_true",
+        "frac_true_below_1pct",
+        "frac_true_below_10pct",
+        "frac_near_tie",
+    ):
         vals = np.array([r[key] for r in usable], dtype=float)
         out[key] = float((vals * w).sum() / w.sum())
     return out
@@ -91,8 +97,12 @@ def combine(per_scene: list[dict]) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Misura la confidenza sugli errori. D-018.")
-    ap.add_argument("--train-config", type=Path, default=None,
-                    help="default: artifacts/best_config.txt, cioè il modello scelto")
+    ap.add_argument(
+        "--train-config",
+        type=Path,
+        default=None,
+        help="default: artifacts/best_config.txt, cioè il modello scelto",
+    )
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/test"))
     ap.add_argument("--scenes", type=int, default=20)
@@ -123,8 +133,9 @@ def main(argv: list[str] | None = None) -> int:
 
     model, _ = load_checkpoint(Path(train_cfg["output"]["best_checkpoint"]), device)
 
-    paths = [p for p in sorted(args.raw_dir.glob("*_prep.nc"))
-             if resolve_labels(p) is not None][: args.scenes]
+    paths = [p for p in sorted(args.raw_dir.glob("*_prep.nc")) if resolve_labels(p) is not None][
+        : args.scenes
+    ]
     if not paths:
         log.error("Nessuna scena con etichette in %s", args.raw_dir)
         return 1
@@ -133,8 +144,11 @@ def main(argv: list[str] | None = None) -> int:
     for i, path in enumerate(paths, 1):
         scene = load_scene(path, data_cfg, labels_from=resolve_labels(path))
         pred, proba, _ = predict_scene(
-            model, scene.channels(channels), n_classes=n_classes,
-            device=device, return_proba=True,
+            model,
+            scene.channels(channels),
+            n_classes=n_classes,
+            device=device,
+            return_proba=True,
         )
         truth = np.where(scene.mask_valid, scene.sod, IGNORE).astype("uint8")
         if collapse_classes:
@@ -145,7 +159,9 @@ def main(argv: list[str] | None = None) -> int:
         per_scene.append(row)
         log.info(
             "[%2d/%d] %s  errori %5.1f%%  p(sbagliata) %.3f  p(vera) %.4f",
-            i, len(paths), scene.meta.scene_id[:18],
+            i,
+            len(paths),
+            scene.meta.scene_id[:18],
             100 * row.get("error_rate", 0.0),
             row.get("median_p_predicted", float("nan")),
             row.get("median_p_true", float("nan")),
@@ -156,11 +172,18 @@ def main(argv: list[str] | None = None) -> int:
 
     agg = combine(per_scene)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(
-        {"config": str(args.train_config), "n_classes": n_classes,
-         "split": "test_ufficiale", "aggregate": agg, "per_scene": per_scene},
-        indent=2,
-    ))
+    args.out.write_text(
+        json.dumps(
+            {
+                "config": str(args.train_config),
+                "n_classes": n_classes,
+                "split": "test_ufficiale",
+                "aggregate": agg,
+                "per_scene": per_scene,
+            },
+            indent=2,
+        )
+    )
 
     log.info("=" * 64)
     if not agg.get("n_wrong"):
@@ -169,10 +192,13 @@ def main(argv: list[str] | None = None) -> int:
     log.info("Su %s pixel sbagliati, in mediana il modello mette:", f"{agg['n_wrong']:,}")
     log.info("  %.3f sulla classe SBAGLIATA che ha scelto", agg["median_p_predicted"])
     log.info("  %.4f sulla classe VERA", agg["median_p_true"])
-    log.info("  il %.1f%% degli errori lascia alla classe vera meno dell'1%%",
-             100 * agg["frac_true_below_1pct"])
-    log.info("  il %.1f%% degli errori è un quasi-pareggio (margine < 0,10)",
-             100 * agg["frac_near_tie"])
+    log.info(
+        "  il %.1f%% degli errori lascia alla classe vera meno dell'1%%",
+        100 * agg["frac_true_below_1pct"],
+    )
+    log.info(
+        "  il %.1f%% degli errori è un quasi-pareggio (margine < 0,10)", 100 * agg["frac_near_tie"]
+    )
     log.info("")
     # The verdict keys on frac_near_tie, and getting this wrong once already
     # produced the opposite conclusion from the data. The first version tested
@@ -185,15 +211,17 @@ def main(argv: list[str] | None = None) -> int:
     # whether there is a margin small enough for a decision rule to close.
     tie = agg["frac_near_tie"]
     if tie < 0.20:
-        log.info("VERDETTO: il modello sbaglia con sicurezza. Solo il %.1f%% degli errori",
-                 100 * tie)
+        log.info(
+            "VERDETTO: il modello sbaglia con sicurezza. Solo il %.1f%% degli errori", 100 * tie
+        )
         log.info("ha un margine abbastanza stretto da poter essere ribaltato. Le correzioni")
         log.info("a tempo di inferenza (temperatura, soglie, riordino della decisione) non")
         log.info("hanno su cosa lavorare: agiscono sul margine fra candidati, e il candidato")
         log.info("giusto non è in gara. Vedi D-018.")
     else:
-        log.info("VERDETTO: il %.1f%% degli errori è un quasi-pareggio: una correzione sul",
-                 100 * tie)
+        log.info(
+            "VERDETTO: il %.1f%% degli errori è un quasi-pareggio: una correzione sul", 100 * tie
+        )
         log.info("margine potrebbe ribaltarne una parte. Vale la pena misurarla.")
     return 0
 

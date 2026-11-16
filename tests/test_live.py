@@ -33,7 +33,8 @@ def test_the_live_path_calls_process_scene_rather_than_reimplementing_it():
     for reimplemented in ("predict_scene", "find_route", "geocode_scene"):
         assert reimplemented not in src, (
             f"live.compute chiama {reimplemented} direttamente: "
-            f"sta rifacendo la catena invece di eseguirla")
+            f"sta rifacendo la catena invece di eseguirla"
+        )
 
 
 def test_process_scene_accepts_the_progress_hook():
@@ -59,8 +60,13 @@ def test_process_scene_runs_without_a_hook():
 def test_a_broken_run_returns_an_error_instead_of_raising(tmp_path):
     """This sits behind a button on a stage. A traceback across the projector
     is a worse outcome than a red box."""
-    run = live.compute(tmp_path / "non-esiste.nc", model=None, device="cpu",
-                       out_dir=tmp_path, train_config="configs/train3.yaml")
+    run = live.compute(
+        tmp_path / "non-esiste.nc",
+        model=None,
+        device="cpu",
+        out_dir=tmp_path,
+        train_config="configs/train3.yaml",
+    )
     assert not run.ok
     assert run.error
     assert run.total_seconds >= 0
@@ -87,8 +93,7 @@ def test_an_identical_route_is_reported_as_identical():
 def test_a_different_route_is_flagged_loudly_not_swallowed():
     """If the two ever diverge, that is a Tuesday problem — but only if the
     demo says so instead of quietly displaying the newer answer."""
-    v = live.agreement(_ov([[r, r] for r in range(20)]),
-                       _ov([[r, r + 1] for r in range(20)]))
+    v = live.agreement(_ov([[r, r] for r in range(20)]), _ov([[r, r + 1] for r in range(20)]))
     assert v["comparable"] and not v["identical"]
     assert "DIVERSA" in v["note"]
 

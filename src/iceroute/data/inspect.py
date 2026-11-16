@@ -206,7 +206,17 @@ def print_report(rep: dict) -> None:
     for v in rep["variables"]:
         by_role.setdefault(v.get("role", "error"), []).append(v)
 
-    order = ["sar", "incidence", "target", "distance", "geometry", "passive", "weather", "other", "error"]
+    order = [
+        "sar",
+        "incidence",
+        "target",
+        "distance",
+        "geometry",
+        "passive",
+        "weather",
+        "other",
+        "error",
+    ]
     for role in order:
         items = by_role.get(role)
         if not items:
@@ -342,7 +352,7 @@ def make_figure(path: Path, rep: dict, out_png: Path, downsample: int = 4) -> bo
     sar = [v["name"] for v in rep["variables"] if v.get("role") == "sar"]
     targets = [v["name"] for v in rep["variables"] if v.get("role") == "target"]
     # Prefer SOD, then SIC, then whatever target exists.
-    targets.sort(key=lambda n: (0 if "SOD" in n.upper() else 1 if "SIC" in n.upper() else 2))
+    targets.sort(key=lambda n: 0 if "SOD" in n.upper() else 1 if "SIC" in n.upper() else 2)
     panels = sar[:2] + targets[:2]
     if not panels:
         return False
@@ -375,9 +385,7 @@ def make_figure(path: Path, rep: dict, out_png: Path, downsample: int = 4) -> bo
             # Percentile stretch: SAR backscatter has a long tail and a raw
             # min/max scaling renders the scene almost uniformly black.
             vmin, vmax = (
-                (np.percentile(finite, 2), np.percentile(finite, 98))
-                if finite.size
-                else (0, 1)
+                (np.percentile(finite, 2), np.percentile(finite, 98)) if finite.size else (0, 1)
             )
         im = ax.imshow(plot, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
         ax.set_title(name, fontsize=11)

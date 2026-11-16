@@ -47,9 +47,7 @@ def test_geodesic_points_include_the_endpoints():
 
 def test_geodesic_samples_are_evenly_spaced():
     pts = geodesic_points(-20.0, 75.0, -10.0, 75.0, 21)
-    seg = [
-        geodesic_distance_m(*a, *b) for a, b in zip(pts, pts[1:], strict=False)
-    ]
+    seg = [geodesic_distance_m(*a, *b) for a, b in zip(pts, pts[1:], strict=False)]
     assert max(seg) / min(seg) < 1.05
 
 
@@ -116,9 +114,7 @@ def test_baseline_flags_land_crossing():
     land = np.zeros((n, n), dtype=bool)
     land[14:17, :] = True
     cost = build_cost_grid(np.full((n, n), 30.0), SpeedModel("PC6", 12.0), land_mask=land)
-    res = geodesic_baseline(
-        grid, cost, (5, 15), (25, 15), open_water_speed_kn=12.0, land_mask=land
-    )
+    res = geodesic_baseline(grid, cost, (5, 15), (25, 15), open_water_speed_kn=12.0, land_mask=land)
     assert res.crosses_land
     assert not res.feasible
 
@@ -162,7 +158,7 @@ def test_no_time_saving_is_claimed_against_an_impossible_route():
     n = 41
     grid = make_grid(n, n)
     rio = np.full((n, n), 30.0)
-    rio[18:23, 5:38] = -50.0        # a no-go wall with a gap on the left
+    rio[18:23, 5:38] = -50.0  # a no-go wall with a gap on the left
     cost = build_cost_grid(rio, SpeedModel("PC6", 12.0))
 
     route = find_route(cost, grid, (5, 20), (35, 20), rio=rio)

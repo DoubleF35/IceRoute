@@ -176,9 +176,7 @@ def predict_scene(
     window = blend_window(tile_size, overlap)
 
     labels = np.zeros((height, width), dtype="uint8")
-    proba_full = (
-        np.zeros((n_classes, height, width), dtype="float32") if return_proba else None
-    )
+    proba_full = np.zeros((n_classes, height, width), dtype="float32") if return_proba else None
 
     # The streaming accumulator spans only the rows a live tile row can touch.
     strip_h = tile_size
@@ -204,9 +202,7 @@ def predict_scene(
         # Every tile in this row, in batches.
         for b0 in range(0, len(cols), batch_size):
             batch_cols = cols[b0 : b0 + batch_size]
-            crops = np.stack(
-                [x[:, r0 : r0 + tile_size, c0 : c0 + tile_size] for c0 in batch_cols]
-            )
+            crops = np.stack([x[:, r0 : r0 + tile_size, c0 : c0 + tile_size] for c0 in batch_cols])
             t = torch.from_numpy(crops).to(dev, non_blocking=True)
 
             with torch.autocast("cuda", dtype=torch.float16, enabled=use_amp):
@@ -259,7 +255,12 @@ def predict_scene(
 
     log.info(
         "inferenza %dx%d: %d tile, %.1fs, accumulatore %.0f MB (naive %.0f MB)",
-        orig_h, orig_w, n_tiles, stats.seconds, peak_mb, stats.naive_accumulator_mb,
+        orig_h,
+        orig_w,
+        n_tiles,
+        stats.seconds,
+        peak_mb,
+        stats.naive_accumulator_mb,
     )
     return labels, proba_full, stats
 

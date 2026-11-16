@@ -48,7 +48,7 @@ def test_stretch_uses_percentiles_not_min_max():
 
 def test_stretch_ignores_invalid_pixels():
     band = np.zeros(1000)
-    band[:500] = 1000.0                # invalid junk
+    band[:500] = 1000.0  # invalid junk
     valid = np.zeros(1000, dtype=bool)
     valid[500:] = True
     band[500:] = np.linspace(0, 1, 500)
@@ -124,9 +124,15 @@ def _entry(**over) -> dict:
         "route_exists": True,
         "comparison": {
             "iceroute": {"time_hours": 23.7, "distance_km": 528.0, "min_rio": 10.0},
-            "baseline": {"time_hours": 30.0, "feasible": True, "blocked_by_ice": False,
-                         "n_no_go_cells": 0, "n_no_data_cells": 0},
-            "time_saved_hours": 6.3, "time_saved_percent": 21.0,
+            "baseline": {
+                "time_hours": 30.0,
+                "feasible": True,
+                "blocked_by_ice": False,
+                "n_no_go_cells": 0,
+                "n_no_data_cells": 0,
+            },
+            "time_saved_hours": 6.3,
+            "time_saved_percent": 21.0,
         },
         "n_waypoints": 9,
     }
@@ -143,24 +149,40 @@ def test_transit_card_shows_the_saving_when_it_is_real():
 
 def test_transit_card_claims_nothing_against_an_impossible_route():
     """SPEC rule 2: you cannot save hours against a voyage POLARIS forbids."""
-    e = _entry(comparison={
-        "baseline": {"time_hours": None, "feasible": False, "blocked_by_ice": True,
-                     "n_no_go_cells": 93, "n_no_data_cells": 0},
-        "time_saved_hours": None, "time_saved_percent": None,
-    })
+    e = _entry(
+        comparison={
+            "baseline": {
+                "time_hours": None,
+                "feasible": False,
+                "blocked_by_ice": True,
+                "n_no_go_cells": 93,
+                "n_no_data_cells": 0,
+            },
+            "time_saved_hours": None,
+            "time_saved_percent": None,
+        }
+    )
     html = transit_card(e, provisional_speed=False)
     assert "vietata dal ghiaccio" in html
     assert "93" in html
-    assert "+" not in html.split("</div>")[1]      # no fabricated delta
+    assert "+" not in html.split("</div>")[1]  # no fabricated delta
 
 
 def test_transit_card_distinguishes_no_coverage_from_blocked_by_ice():
     """Conflating them would claim the ice stopped a voyage a data gap stopped."""
-    e = _entry(comparison={
-        "baseline": {"time_hours": None, "feasible": False, "blocked_by_ice": False,
-                     "n_no_go_cells": 0, "n_no_data_cells": 139},
-        "time_saved_hours": None, "time_saved_percent": None,
-    })
+    e = _entry(
+        comparison={
+            "baseline": {
+                "time_hours": None,
+                "feasible": False,
+                "blocked_by_ice": False,
+                "n_no_go_cells": 0,
+                "n_no_data_cells": 139,
+            },
+            "time_saved_hours": None,
+            "time_saved_percent": None,
+        }
+    )
     html = transit_card(e, provisional_speed=False)
     assert "non è il ghiaccio" in html
     assert "vietata dal ghiaccio" not in html
@@ -182,8 +204,9 @@ def test_transit_card_handles_a_missing_route():
     [(10.0, "normale"), (-5.0, "elevato"), (-20.0, "speciale")],
 )
 def test_rio_card_labels_the_polaris_band(rio, expected):
-    html = rio_card(_entry(comparison={
-        "iceroute": {"time_hours": 1.0, "distance_km": 1.0, "min_rio": rio}}))
+    html = rio_card(
+        _entry(comparison={"iceroute": {"time_hours": 1.0, "distance_km": 1.0, "min_rio": rio}})
+    )
     assert expected in html
 
 
@@ -196,25 +219,31 @@ def test_cards_say_not_measured_rather_than_zero():
 
 
 def test_downlink_card_flags_a_provisional_ratio():
-    html = downlink_card({"compression": {"ratio_median": 1012.0, "provisional": True,
-                                          "n_scenes": 3}})
+    html = downlink_card(
+        {"compression": {"ratio_median": 1012.0, "provisional": True, "n_scenes": 3}}
+    )
     assert "1012:1" in html
     assert "limite superiore" in html
 
 
 def test_downlink_card_without_the_flag_makes_no_caveat():
-    html = downlink_card({"compression": {"ratio_median": 640.0, "provisional": False,
-                                          "n_scenes": 5}})
+    html = downlink_card(
+        {"compression": {"ratio_median": 640.0, "provisional": False, "n_scenes": 5}}
+    )
     assert "640:1" in html
     assert "limite superiore" not in html
 
 
 def test_onboard_card_reports_measured_size_and_latency():
-    html = onboard_card({"quantization": {
-        "size": {"int8_mb": 2.049},
-        "latency": {"single_thread": {"int8": {"median_ms_per_tile": 36.2}}},
-        "accuracy": {"miou_drop": -0.002},
-    }})
+    html = onboard_card(
+        {
+            "quantization": {
+                "size": {"int8_mb": 2.049},
+                "latency": {"single_thread": {"int8": {"median_ms_per_tile": 36.2}}},
+                "accuracy": {"miou_drop": -0.002},
+            }
+        }
+    )
     assert "2.05 MB" in html
     assert "36 ms" in html
     assert "non degrada" in html
@@ -237,7 +266,7 @@ def test_labels_resolve_to_the_reference_file_when_one_exists(tmp_path):
 
     scene = tmp_path / "s_prep.nc"
     scene.touch()
-    assert resolve_labels(scene) is None       # no reference yet
+    assert resolve_labels(scene) is None  # no reference yet
 
     ref = tmp_path / "s_prep_reference.nc"
     ref.touch()
@@ -284,10 +313,16 @@ def test_scene_scores_reads_the_evaluation_not_the_demo_index():
     """
     from iceroute.demo.app import scene_scores
 
-    metrics = {"evaluation": {"scenes": {"per_scene": [
-        {"scene_id": "a.nc", "miou": 0.25, "rio": {"worst_unsafe_fraction": 0.52}},
-        {"scene_id": "b.nc", "miou": 0.77, "rio": {"worst_unsafe_fraction": 0.01}},
-    ]}}}
+    metrics = {
+        "evaluation": {
+            "scenes": {
+                "per_scene": [
+                    {"scene_id": "a.nc", "miou": 0.25, "rio": {"worst_unsafe_fraction": 0.52}},
+                    {"scene_id": "b.nc", "miou": 0.77, "rio": {"worst_unsafe_fraction": 0.01}},
+                ]
+            }
+        }
+    }
     assert scene_scores(metrics, "a.nc") == (0.25, 0.52)
     assert scene_scores(metrics, "b.nc") == (0.77, 0.01)
 
@@ -333,10 +368,10 @@ def test_the_designated_worst_case_really_is_the_worst(tmp_path):
     metrics_path = Path("artifacts/metrics.json")
     if not metrics_path.exists():
         pytest.skip("valutazione non ancora eseguita")
-    per = ((json.loads(metrics_path.read_text()).get("evaluation") or {})
-           .get("scenes") or {}).get("per_scene") or []
-    scored = {r["scene_id"]: (r.get("rio") or {}).get("worst_unsafe_fraction")
-              for r in per}
+    per = ((json.loads(metrics_path.read_text()).get("evaluation") or {}).get("scenes") or {}).get(
+        "per_scene"
+    ) or []
+    scored = {r["scene_id"]: (r.get("rio") or {}).get("worst_unsafe_fraction") for r in per}
 
     cfg = yaml.safe_load(Path("configs/demo.yaml").read_text())
     worst_id = cfg["worst_case"]["id"]
@@ -382,8 +417,8 @@ def test_conditions_along_separates_ice_type_from_concentration():
     from iceroute.routing.polaris import conditions_along
 
     names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
-    sod = np.full((4, 4), 2, dtype="uint8")          # all thick ice
-    sic = np.full((4, 4), 3.0)                       # ...at 3/10
+    sod = np.full((4, 4), 2, dtype="uint8")  # all thick ice
+    sic = np.full((4, 4), 3.0)  # ...at 3/10
     # RIO = 3(-3) + 7(+3) = +12 for a PC6
     rio = np.full((4, 4), 12.0)
     cells = [(0, i) for i in range(4)]
@@ -404,12 +439,12 @@ def test_the_same_ice_type_at_high_concentration_is_reported_as_forbidden():
     names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
     sod = np.full((4, 4), 2, dtype="uint8")
     sic = np.full((4, 4), 8.0)
-    rio = np.full((4, 4), -18.0)                     # 8(-3) + 2(+3)
+    rio = np.full((4, 4), -18.0)  # 8(-3) + 2(+3)
     c = conditions_along([(0, i) for i in range(4)], sod, sic, rio, "PC6", names)
 
-    assert c["by_class"] == {"Ghiaccio spesso": 4}   # same class as above
-    assert c["worst_class_sic_median"] == 8.0        # different concentration
-    assert c["fraction_no_go"] == 1.0                # opposite verdict
+    assert c["by_class"] == {"Ghiaccio spesso": 4}  # same class as above
+    assert c["worst_class_sic_median"] == 8.0  # different concentration
+    assert c["fraction_no_go"] == 1.0  # opposite verdict
 
 
 def test_conditions_of_an_empty_route_are_empty():
@@ -417,8 +452,7 @@ def test_conditions_of_an_empty_route_are_empty():
 
     from iceroute.routing.polaris import conditions_along
 
-    assert conditions_along([], np.zeros((2, 2)), None, np.zeros((2, 2)),
-                            "PC6", ["a", "b"]) == {}
+    assert conditions_along([], np.zeros((2, 2)), None, np.zeros((2, 2)), "PC6", ["a", "b"]) == {}
 
 
 def test_every_demo_route_stays_in_normal_operation():
@@ -442,9 +476,11 @@ def test_every_demo_route_stays_in_normal_operation():
             assert c, f"{scene['scene_id']}/{ice_class}: condizioni non misurate"
             assert c["fraction_no_go"] == 0.0, (
                 f"{scene['scene_id']}/{ice_class}: la rotta attraversa "
-                f"{100 * c['fraction_no_go']:.0f}% di celle vietate")
+                f"{100 * c['fraction_no_go']:.0f}% di celle vietate"
+            )
             assert c["rio_min"] is not None and c["rio_min"] >= 0, (
-                f"{scene['scene_id']}/{ice_class}: RIO minimo {c['rio_min']}")
+                f"{scene['scene_id']}/{ice_class}: RIO minimo {c['rio_min']}"
+            )
             checked += 1
     assert checked, "nessuna rotta verificata"
 

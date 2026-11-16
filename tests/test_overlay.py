@@ -119,9 +119,9 @@ def test_a_proportionally_decimated_image_is_still_drawn():
 def test_the_tolerance_is_tighter_than_the_mismatch_it_must_catch():
     """The real raw-vs-geocoded pairing differs by 2.8%. A tolerance set just
     under that would pass the next scene whose shapes happen to be closer."""
-    ov.draw(_blank(60, 40), _overlay(), show="both")           # exact: fine
+    ov.draw(_blank(60, 40), _overlay(), show="both")  # exact: fine
     with pytest.raises(ov.GridMismatch):
-        ov.draw(_blank(61, 40), _overlay(), show="both")       # 1.7%: refused
+        ov.draw(_blank(61, 40), _overlay(), show="both")  # 1.7%: refused
 
 
 # ---------------------------------------------------------------------------
@@ -146,8 +146,7 @@ def test_no_forbidden_cells_is_no_runs():
 def test_forbidden_cells_are_painted_over_the_direct_route():
     """The evidence has to be visible, not merely counted in the index."""
     plain = ov.draw(_blank(), _overlay(), show="baseline")
-    marked = ov.draw(_blank(), _overlay(no_go=[[20, c] for c in range(20, 40)]),
-                     show="baseline")
+    marked = ov.draw(_blank(), _overlay(no_go=[[20, c] for c in range(20, 40)]), show="baseline")
     assert _changed(plain, marked) > 10
     assert _has_colour(marked, ov.COL_NO_GO), "il tratto vietato non è rosso"
 
@@ -195,11 +194,23 @@ def test_the_geojson_does_not_carry_the_per_cell_lists():
     from iceroute.routing.astar import Route
     from iceroute.routing.baseline import BaselineResult
 
-    route = Route(cells=[(0, 0), (1, 1)], lonlat=[(0.0, 70.0), (0.1, 70.1)],
-                  time_hours=1.0, distance_km=10.0, ice_class="PC6")
-    res = BaselineResult(route=route, crosses_no_go=True, n_no_go_cells=2,
-                         n_slow_cells=0, crosses_land=False, feasible=False,
-                         no_go_cells=[(0, 0), (1, 1)], no_data_cells=[(2, 2)])
+    route = Route(
+        cells=[(0, 0), (1, 1)],
+        lonlat=[(0.0, 70.0), (0.1, 70.1)],
+        time_hours=1.0,
+        distance_km=10.0,
+        ice_class="PC6",
+    )
+    res = BaselineResult(
+        route=route,
+        crosses_no_go=True,
+        n_no_go_cells=2,
+        n_slow_cells=0,
+        crosses_land=False,
+        feasible=False,
+        no_go_cells=[(0, 0), (1, 1)],
+        no_data_cells=[(2, 2)],
+    )
 
     props = res.as_geojson()["properties"]
     assert props["n_no_go_cells"] == 2, "il conteggio serve e deve restare"
@@ -213,12 +224,20 @@ def test_the_baseline_still_counts_what_it_now_also_lists():
     from iceroute.routing.astar import Route
     from iceroute.routing.baseline import BaselineResult
 
-    route = Route(cells=[(0, 0)], lonlat=[(0.0, 70.0)], time_hours=1.0,
-                  distance_km=1.0, ice_class="IA")
-    res = BaselineResult(route=route, crosses_no_go=True, n_no_go_cells=3,
-                         n_slow_cells=0, crosses_land=False, feasible=False,
-                         n_no_data_cells=1,
-                         no_go_cells=[(0, 0), (0, 1), (0, 2)], no_data_cells=[(5, 5)])
+    route = Route(
+        cells=[(0, 0)], lonlat=[(0.0, 70.0)], time_hours=1.0, distance_km=1.0, ice_class="IA"
+    )
+    res = BaselineResult(
+        route=route,
+        crosses_no_go=True,
+        n_no_go_cells=3,
+        n_slow_cells=0,
+        crosses_land=False,
+        feasible=False,
+        n_no_data_cells=1,
+        no_go_cells=[(0, 0), (0, 1), (0, 2)],
+        no_data_cells=[(5, 5)],
+    )
     assert len(res.no_go_cells) == res.n_no_go_cells
     assert len(res.no_data_cells) == res.n_no_data_cells
 
@@ -268,8 +287,9 @@ def test_every_route_in_the_demo_can_actually_be_drawn():
     for scene in index.get("scenes", []):
         geo_png = Path("data/demo/images") / (scene.get("files") or {}).get("mask_geo", "")
         if not geo_png.is_file():
-            pytest.fail(f"{scene['scene_id']}: manca la maschera geocodificata, "
-                        f"nessuna rotta è disegnabile")
+            pytest.fail(
+                f"{scene['scene_id']}: manca la maschera geocodificata, nessuna rotta è disegnabile"
+            )
         for ice_class, entry in (scene.get("classes") or {}).items():
             if not entry.get("route_exists"):
                 continue

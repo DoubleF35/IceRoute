@@ -45,20 +45,22 @@ def _setup():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    plt.rcParams.update({
-        "font.size": 13,
-        "axes.labelsize": 14,
-        "axes.titlesize": 15,
-        "figure.facecolor": "none",
-        "axes.facecolor": "none",
-        "savefig.facecolor": "none",
-        "savefig.transparent": True,
-        "text.color": COL_INK,
-        "axes.labelcolor": COL_INK,
-        "xtick.color": COL_MUTED,
-        "ytick.color": COL_MUTED,
-        "axes.edgecolor": COL_MUTED,
-    })
+    plt.rcParams.update(
+        {
+            "font.size": 13,
+            "axes.labelsize": 14,
+            "axes.titlesize": 15,
+            "figure.facecolor": "none",
+            "axes.facecolor": "none",
+            "savefig.facecolor": "none",
+            "savefig.transparent": True,
+            "text.color": COL_INK,
+            "axes.labelcolor": COL_INK,
+            "xtick.color": COL_MUTED,
+            "ytick.color": COL_MUTED,
+            "axes.edgecolor": COL_MUTED,
+        }
+    )
     return plt
 
 
@@ -94,8 +96,11 @@ def figure_works(demo_dir: Path, out: Path, scene: dict | None = None) -> str:
 
     import matplotlib.image as mpimg
 
-    panels = [("SAR (HV)", "sar"), ("Predizione IceRoute", "mask_pred"),
-              ("Carta dell'analista", "mask_truth")]
+    panels = [
+        ("SAR (HV)", "sar"),
+        ("Predizione IceRoute", "mask_pred"),
+        ("Carta dell'analista", "mask_truth"),
+    ]
     fig, axes = plt.subplots(1, 3, figsize=(16, 6))
     for ax, (title, key) in zip(axes, panels, strict=True):
         path = demo_dir / "images" / scene["files"].get(key, "")
@@ -108,7 +113,9 @@ def figure_works(demo_dir: Path, out: Path, scene: dict | None = None) -> str:
     fig.suptitle(
         f"{scene['scene_id'][:15]} · {scene.get('region', '')} · "
         f"inferenza {scene.get('inference_seconds', 0):.1f} s",
-        y=0.04, fontsize=12, color=COL_MUTED,
+        y=0.04,
+        fontsize=12,
+        color=COL_MUTED,
     )
     return _save(fig, out)
 
@@ -146,17 +153,23 @@ def figure_useful(demo_dir: Path, out: Path, scene: dict | None, ice_class: str)
     if saved is not None:
         headline = f"{cmp_['iceroute']['time_hours']:.1f} h · {saved:+.1f} h sulla diretta"
     elif cmp_["baseline"].get("blocked_by_ice"):
-        headline = (f"{cmp_['iceroute']['time_hours']:.1f} h · la rotta diretta e' "
-                    f"vietata dal ghiaccio ({cmp_['baseline']['n_no_go_cells']} celle)")
+        headline = (
+            f"{cmp_['iceroute']['time_hours']:.1f} h · la rotta diretta e' "
+            f"vietata dal ghiaccio ({cmp_['baseline']['n_no_go_cells']} celle)"
+        )
     else:
         headline = f"{cmp_['iceroute']['time_hours']:.1f} h · confronto non disponibile"
 
     ax.set_title(f"{ice_class} — {headline}", pad=14)
     ax.text(
-        0.5, -0.04,
+        0.5,
+        -0.04,
         f"RIO minimo sulla rotta {cmp_['iceroute'].get('min_rio', float('nan')):+.1f} · "
         f"{entry.get('n_waypoints', '?')} waypoint · soglie IMO MSC.1/Circ.1519",
-        transform=ax.transAxes, ha="center", fontsize=11, color=COL_MUTED,
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=11,
+        color=COL_MUTED,
     )
     return _save(fig, out)
 
@@ -174,15 +187,19 @@ def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
         return
     sx, sy = w / cols, h / rows
     if abs(sx - sy) > 0.02 * max(sx, sy):
-        raise ValueError(
-            f"figura {w}x{h} incompatibile con la griglia della rotta {cols}x{rows}"
-        )
+        raise ValueError(f"figura {w}x{h} incompatibile con la griglia della rotta {cols}x{rows}")
 
     base, ours = ov.get("baseline") or {}, ov.get("iceroute") or {}
     if base.get("path"):
         pts = base["path"]
-        ax.plot([c * sx for _, c in pts], [r * sy for r, _ in pts],
-                "--", color=COL_BASE, lw=2.2, label="rotta diretta")
+        ax.plot(
+            [c * sx for _, c in pts],
+            [r * sy for r, _ in pts],
+            "--",
+            color=COL_BASE,
+            lw=2.2,
+            label="rotta diretta",
+        )
     if base.get("no_go"):
         # Contiguous stretches, not one marker per cell — see overlay.no_go_runs.
         runs = overlay_mod.no_go_runs(base["no_go"])
@@ -190,21 +207,33 @@ def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
         for run in runs:
             xs, ys = [c * sx for _, c in run], [r * sy for r, _ in run]
             if len(run) > 2:
-                ax.plot(xs, ys, "-", color="#ff2020", lw=4.0, solid_capstyle="round",
-                        label=label)
+                ax.plot(xs, ys, "-", color="#ff2020", lw=4.0, solid_capstyle="round", label=label)
             else:
-                ax.plot(xs, ys, "x", color="#ff2020", ms=8, mew=2.4, ls="none",
-                        label=label)
-            label = "_nolegend_"   # one legend entry, not one per run
+                ax.plot(xs, ys, "x", color="#ff2020", ms=8, mew=2.4, ls="none", label=label)
+            label = "_nolegend_"  # one legend entry, not one per run
     if ours.get("path"):
         pts = ours["path"]
-        ax.plot([c * sx for _, c in pts], [r * sy for r, _ in pts],
-                "-", color=COL_ROUTE, lw=3.0, label="IceRoute")
+        ax.plot(
+            [c * sx for _, c in pts],
+            [r * sy for r, _ in pts],
+            "-",
+            color=COL_ROUTE,
+            lw=3.0,
+            label="IceRoute",
+        )
     if ours.get("waypoints"):
         wp = ours["waypoints"]
-        ax.plot([c * sx for _, c in wp], [r * sy for r, _ in wp], "o",
-                color=COL_ROUTE, ms=6, mec="#0a0e14", mew=1.4, ls="none",
-                label=f"waypoint trasmessi ({len(wp)})")
+        ax.plot(
+            [c * sx for _, c in wp],
+            [r * sy for r, _ in wp],
+            "o",
+            color=COL_ROUTE,
+            ms=6,
+            mec="#0a0e14",
+            mew=1.4,
+            ls="none",
+            label=f"waypoint trasmessi ({len(wp)})",
+        )
     if ax.get_legend_handles_labels()[0]:
         ax.legend(loc="lower right", framealpha=0.3, facecolor="#111823")
 
@@ -226,25 +255,45 @@ def figure_onboard(metrics: dict, out: Path) -> str:
 
     for ax, vals, unit, title in (
         (ax1, [size["fp32_mb"], size["int8_mb"]], "MB", "Dimensione del modello"),
-        (ax2, [lat["fp32"]["median_ms_per_tile"], lat["int8"]["median_ms_per_tile"]],
-         "ms", "Latenza per tile (CPU, 1 thread)"),
+        (
+            ax2,
+            [lat["fp32"]["median_ms_per_tile"], lat["int8"]["median_ms_per_tile"]],
+            "ms",
+            "Latenza per tile (CPU, 1 thread)",
+        ),
     ):
         bars = ax.bar(["fp32", "INT8"], vals, color=[COL_MUTED, COL_THIN], width=0.55)
         ax.set_title(title, pad=10)
         ax.set_ylabel(unit)
         ax.spines[["top", "right"]].set_visible(False)
         for b, v in zip(bars, vals, strict=True):
-            ax.text(b.get_x() + b.get_width() / 2, v, f"{v:.1f}",
-                    ha="center", va="bottom", fontsize=13, color=COL_INK)
+            ax.text(
+                b.get_x() + b.get_width() / 2,
+                v,
+                f"{v:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=13,
+                color=COL_INK,
+            )
         ax.set_ylim(0, max(vals) * 1.22)
-        ax.text(0.5, -0.20, f"{vals[0] / vals[1]:.2f}× piu' piccolo/veloce"
-                if vals[1] else "", transform=ax.transAxes, ha="center",
-                fontsize=11, color=COL_THIN)
+        ax.text(
+            0.5,
+            -0.20,
+            f"{vals[0] / vals[1]:.2f}× piu' piccolo/veloce" if vals[1] else "",
+            transform=ax.transAxes,
+            ha="center",
+            fontsize=11,
+            color=COL_THIN,
+        )
 
     drop = (q.get("accuracy") or {}).get("miou_drop")
     if isinstance(drop, float):
-        note = ("INT8 non degrada in modo misurabile" if drop <= 0.002
-                else f"INT8 costa {drop:.3f} di mIoU")
+        note = (
+            "INT8 non degrada in modo misurabile"
+            if drop <= 0.002
+            else f"INT8 costa {drop:.3f} di mIoU"
+        )
         fig.text(0.5, -0.08, note, ha="center", fontsize=12, color=COL_MUTED)
     return _save(fig, out)
 
@@ -269,24 +318,33 @@ def figure_business(metrics: dict, out: Path) -> str:
     fig, ax = plt.subplots(figsize=(8.5, 5))
     bars = ax.bar(
         ["Scena SAR\n(compressa)", "Payload IceRoute\n(maschera + rotta)"],
-        [raw, payload], color=[COL_MUTED, COL_THIN], width=0.5,
+        [raw, payload],
+        color=[COL_MUTED, COL_THIN],
+        width=0.5,
     )
     ax.set_yscale("log")
     ax.set_ylabel("byte (scala logaritmica)")
     ax.spines[["top", "right"]].set_visible(False)
     for b, v in zip(bars, [raw, payload], strict=True):
         label = f"{v / 1e6:.1f} MB" if v > 1e6 else f"{v / 1e3:.0f} KB"
-        ax.text(b.get_x() + b.get_width() / 2, v * 1.15, label,
-                ha="center", fontsize=14, color=COL_INK)
+        ax.text(
+            b.get_x() + b.get_width() / 2, v * 1.15, label, ha="center", fontsize=14, color=COL_INK
+        )
 
     ratio = comp.get("ratio_median", raw / max(payload, 1))
     title = f"{ratio:.0f}:1"
     if comp.get("provisional"):
         title += "  (limite superiore)"
     ax.set_title(title, pad=14, fontsize=20)
-    ax.text(0.5, -0.16,
-            "numeratore: canali SAR compressi senza perdita, non byte grezzi",
-            transform=ax.transAxes, ha="center", fontsize=10.5, color=COL_MUTED)
+    ax.text(
+        0.5,
+        -0.16,
+        "numeratore: canali SAR compressi senza perdita, non byte grezzi",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=10.5,
+        color=COL_MUTED,
+    )
     return _save(fig, out)
 
 
@@ -317,10 +375,20 @@ def figure_confusion(metrics: dict, out: Path) -> str:
     for i in range(len(names)):
         for j in range(len(names)):
             if support[i] > 0:
-                ax.text(j, i, f"{norm[i, j]:.2f}", ha="center", va="center",
-                        fontsize=11, color="white" if norm[i, j] > 0.55 else "#111823")
-    ax.set_title(f"mIoU {agg.get('miou', float('nan')):.3f} · "
-                 f"ghiaccio/acqua {agg.get('binary_accuracy', float('nan')):.3f}", pad=14)
+                ax.text(
+                    j,
+                    i,
+                    f"{norm[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=11,
+                    color="white" if norm[i, j] > 0.55 else "#111823",
+                )
+    ax.set_title(
+        f"mIoU {agg.get('miou', float('nan')):.3f} · "
+        f"ghiaccio/acqua {agg.get('binary_accuracy', float('nan')):.3f}",
+        pad=14,
+    )
     fig.colorbar(im, ax=ax, label="frazione della classe vera")
     return _save(fig, out)
 
@@ -350,8 +418,7 @@ def main(argv: list[str] | None = None) -> int:
     # the figure's actual claim, and now that the forbidden cells are drawn, a
     # scene where the straight line is perfectly legal shows two lines on top
     # of each other and proves nothing. The worst case is never the lead.
-    scenes = [s for s in index.get("scenes", [])
-              if s.get("classes") and not s.get("worst_case")]
+    scenes = [s for s in index.get("scenes", []) if s.get("classes") and not s.get("worst_case")]
 
     def _entry(s):
         return s["classes"].get(args.ice_class) or {}
@@ -360,17 +427,22 @@ def main(argv: list[str] | None = None) -> int:
         return ((_entry(s).get("comparison") or {}).get("baseline") or {}).get("blocked_by_ice")
 
     def _separation(s):
-        ov = overlay_mod.load(args.demo_dir / overlay_mod.OVERLAY_DIR
-                              / (_entry(s).get("overlay") or ""))
+        ov = overlay_mod.load(
+            args.demo_dir / overlay_mod.OVERLAY_DIR / (_entry(s).get("overlay") or "")
+        )
         return (ov.get("separation") or {}).get("pct_diagonal") or 0.0
 
     with_route = [s for s in scenes if _entry(s).get("route_exists")]
     candidates = [s for s in with_route if _blocked(s)] or with_route
     lead = max(candidates, key=_separation) if candidates else (scenes[0] if scenes else None)
     if lead:
-        log.info("Scena guida: %s — diretta vietata: %s, le due rotte si separano "
-                 "del %.1f%% della diagonale", lead["scene_id"][:20],
-                 bool(_blocked(lead)), _separation(lead))
+        log.info(
+            "Scena guida: %s — diretta vietata: %s, le due rotte si separano "
+            "del %.1f%% della diagonale",
+            lead["scene_id"][:20],
+            bool(_blocked(lead)),
+            _separation(lead),
+        )
 
     log.info("Figure in %s", args.out)
     figure_works(args.demo_dir, args.out / "01_works.png", lead)
@@ -381,9 +453,16 @@ def main(argv: list[str] | None = None) -> int:
     # the subject by reimplementing this rule will eventually disagree with the
     # picture it sits under — it already did, naming IA under a PC6 figure.
     if lead:
-        (args.out / "route_lead.json").write_text(json.dumps(
-            {"scene_id": lead["scene_id"], "ice_class": args.ice_class,
-             "figure": "02_useful.png"}, indent=1))
+        (args.out / "route_lead.json").write_text(
+            json.dumps(
+                {
+                    "scene_id": lead["scene_id"],
+                    "ice_class": args.ice_class,
+                    "figure": "02_useful.png",
+                },
+                indent=1,
+            )
+        )
     figure_onboard(metrics, args.out / "03_onboard.png")
     figure_business(metrics, args.out / "04_business.png")
     figure_confusion(metrics, args.out / "05_confusion.png")

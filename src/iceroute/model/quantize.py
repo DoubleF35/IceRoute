@@ -126,7 +126,9 @@ def quantize_model(
     )
     log.info(
         "INT8 scritto in %s (%.3f MB, calibrato su %d patch)",
-        int8_path, int8_path.stat().st_size / 1024**2, reader.n_samples,
+        int8_path,
+        int8_path.stat().st_size / 1024**2,
+        reader.n_samples,
     )
     return int8_path
 
@@ -316,21 +318,32 @@ def compare_accuracy(
         one32, one8 = ConfusionMatrix(n_classes), ConfusionMatrix(n_classes)
         for model, agg, single in ((fp32, cm32, one32), (int8, cm8, one8)):
             labels, _, _ = predict_scene(
-                model, x, n_classes=n_classes, tile_size=tile_size, overlap=overlap,
-                batch_size=batch_size, device="cpu", amp=False,
+                model,
+                x,
+                n_classes=n_classes,
+                tile_size=tile_size,
+                overlap=overlap,
+                batch_size=batch_size,
+                device="cpu",
+                amp=False,
             )
             agg.update(truth, labels)
             single.update(truth, labels)
 
-        per_scene.append({
-            "scene_id": scene.meta.scene_id,
-            "fp32_miou": round(one32.miou(), 4),
-            "int8_miou": round(one8.miou(), 4),
-            "drop": round(one32.miou() - one8.miou(), 4),
-        })
+        per_scene.append(
+            {
+                "scene_id": scene.meta.scene_id,
+                "fp32_miou": round(one32.miou(), 4),
+                "int8_miou": round(one8.miou(), 4),
+                "drop": round(one32.miou() - one8.miou(), 4),
+            }
+        )
         log.info(
             "  %s: fp32 %.4f → int8 %.4f (Δ %+.4f)",
-            scene.meta.scene_id, one32.miou(), one8.miou(), one8.miou() - one32.miou(),
+            scene.meta.scene_id,
+            one32.miou(),
+            one8.miou(),
+            one8.miou() - one32.miou(),
         )
 
     drop = cm32.miou() - cm8.miou()
@@ -421,7 +434,9 @@ def main(argv: list[str] | None = None) -> int:
     del sess
 
     quantize_model(
-        fp32_path, int8_path, reader,
+        fp32_path,
+        int8_path,
+        reader,
         per_channel=bool(qcfg.get("per_channel", True)),
         method=str(qcfg.get("method", "minmax")),
     )
@@ -437,9 +452,11 @@ def main(argv: list[str] | None = None) -> int:
     }
     s = report["size"]
     log.info(
-        "dimensioni: fp32 %.3f MB → int8 %.3f MB (%.1f KB), rapporto %.2f×, "
-        "%.3f byte/parametro",
-        s["fp32_mb"], s["int8_mb"], s["int8_kb"], s["compression_ratio"],
+        "dimensioni: fp32 %.3f MB → int8 %.3f MB (%.1f KB), rapporto %.2f×, %.3f byte/parametro",
+        s["fp32_mb"],
+        s["int8_mb"],
+        s["int8_kb"],
+        s["compression_ratio"],
         s["bytes_per_parameter_int8"],
     )
 
@@ -459,7 +476,10 @@ def main(argv: list[str] | None = None) -> int:
         q = report["latency"][label]["int8"]["median_ms_per_tile"]
         log.info(
             "latenza/tile (%s): fp32 %.1f ms → int8 %.1f ms (%.2f×)",
-            label, f, q, f / q if q else float("nan"),
+            label,
+            f,
+            q,
+            f / q if q else float("nan"),
         )
 
     # -- accuracy -----------------------------------------------------------
@@ -475,8 +495,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         log.info("Confronto fp32 vs INT8 su %d scene intere…", len(scene_ids))
         acc = compare_accuracy(
-            fp32_path, int8_path, [args.raw_dir / s for s in scene_ids], data_cfg,
-            n_classes=n_classes, channels=channels, tile_size=tile,
+            fp32_path,
+            int8_path,
+            [args.raw_dir / s for s in scene_ids],
+            data_cfg,
+            n_classes=n_classes,
+            channels=channels,
+            tile_size=tile,
             overlap=int(eval_cfg.get("tile_overlap", 32)),
             batch_size=int(eval_cfg.get("batch_size", 8)),
             max_acceptable_drop=float(qcfg.get("max_acceptable_miou_drop", 0.03)),
@@ -484,7 +509,10 @@ def main(argv: list[str] | None = None) -> int:
         report["accuracy"] = acc.as_dict()
         log.info(
             "mIoU: fp32 %.4f → int8 %.4f, degrado %+.4f (soglia %.3f) → %s",
-            acc.fp32_miou, acc.int8_miou, -acc.miou_drop, acc.max_acceptable_drop,
+            acc.fp32_miou,
+            acc.int8_miou,
+            -acc.miou_drop,
+            acc.max_acceptable_drop,
             "accettabile" if acc.acceptable else "OLTRE SOGLIA",
         )
         if not acc.acceptable:

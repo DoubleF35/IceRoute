@@ -108,12 +108,19 @@ def measure_downlink(
             # ground-side comparison geodesic, 26 KB the satellite never sends.
             route = downlink_route(json.loads(gj.read_text()))
 
-        results.append(measure_scene(
-            scene.meta.scene_id, mask, np.stack([scene.hh, scene.hv]),
-            n_classes=N_CLASSES, mask_source="predicted", netcdf_path=path,
-            route_geojson=route, coverage=float(scene.mask_valid.mean()),
-            metadata={"scene_id": scene.meta.scene_id, "crs": "EPSG:3413"},
-        ))
+        results.append(
+            measure_scene(
+                scene.meta.scene_id,
+                mask,
+                np.stack([scene.hh, scene.hv]),
+                n_classes=N_CLASSES,
+                mask_source="predicted",
+                netcdf_path=path,
+                route_geojson=route,
+                coverage=float(scene.mask_valid.mean()),
+                metadata={"scene_id": scene.meta.scene_id, "crs": "EPSG:3413"},
+            )
+        )
         log.info("  %s: %.0f:1", scene.meta.scene_id[:18], results[-1].ratio)
         del scene, pred
         if device == "cuda":
@@ -152,55 +159,82 @@ def adjudicate(metrics: dict) -> list[dict]:
     rows = []
 
     def add(claim_id, claimed, measured, status, action):
-        rows.append({"id": claim_id, "claimed": claimed, "measured": measured,
-                     "status": status, "action": action})
+        rows.append(
+            {
+                "id": claim_id,
+                "claimed": claimed,
+                "measured": measured,
+                "status": status,
+                "action": action,
+            }
+        )
 
     int8_kb = size.get("int8_kb")
-    add("A-02", "58 KB di pesi INT8",
+    add(
+        "A-02",
+        "58 KB di pesi INT8",
         f"{int8_kb:.0f} KB" if int8_kb else "non misurato",
         "contraddetta" if int8_kb else "non misurata",
         f"Sostituire con {size.get('int8_mb', 0):.2f} MB. A "
         f"{size.get('bytes_per_parameter_int8', 0):.2f} byte/parametro i 58 KB sono "
-        f"aritmeticamente impossibili." if int8_kb else "Lancia make quantize.")
+        f"aritmeticamente impossibili."
+        if int8_kb
+        else "Lancia make quantize.",
+    )
 
     drop = acc.get("miou_drop")
-    add("A-04", "1–3% di mIoU perso con INT8",
+    add(
+        "A-04",
+        "1–3% di mIoU perso con INT8",
         f"{drop:+.4f}" if isinstance(drop, float) else "non misurato",
-        "contraddetta (in meglio)" if isinstance(drop, float) and drop <= 0.01
-        else "non misurata",
+        "contraddetta (in meglio)" if isinstance(drop, float) and drop <= 0.01 else "non misurata",
         "Dire che il degrado misurato e' nullo: e' meglio di quanto dichiarato."
-        if isinstance(drop, float) else "Lancia make quantize.")
+        if isinstance(drop, float)
+        else "Lancia make quantize.",
+    )
 
     ratio = comp.get("ratio_median")
-    add("P-06 / compressione", "~200:1",
+    add(
+        "P-06 / compressione",
+        "~200:1",
         f"{ratio:.0f}:1" if ratio else "non misurato",
-        ("provvisoria" if comp.get("provisional") else "sostenuta")
-        if ratio else "non misurata",
+        ("provvisoria" if comp.get("provisional") else "sostenuta") if ratio else "non misurata",
         "Misurata sull'ice chart: non citabile finche' non e' sulla maschera predetta."
-        if comp.get("provisional") else
-        (f"Usare {ratio:.0f}:1." if ratio else "Lancia make report."))
+        if comp.get("provisional")
+        else (f"Usare {ratio:.0f}:1." if ratio else "Lancia make report."),
+    )
 
     miou = agg.get("miou")
-    add("mIoU", "6 stadi di sviluppo del ghiaccio",
+    add(
+        "mIoU",
+        "6 stadi di sviluppo del ghiaccio",
         f"{_fmt(miou)} su 3 classi" if miou else "non misurato",
         "ridimensionata",
         "Il deck deve dire 3 classi: acqua libera, ghiaccio sottile, ghiaccio spesso. "
-        "Il ripiego SPEC §7.4 e' attivo (D-020).")
+        "Il ripiego SPEC §7.4 e' attivo (D-020).",
+    )
 
-    add("A-03", "5,3 ms per tile (proiezione GPU@SAT)",
+    add(
+        "A-03",
+        "5,3 ms per tile (proiezione GPU@SAT)",
         f"{lat.get('median_ms_per_tile', float('nan')):.0f} ms su CPU 1 thread"
-        if lat else "non misurata",
+        if lat
+        else "non misurata",
         "grandezza diversa",
         "La latenza CPU non valida la proiezione GPU@SAT: sono due cose. "
-        "Etichettare la proiezione come tale.")
+        "Etichettare la proiezione come tale.",
+    )
 
     unsafe = (ev.get("scenes") or {}).get("worst_unsafe_fraction")
     if isinstance(unsafe, float):
-        add("sicurezza", "(nessuna affermazione pubblica)",
+        add(
+            "sicurezza",
+            "(nessuna affermazione pubblica)",
             f"{unsafe:.1%} permissiva nel caso peggiore",
             "da dichiarare",
             "E' la frazione di pixel dove una rotta passerebbe in ghiaccio vietato. "
-            "Va detta prima che la trovi qualcun altro.")
+            "Va detta prima che la trovi qualcun altro.",
+        )
     return rows
 
 
@@ -227,8 +261,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--demo-dir", type=Path, default=Path("data/demo"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--train-config", type=Path, default=None,
-                    help="default: il config schierato, da artifacts/best_config.txt")
+    ap.add_argument(
+        "--train-config",
+        type=Path,
+        default=None,
+        help="default: il config schierato, da artifacts/best_config.txt",
+    )
     ap.add_argument("--raw-dir", type=Path, default=None)
     ap.add_argument("--device", default=None)
     ap.add_argument("--skip-downlink", action="store_true")
@@ -253,8 +291,11 @@ def main(argv: list[str] | None = None) -> int:
         device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
         log.info("Compressione sulle maschere predette...")
         metrics["compression"] = measure_downlink(
-            args.demo_dir, data_cfg, args.raw_dir,
-            checkpoint=Path(train_cfg["output"]["best_checkpoint"]), device=device,
+            args.demo_dir,
+            data_cfg,
+            args.raw_dir,
+            checkpoint=Path(train_cfg["output"]["best_checkpoint"]),
+            device=device,
         )
         # The number carries the model that produced it. Without this a stale
         # metrics.json cannot be told from a fresh one measured on the wrong net.

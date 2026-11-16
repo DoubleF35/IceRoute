@@ -53,7 +53,9 @@ _SECTION = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*):")
 
 # What a managed value is allowed to look like *before* we touch it. Anything
 # else means a person has written prose there, and prose wins over this module.
-_REPLACEABLE = re.compile(r"^\s*(null|~|true|false|-?\d[\d_]*\.?\d*(?:[eE][-+]?\d+)?|\"[^\"#]*\"|'[^'#]*')\s*$")
+_REPLACEABLE = re.compile(
+    r"^\s*(null|~|true|false|-?\d[\d_]*\.?\d*(?:[eE][-+]?\d+)?|\"[^\"#]*\"|'[^'#]*')\s*$"
+)
 
 
 class SyncError(RuntimeError):
@@ -66,7 +68,7 @@ class Measure:
 
     section: str
     key: str
-    source: tuple[str, ...]          # path into metrics.json
+    source: tuple[str, ...]  # path into metrics.json
     fmt: str = "{:d}"
 
     @property
@@ -95,8 +97,12 @@ MEASURES: tuple[Measure, ...] = (
     Measure("downlink", "ratio_max", ("compression", "ratio_max"), "{:.1f}"),
     Measure("model", "parameters", ("evaluation", "n_parameters"), "{:d}"),
     Measure("model", "onnx_int8_bytes", ("quantization", "size", "int8_bytes"), "{:d}"),
-    Measure("model", "latency_ms_per_tile",
-            ("quantization", "latency", "single_thread", "int8", "median_ms_per_tile"), "{:.3f}"),
+    Measure(
+        "model",
+        "latency_ms_per_tile",
+        ("quantization", "latency", "single_thread", "int8", "median_ms_per_tile"),
+        "{:.3f}",
+    ),
     Measure("model", "int8_degradation", ("quantization", "accuracy", "miou_drop"), "{:.4f}"),
 )
 
@@ -257,23 +263,29 @@ def run(repo: Path = Path("."), *, dry_run: bool = False) -> Result:
     verb = "da aggiornare" if dry_run else "aggiornate"
     for where in res.changed:
         log.info("  %s %s", where, verb)
-    log.info("%s: %d %s, %d già allineate, %d non misurate",
-             ASSUMPTIONS, len(res.changed), verb, len(res.unchanged), len(res.missing))
+    log.info(
+        "%s: %d %s, %d già allineate, %d non misurate",
+        ASSUMPTIONS,
+        len(res.changed),
+        verb,
+        len(res.unchanged),
+        len(res.missing),
+    )
     return res
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Allinea configs/assumptions.yaml alle misure.")
     ap.add_argument("--repo", type=Path, default=Path("."))
-    ap.add_argument("--check", action="store_true",
-                    help="non scrivere; esci 1 se il file è disallineato")
+    ap.add_argument(
+        "--check", action="store_true", help="non scrivere; esci 1 se il file è disallineato"
+    )
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     res = run(args.repo, dry_run=args.check)
     if args.check and res.wrote:
-        log.error("configs/assumptions.yaml è indietro rispetto alle misure: "
-                  "lancia make report")
+        log.error("configs/assumptions.yaml è indietro rispetto alle misure: lancia make report")
         return 1
     return 0
 

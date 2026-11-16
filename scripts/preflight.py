@@ -61,8 +61,10 @@ def check_demo(repo: Path, rep: Report) -> dict:
     index = json.loads(index_path.read_text())
 
     if not index.get("generated_from_predicted_mask"):
-        rep.fail("rotte dalla maschera predetta",
-                 "l'indice viene da una classifica su ice chart, non dal modello")
+        rep.fail(
+            "rotte dalla maschera predetta",
+            "l'indice viene da una classifica su ice chart, non dal modello",
+        )
     else:
         rep.ok("rotte dalla maschera predetta")
 
@@ -107,21 +109,28 @@ def check_demo(repo: Path, rep: Report) -> dict:
     # wrong guess here is unrecoverable.
     img_dir = repo / "data/demo/images"
     if img_dir.exists():
-        referenced = {v for s in scenes for k, v in (s.get("files") or {}).items()
-                      if isinstance(v, str) and v.endswith(".png")}
+        referenced = {
+            v
+            for s in scenes
+            for k, v in (s.get("files") or {}).items()
+            if isinstance(v, str) and v.endswith(".png")
+        }
         on_disk = list(img_dir.glob("*.png"))
         orphans = [p for p in on_disk if p.name not in referenced]
         if orphans:
             mb = sum(p.stat().st_size for p in orphans) / 1e6
-            rep.warn("immagini orfane in data/demo/images",
-                     f"{len(orphans)} su {len(on_disk)} non sono nell'indice ({mb:.0f} MB)")
+            rep.warn(
+                "immagini orfane in data/demo/images",
+                f"{len(orphans)} su {len(on_disk)} non sono nell'indice ({mb:.0f} MB)",
+            )
         else:
             rep.ok("immagini orfane in data/demo/images", "nessuna")
 
     differ = sum(1 for s in carousel if s.get("routes_differ"))
     if differ == 0:
-        rep.fail("momento 'cambio classe di nave'",
-                 "nessuna scena lo sostiene: il selettore è teatro")
+        rep.fail(
+            "momento 'cambio classe di nave'", "nessuna scena lo sostiene: il selettore è teatro"
+        )
     elif differ < 2:
         rep.warn("momento 'cambio classe di nave'", f"solo {differ} scena su {len(carousel)}")
     else:
@@ -147,8 +156,10 @@ def check_model_is_current(repo: Path, index: dict, rep: Report) -> None:
     want = (cfg.get("output") or {}).get("best_checkpoint")
     got = index.get("checkpoint")
     if got != want:
-        rep.fail("demo allineata al modello scelto",
-                 f"la demo usa {got}, il modello scelto è {want}: rilancia precompute")
+        rep.fail(
+            "demo allineata al modello scelto",
+            f"la demo usa {got}, il modello scelto è {want}: rilancia precompute",
+        )
     else:
         rep.ok("demo allineata al modello scelto", str(want))
 
@@ -157,20 +168,26 @@ def check_model_is_current(repo: Path, index: dict, rep: Report) -> None:
     # `make report` quietly restated the headline compression ratio as 347:1
     # instead of 439:1, with no code in the measurement chain having changed.
     # Nothing caught it, because the check above only looks at data/demo/.
-    comp = (json.loads((repo / "artifacts/metrics.json").read_text()).get("compression")
-            if (repo / "artifacts/metrics.json").exists() else None) or {}
+    comp = (
+        json.loads((repo / "artifacts/metrics.json").read_text()).get("compression")
+        if (repo / "artifacts/metrics.json").exists()
+        else None
+    ) or {}
     measured = comp.get("checkpoint")
     if not comp:
         return
     if measured is None:
-        rep.warn("compressione misurata sul modello scelto",
-                 "metrics.json non registra con quale modello: rilancia make report")
+        rep.warn(
+            "compressione misurata sul modello scelto",
+            "metrics.json non registra con quale modello: rilancia make report",
+        )
     elif measured != want:
-        rep.fail("compressione misurata sul modello scelto",
-                 f"misurata su {measured}, schierato è {want}: rilancia make report")
+        rep.fail(
+            "compressione misurata sul modello scelto",
+            f"misurata su {measured}, schierato è {want}: rilancia make report",
+        )
     else:
-        rep.ok("compressione misurata sul modello scelto",
-               f"{comp.get('ratio_median')}:1")
+        rep.ok("compressione misurata sul modello scelto", f"{comp.get('ratio_median')}:1")
 
 
 def check_worst_case_is_worst(repo: Path, rep: Report) -> None:
@@ -180,21 +197,26 @@ def check_worst_case_is_worst(repo: Path, rep: Report) -> None:
         return
     cfg = yaml.safe_load(demo_cfg.read_text())
     worst_id = (cfg.get("worst_case") or {}).get("id")
-    per = ((json.loads(metrics.read_text()).get("evaluation") or {})
-           .get("scenes") or {}).get("per_scene") or []
+    per = ((json.loads(metrics.read_text()).get("evaluation") or {}).get("scenes") or {}).get(
+        "per_scene"
+    ) or []
     scored = {r["scene_id"]: (r.get("rio") or {}).get("worst_unsafe_fraction") for r in per}
     if not worst_id or not isinstance(scored.get(worst_id), float):
         rep.warn("caso peggiore dichiarato", "non valutato")
         return
-    offenders = [e["id"] for e in cfg["scenes"]
-                 if isinstance(scored.get(e["id"]), float)
-                 and scored[e["id"]] >= scored[worst_id]]
+    offenders = [
+        e["id"]
+        for e in cfg["scenes"]
+        if isinstance(scored.get(e["id"]), float) and scored[e["id"]] >= scored[worst_id]
+    ]
     if offenders:
-        rep.fail("il caso peggiore è davvero il peggiore",
-                 f"più permissive nel carosello: {offenders}")
+        rep.fail(
+            "il caso peggiore è davvero il peggiore", f"più permissive nel carosello: {offenders}"
+        )
     else:
-        rep.ok("il caso peggiore è davvero il peggiore",
-               f"{worst_id[:14]} a {scored[worst_id]:.1%}")
+        rep.ok(
+            "il caso peggiore è davvero il peggiore", f"{worst_id[:14]} a {scored[worst_id]:.1%}"
+        )
 
 
 def check_routes_are_drawable(repo: Path, index: dict, rep: Report) -> None:
@@ -264,9 +286,11 @@ def check_standalone(repo: Path, rep: Report) -> None:
         return
     mb = page.stat().st_size / 1e6
     if index.exists() and page.stat().st_mtime < index.stat().st_mtime:
-        rep.fail("copia statica demo.html",
-                 f"più vecchia di data/demo/: mostra una build superata. Rilancia "
-                 f"make demo-static ({mb:.1f} MB)")
+        rep.fail(
+            "copia statica demo.html",
+            f"più vecchia di data/demo/: mostra una build superata. Rilancia "
+            f"make demo-static ({mb:.1f} MB)",
+        )
     else:
         rep.ok("copia statica demo.html", f"{mb:.1f} MB, aggiornata")
 
@@ -288,17 +312,25 @@ def check_assumptions(repo: Path, rep: Report) -> None:
         rep.warn("assunzioni allineate alle misure", str(exc))
         return
     if res.changed:
-        rep.fail("assunzioni allineate alle misure",
-                 f"{len(res.changed)} indietro ({', '.join(res.changed[:3])}): make report")
+        rep.fail(
+            "assunzioni allineate alle misure",
+            f"{len(res.changed)} indietro ({', '.join(res.changed[:3])}): make report",
+        )
     elif res.missing:
-        rep.warn("assunzioni allineate alle misure",
-                 f"{len(res.missing)} non ancora misurate: {', '.join(res.missing[:3])}")
+        rep.warn(
+            "assunzioni allineate alle misure",
+            f"{len(res.missing)} non ancora misurate: {', '.join(res.missing[:3])}",
+        )
     else:
         rep.ok("assunzioni allineate alle misure", f"{len(res.unchanged)} voci")
 
 
 def check_backup_video(repo: Path, rep: Report) -> None:
-    vids = list((repo / "artifacts/video").glob("*.mp4")) if (repo / "artifacts/video").exists() else []
+    vids = (
+        list((repo / "artifacts/video").glob("*.mp4"))
+        if (repo / "artifacts/video").exists()
+        else []
+    )
     if not vids:
         rep.warn("video di riserva", "non registrato: make video")
     else:
@@ -310,6 +342,7 @@ def check_imports(rep: Report) -> None:
     """The UI must import with the network off, before anyone clicks anything."""
     try:
         import iceroute.demo.app  # noqa: F401
+
         rep.ok("la UI si importa")
     except Exception as exc:  # noqa: BLE001
         rep.fail("la UI si importa", str(exc))

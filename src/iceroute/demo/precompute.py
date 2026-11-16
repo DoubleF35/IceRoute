@@ -59,9 +59,9 @@ log = logging.getLogger("precompute")
 # High contrast, no pastels: a conference projector washes out mid tones and
 # these have to stay separable from the back of the room (SPEC §9.4).
 CLASS_COLOURS = {
-    0: (10, 40, 90),      # acqua libera — blu profondo
-    1: (0, 200, 255),     # ghiaccio sottile — ciano acceso
-    2: (255, 255, 255),   # ghiaccio spesso — bianco
+    0: (10, 40, 90),  # acqua libera — blu profondo
+    1: (0, 200, 255),  # ghiaccio sottile — ciano acceso
+    2: (255, 255, 255),  # ghiaccio spesso — bianco
 }
 NODATA_COLOUR = (26, 26, 26)
 
@@ -76,18 +76,26 @@ NODATA_COLOUR = (26, 26, 26)
 # 3/10 concentration, RIO +12. Without a concentration layer the demo could not
 # show why, only assert it.
 SIC_COLOURS = {
-    0: (24, 22, 38), 1: (52, 30, 74), 2: (86, 36, 98), 3: (124, 42, 104),
-    4: (160, 52, 98), 5: (194, 68, 84), 6: (222, 92, 66), 7: (240, 124, 48),
-    8: (250, 162, 36), 9: (252, 202, 48), 10: (255, 240, 120),
+    0: (24, 22, 38),
+    1: (52, 30, 74),
+    2: (86, 36, 98),
+    3: (124, 42, 104),
+    4: (160, 52, 98),
+    5: (194, 68, 84),
+    6: (222, 92, 66),
+    7: (240, 124, 48),
+    8: (250, 162, 36),
+    9: (252, 202, 48),
+    10: (255, 240, 120),
 }
 
 # RIO is rendered around the two POLARIS decision boundaries, not on a smooth
 # ramp: the eye should read "may I go here", not "what number is this".
 RIO_COLOURS = {
-    0: (46, 204, 113),    # normale
-    1: (241, 196, 15),    # rischio elevato
-    2: (231, 76, 60),     # considerazione speciale
-    3: (40, 40, 40),      # ignoto / fuori copertura
+    0: (46, 204, 113),  # normale
+    1: (241, 196, 15),  # rischio elevato
+    2: (231, 76, 60),  # considerazione speciale
+    3: (40, 40, 40),  # ignoto / fuori copertura
 }
 
 
@@ -187,10 +195,13 @@ def predict_mask(model, scene, channels: list[str], eval_cfg: dict, device: str)
     from iceroute.model.inference import predict_scene
 
     labels, _, stats = predict_scene(
-        model, scene.channels(channels), n_classes=N_CLASSES,
+        model,
+        scene.channels(channels),
+        n_classes=N_CLASSES,
         tile_size=int(eval_cfg.get("tile_size", 256)),
         overlap=int(eval_cfg.get("tile_overlap", 32)),
-        batch_size=int(eval_cfg.get("batch_size", 8)), device=device,
+        batch_size=int(eval_cfg.get("batch_size", 8)),
+        device=device,
     )
     return labels, stats
 
@@ -307,13 +318,16 @@ def process_scene(
     rios, costs = {}, {}
     for ic in ice_classes:
         rio = compute_rio(
-            geo.sod, ic, mapping, table=table, sic=geo.sic,
-            mask_valid=geo.mask_valid, n_classes=N_CLASSES,
+            geo.sod,
+            ic,
+            mapping,
+            table=table,
+            sic=geo.sic,
+            mask_valid=geo.mask_valid,
+            n_classes=N_CLASSES,
         )
         rios[ic] = rio
-        costs[ic] = build_cost_grid(
-            rio, speed_model_from_config(routing_cfg, ic), land_mask=land
-        )
+        costs[ic] = build_cost_grid(rio, speed_model_from_config(routing_cfg, ic), land_mask=land)
         assets.files[f"rio_{ic}"] = save_png(
             colour_rio(rio, ic), img_dir / f"{stem}_rio_{ic}.png", downscale=1
         )
@@ -322,10 +336,7 @@ def process_scene(
     step("Scelta dei waypoint")
     entry = (routing_cfg.get("waypoints") or {}).get(scene.meta.scene_id)
     try:
-        wp = (
-            waypoints_from_config(geo.grid, entry) if entry
-            else choose_waypoints(geo.grid, costs)
-        )
+        wp = waypoints_from_config(geo.grid, entry) if entry else choose_waypoints(geo.grid, costs)
     except ValueError as exc:
         assets.warnings.append(f"Waypoint non selezionabili: {exc}")
         log.warning("  %s", assets.warnings[-1])
@@ -341,7 +352,10 @@ def process_scene(
         entry_out: dict = {"polaris": summarise(rio, ic)}
         try:
             route = find_route(
-                cost, geo.grid, wp.start, wp.goal,
+                cost,
+                geo.grid,
+                wp.start,
+                wp.goal,
                 connectivity=int(astar_cfg["connectivity"]),
                 heuristic_weight=float(astar_cfg["heuristic_weight"]),
                 max_expansions=int(astar_cfg["max_expansions"]),
@@ -370,29 +384,46 @@ def process_scene(
             }
 
         base = geodesic_baseline(
-            geo.grid, cost, wp.start, wp.goal, open_water_speed_kn=v_open,
-            rio=rio, land_mask=land, coverage=geo.mask_valid,
+            geo.grid,
+            cost,
+            wp.start,
+            wp.goal,
+            open_water_speed_kn=v_open,
+            rio=rio,
+            land_mask=land,
+            coverage=geo.mask_valid,
         )
         simple = simplify_route(
-            route, geo.grid,
+            route,
+            geo.grid,
             tolerance_m=float(simp_cfg["tolerance_m"]),
             max_waypoints=int(simp_cfg["max_waypoints"]),
             max_turn_deg=float(simp_cfg["max_turn_deg"]),
         )
         path = routes_dir / f"{stem}__{ic}.geojson"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [
-                simple.as_geojson({
-                    "kind": "iceroute", "ice_class": ic,
-                    "transit_time_hours": round(route.time_hours, 3),
-                    "distance_km": round(route.distance_km, 3),
-                    "min_rio_on_route": None if route.min_rio is None else round(route.min_rio, 2),
-                }),
-                base.as_geojson(),
-            ],
-        }, indent=1))
+        path.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        simple.as_geojson(
+                            {
+                                "kind": "iceroute",
+                                "ice_class": ic,
+                                "transit_time_hours": round(route.time_hours, 3),
+                                "distance_km": round(route.distance_km, 3),
+                                "min_rio_on_route": None
+                                if route.min_rio is None
+                                else round(route.min_rio, 2),
+                            }
+                        ),
+                        base.as_geojson(),
+                    ],
+                },
+                indent=1,
+            )
+        )
 
         # The drawable form of the same two tracks, in grid pixels. Separate
         # file, never inside the GeoJSON: that one goes down the downlink and
@@ -409,14 +440,16 @@ def process_scene(
             route.cells, geo.sod, geo.sic, rio, ic, CLASS_NAMES
         )
 
-        entry_out.update({
-            "route_exists": True,
-            "geojson": path.name,
-            "overlay": ov_path.name,
-            "comparison": compare(route, base),
-            "n_waypoints": len(simple),
-            "simplify_warnings": simple.warnings,
-        })
+        entry_out.update(
+            {
+                "route_exists": True,
+                "geojson": path.name,
+                "overlay": ov_path.name,
+                "comparison": compare(route, base),
+                "n_waypoints": len(simple),
+                "simplify_warnings": simple.warnings,
+            }
+        )
         assets.classes[ic] = entry_out
         signatures.append(tuple(route.cells))
         log.info("  %s: %s", ic, entry_out["comparison"]["headline"])
@@ -445,8 +478,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Genera data/demo/ per la UI. SPEC §9.2.")
     ap.add_argument("--config", type=Path, default=Path("configs/routing.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--train-config", type=Path, default=None,
-                    help="default: il config schierato, da artifacts/best_config.txt")
+    ap.add_argument(
+        "--train-config",
+        type=Path,
+        default=None,
+        help="default: il config schierato, da artifacts/best_config.txt",
+    )
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=Path("data/demo"))
     ap.add_argument("--demo-config", type=Path, default=Path("configs/demo.yaml"))
@@ -455,9 +492,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--downscale", type=int, default=4, help="fattore di riduzione dei PNG")
     ap.add_argument("--device", default=None)
     ap.add_argument(
-        "--use-chart", action="store_true",
+        "--use-chart",
+        action="store_true",
         help="instrada sull'ice chart invece che sul modello: serve a CLASSIFICARE "
-             "le scene candidate, non a costruire la demo",
+        "le scene candidate, non a costruire la demo",
     )
     args = ap.parse_args(argv)
 
@@ -472,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
     data_cfg = load_config(args.data_config)
     routing_cfg = yaml.safe_load(args.config.read_text())
     from iceroute.report.metrics import deployed_config
+
     train_path = args.train_config or deployed_config()
     train_cfg = yaml.safe_load(train_path.read_text())
     log.info("Modello: %s", train_path)
@@ -494,9 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     # Scene source, in order of precedence: explicit --scenes, then the demo
     # config, then whatever directory was given. The config exists so the choice
     # of scenes is a reviewed decision in git, not a flag someone typed once.
-    demo_cfg = (
-        yaml.safe_load(args.demo_config.read_text()) if args.demo_config.exists() else {}
-    )
+    demo_cfg = yaml.safe_load(args.demo_config.read_text()) if args.demo_config.exists() else {}
     if args.raw_dir is None:
         args.raw_dir = Path(demo_cfg.get("source_dir", "data/raw/train"))
 
@@ -514,20 +551,20 @@ def main(argv: list[str] | None = None) -> int:
             scenes.append(worst_id)
         log.info(
             "Scene demo da %s: %d%s",
-            args.demo_config, len(scenes),
+            args.demo_config,
+            len(scenes),
             f" (di cui 1 caso peggiore: {worst_id[:18]})" if worst_id else "",
         )
     elif args.raw_dir.name == "test":
         # Official test scenes are not in the frozen split; enumerate from disk,
         # and only those whose reference labels are present.
         scenes = [
-            p.name for p in sorted(args.raw_dir.glob("*_prep.nc"))
-            if resolve_labels(p) is not None
+            p.name for p in sorted(args.raw_dir.glob("*_prep.nc")) if resolve_labels(p) is not None
         ]
     else:
-        split = yaml.safe_load(
-            Path(data_cfg.get("split_file", "configs/split.yaml")).read_text()
-        )["split"]
+        split = yaml.safe_load(Path(data_cfg.get("split_file", "configs/split.yaml")).read_text())[
+            "split"
+        ]
         scenes = list(split["demo"])
 
     present = [s for s in scenes if (args.raw_dir / s).exists()]
@@ -541,11 +578,21 @@ def main(argv: list[str] | None = None) -> int:
         is_worst = sid == worst_id
         log.info("[%d/%d] %s%s", i, len(present), sid, "  [CASO PEGGIORE]" if is_worst else "")
         try:
-            results.append(process_scene(
-                args.raw_dir / sid, model=model, data_cfg=data_cfg, routing_cfg=routing_cfg,
-                train_cfg=train_cfg, out_dir=args.out, table=table, device=device,
-                downscale=args.downscale, use_chart=args.use_chart, worst_case=is_worst,
-            ))
+            results.append(
+                process_scene(
+                    args.raw_dir / sid,
+                    model=model,
+                    data_cfg=data_cfg,
+                    routing_cfg=routing_cfg,
+                    train_cfg=train_cfg,
+                    out_dir=args.out,
+                    table=table,
+                    device=device,
+                    downscale=args.downscale,
+                    use_chart=args.use_chart,
+                    worst_case=is_worst,
+                )
+            )
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the batch
             log.exception("  fallita: %s", exc)
 
@@ -555,8 +602,8 @@ def main(argv: list[str] | None = None) -> int:
             "Le rotte sono calcolate sulla maschera PREDETTA dal modello, non sull'ice "
             "chart. Instradare sulla carta dimostrerebbe un'analisi che non abbiamo "
             "prodotto noi."
-            if not args.use_chart else
-            "CLASSIFICA: rotte calcolate sull'ICE CHART, non sul modello. Serve solo a "
+            if not args.use_chart
+            else "CLASSIFICA: rotte calcolate sull'ICE CHART, non sul modello. Serve solo a "
             "scegliere le scene candidate. Non e' un output utilizzabile come demo."
         ),
         "scheme": "3 classi (ripiego SPEC §7.4)",
@@ -579,11 +626,14 @@ def main(argv: list[str] | None = None) -> int:
     log.info("=" * 66)
     log.info(
         "Scene generate: %d (%d nel carosello + %d caso peggiore)",
-        len(results), len(carousel), len(results) - len(carousel),
+        len(results),
+        len(carousel),
+        len(results) - len(carousel),
     )
     log.info(
         "Scene in cui la rotta CAMBIA con la classe di nave: %d/%d%s",
-        len(differing), len(carousel),
+        len(differing),
+        len(carousel),
         f" — {', '.join(s[:15] for s in differing)}" if differing else "",
     )
     # Which scene actually *looks* like the claim. A scene can forbid the
@@ -591,8 +641,12 @@ def main(argv: list[str] | None = None) -> int:
     # each other; on a projector that argues nothing. Ranked here so the choice
     # of what to open on stage is made against a measurement.
     ranked = sorted(
-        ((a.scene_id, ic, (e.get("separation") or {}).get("pct_diagonal") or 0.0)
-         for a in carousel for ic, e in a.classes.items() if e.get("route_exists")),
+        (
+            (a.scene_id, ic, (e.get("separation") or {}).get("pct_diagonal") or 0.0)
+            for a in carousel
+            for ic, e in a.classes.items()
+            if e.get("route_exists")
+        ),
         key=lambda t: -t[2],
     )
     if ranked:

@@ -209,8 +209,8 @@ class GeocodedScene:
     """A scene resampled onto a regular projected grid."""
 
     grid: GeoGrid
-    sod: np.ndarray            # uint8, FILL_VALUE outside coverage
-    mask_valid: np.ndarray     # bool
+    sod: np.ndarray  # uint8, FILL_VALUE outside coverage
+    mask_valid: np.ndarray  # bool
     sic: np.ndarray | None = None
     distance_to_land: np.ndarray | None = None
     scene_id: str = ""
@@ -304,9 +304,7 @@ def geocode_scene(
     sod = _resample_nearest(sx, sy, scene.sod[sl].ravel(), grid, FILL_VALUE, "uint8")
     valid = _resample_nearest(sx, sy, scene.mask_valid[sl].ravel(), grid, False, "bool")
     sic = _resample_nearest(sx, sy, scene.sic[sl].ravel(), grid, FILL_VALUE, "uint8")
-    dist = _resample_nearest(
-        sx, sy, scene.distance_to_land[sl].ravel(), grid, np.nan, "float32"
-    )
+    dist = _resample_nearest(sx, sy, scene.distance_to_land[sl].ravel(), grid, np.nan, "float32")
 
     # A cell can only be valid if it actually received a source pixel.
     valid &= sod != FILL_VALUE

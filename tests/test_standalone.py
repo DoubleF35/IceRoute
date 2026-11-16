@@ -17,11 +17,17 @@ from iceroute.web import standalone as sa
 
 
 def _entry(hours=24.0, min_rio=6.0, feasible=False, blocked=True):
-    return {"comparison": {
-        "iceroute": {"time_hours": hours, "min_rio": min_rio, "distance_km": 300.0},
-        "baseline": {"time_hours": 22.0 if feasible else None, "feasible": feasible,
-                     "blocked_by_ice": blocked, "n_no_go_cells": 12 if blocked else 0},
-    }}
+    return {
+        "comparison": {
+            "iceroute": {"time_hours": hours, "min_rio": min_rio, "distance_km": 300.0},
+            "baseline": {
+                "time_hours": 22.0 if feasible else None,
+                "feasible": feasible,
+                "blocked_by_ice": blocked,
+                "n_no_go_cells": 12 if blocked else 0,
+            },
+        }
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -53,8 +59,7 @@ def test_the_table_matches_the_live_ui_exactly():
 
     t = sa.transit_table(_entry(hours=24.0, min_rio=6.0), "PC6", 12.0)
     for speed, got in zip(sa.SPEEDS, t["values"], strict=True):
-        want = rescale_transit(24.0, 6.0, nominal_kn=12.0,
-                               chosen_kn=speed, ice_class="PC6").hours
+        want = rescale_transit(24.0, 6.0, nominal_kn=12.0, chosen_kn=speed, ice_class="PC6").hours
         assert got == pytest.approx(round(want, 2))
 
 
@@ -83,7 +88,8 @@ def _ov(no_go=None):
         "grid_shape": [40, 60],
         "iceroute": {"path": [[r, r] for r in range(2, 20)], "waypoints": [[2, 2], [19, 19]]},
         "baseline": {"path": [[20, c] for c in range(2, 58)], "no_go": no_go or []},
-        "start": [2, 2], "goal": [19, 19],
+        "start": [2, 2],
+        "goal": [19, 19],
     }
 
 
@@ -97,13 +103,13 @@ def test_the_svg_declares_the_grid_it_was_built_for():
 def test_both_tracks_reach_the_svg():
     svg = sa.svg_overlay(_ov())
     assert 'class="lay-baseline"' in svg and 'class="lay-iceroute"' in svg
-    assert svg.count("<polyline") >= 4       # casing + core, twice
+    assert svg.count("<polyline") >= 4  # casing + core, twice
 
 
 def test_forbidden_stretches_are_runs_not_one_marker_per_cell():
     svg = sa.svg_overlay(_ov(no_go=[[20, c] for c in range(10, 30)]))
     assert 'class="nogo"' in svg
-    assert svg.count("<circle") <= 4         # waypoints and endpoints only
+    assert svg.count("<circle") <= 4  # waypoints and endpoints only
 
 
 def test_an_isolated_forbidden_cell_becomes_a_marker():
@@ -122,18 +128,40 @@ def test_no_overlay_is_no_svg():
 
 def _ctx():
     return {
-        "scenes": [{"id": "S.nc", "region": "Kara", "acquired": "2020-07-01",
-                    "coverage": 0.8, "worst_case": False, "files": {"sar": "a.png"},
-                    "classes": {"PC6": {"route_exists": True, "svg": "", "rio_img": None,
-                                        "comparison": _entry()["comparison"],
-                                        "n_waypoints": 5, "polaris": {}, "conditions": {},
-                                        "transit": {"values": [], "baseline": [], "note": ""},
-                                        "payload": None, "message": ""}}}],
+        "scenes": [
+            {
+                "id": "S.nc",
+                "region": "Kara",
+                "acquired": "2020-07-01",
+                "coverage": 0.8,
+                "worst_case": False,
+                "files": {"sar": "a.png"},
+                "classes": {
+                    "PC6": {
+                        "route_exists": True,
+                        "svg": "",
+                        "rio_img": None,
+                        "comparison": _entry()["comparison"],
+                        "n_waypoints": 5,
+                        "polaris": {},
+                        "conditions": {},
+                        "transit": {"values": [], "baseline": [], "note": ""},
+                        "payload": None,
+                        "message": "",
+                    }
+                },
+            }
+        ],
         "images": {"a.png": "data:image/png;base64,AAAA"},
-        "speeds": sa.SPEEDS, "nominal_kn": 12.0, "hours_per_day": 24.0,
-        "scheme": "3 classi", "checkpoint": "m.pt",
+        "speeds": sa.SPEEDS,
+        "nominal_kn": 12.0,
+        "hours_per_day": 24.0,
+        "scheme": "3 classi",
+        "checkpoint": "m.pt",
         "aggregate": {"miou": 0.5324, "binary_accuracy": 0.9059},
-        "n_eval_scenes": 20, "compression": 439.2, "quant": {"int8_mb": 2.05},
+        "n_eval_scenes": 20,
+        "compression": 439.2,
+        "quant": {"int8_mb": 2.05},
     }
 
 
@@ -143,7 +171,7 @@ def test_the_page_is_self_contained():
     page = sa.build_page(_ctx())
     for remote in ("http://", "https://", "//cdn", "<link"):
         assert remote not in page, f"riferimento esterno: {remote}"
-    assert page.count("<script") == 2        # the data blob and the renderer
+    assert page.count("<script") == 2  # the data blob and the renderer
 
 
 def test_the_page_says_the_live_computation_is_missing():
@@ -226,10 +254,8 @@ def test_the_offline_copy_carries_the_link_time_too():
     page = Path("demo.html")
     if not page.exists():
         pytest.skip("demo.html assente")
-    blob = json.loads(re.search(r"const D = (\{.*?\});</script>",
-                                page.read_text(), re.S).group(1))
-    pays = [c["payload"] for s in blob["scenes"] for c in s["classes"].values()
-            if c.get("payload")]
+    blob = json.loads(re.search(r"const D = (\{.*?\});</script>", page.read_text(), re.S).group(1))
+    pays = [c["payload"] for s in blob["scenes"] for c in s["classes"].values() if c.get("payload")]
     assert pays, "nessun payload nella pagina"
 
     measured = [p for p in pays if p.get("total")]
@@ -283,15 +309,25 @@ def test_the_legend_colours_come_from_the_modules_that_paint_the_rasters():
     assert pal["rio"] == [h(RIO_COLOURS[i]) for i in (0, 1, 2)]
     assert pal["sic"]["10"] == h(SIC_COLOURS[10])
     assert (pal["ours"], pal["base"], pal["nogo"]) == (
-        h(ov.COL_ICEROUTE), h(ov.COL_BASELINE), h(ov.COL_NO_GO))
+        h(ov.COL_ICEROUTE),
+        h(ov.COL_BASELINE),
+        h(ov.COL_NO_GO),
+    )
 
 
 def test_no_legend_colour_is_typed_into_the_javascript():
     page = sa.build_page(_ctx())
     js = page.split("<script>")[-1]
     assert "#0a2859" not in page, "il vecchio refuso è tornato"
-    for literal in ("'#2ecc71'", "'#f1c40f'", "'#e74c3c'", "'#00c8ff'",
-                    "'#f5f5f5'", "'#ff2020'", "'#ff2d95'"):
+    for literal in (
+        "'#2ecc71'",
+        "'#f1c40f'",
+        "'#e74c3c'",
+        "'#00c8ff'",
+        "'#f5f5f5'",
+        "'#ff2020'",
+        "'#ff2d95'",
+    ):
         assert literal not in js, f"colore ribattuto a mano: {literal}"
 
 
@@ -318,7 +354,7 @@ def test_the_command_bar_states_which_model_produced_the_page():
     full of numbers is which build it came from."""
     page = sa.build_page(_ctx())
     assert '<div id="top">' in page
-    bar = page.split('<div id="top">')[1].split("</div>\n\n<div class=\"wrap\">")[0]
+    bar = page.split('<div id="top">')[1].split('</div>\n\n<div class="wrap">')[0]
     assert "m.pt" in bar and "3 classi" in bar and "20 scene" in bar
 
 

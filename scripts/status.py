@@ -76,7 +76,9 @@ def main() -> int:
     freeze_col = RED if to_freeze <= 7 else YELLOW if to_freeze <= 14 else DIM
     print(f"\n{BOLD}Calendario{RESET}")
     print(f"  Oggi                {today.isoformat()}")
-    print(f"  Feature freeze      {FEATURE_FREEZE.isoformat()}  {freeze_col}fra {to_freeze} giorni{RESET}")
+    print(
+        f"  Feature freeze      {FEATURE_FREEZE.isoformat()}  {freeze_col}fra {to_freeze} giorni{RESET}"
+    )
     print(f"  Wave / OGR Torino   {PITCH_DAY.isoformat()}  {DIM}fra {to_pitch} giorni{RESET}")
 
     # --- Gate ---------------------------------------------------------------
@@ -93,7 +95,9 @@ def main() -> int:
 
     has_miou = "miou" in str(m).lower()
     g2 = _exists("artifacts/models/unet_int8.onnx") and has_miou
-    print(f"  {mark(g2, partial=_exists('artifacts/models/unet_fp32.pt'))} 2    modello addestrato + INT8")
+    print(
+        f"  {mark(g2, partial=_exists('artifacts/models/unet_fp32.pt'))} 2    modello addestrato + INT8"
+    )
 
     n_geojson = _count("*.geojson", "data/demo")
     g3 = n_geojson >= 15  # 5 scene demo × 3 ice class
@@ -110,13 +114,16 @@ def main() -> int:
     print(f"  data/raw/           {raw_gb:>4.1f} GB")
     n_part = _count("*.part", "data/raw/train") + _count("*.part", "data/raw/test")
     if n_part:
-        print(f"  {YELLOW}Download parziali   {n_part:>4}{RESET}  {DIM}(riprendi con 'make download'){RESET}")
+        print(
+            f"  {YELLOW}Download parziali   {n_part:>4}{RESET}  {DIM}(riprendi con 'make download'){RESET}"
+        )
 
     # --- Numeri misurati ----------------------------------------------------
     print(f"\n{BOLD}Numeri misurati{RESET}")
     if not m:
         print(f"  {DIM}artifacts/metrics.json non esiste ancora — 'make report'{RESET}")
     else:
+
         def show(label: str, *keys: str, fmt: str = "{}") -> None:
             cur: object = m
             for k in keys:
@@ -136,7 +143,8 @@ def main() -> int:
     dec = REPO / "DECISIONS.md"
     if dec.exists():
         open_items = [
-            ln for ln in dec.read_text().splitlines()
+            ln
+            for ln in dec.read_text().splitlines()
             if ln.startswith("| P-") and "| Aperta |" in ln
         ]
         colour = RED if open_items else GREEN

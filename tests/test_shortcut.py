@@ -37,8 +37,13 @@ def _cost(blocked=None, slow=None, slow_kn=3.0) -> CostGrid:
     passable = speed > 0
     with np.errstate(divide="ignore"):
         spm = np.where(passable, 1.0 / (speed * KNOT_TO_MS), np.inf)
-    return CostGrid(seconds_per_metre=spm, passable=passable, speed_kn=speed,
-                    ice_class="PC6", open_water_speed_kn=OPEN_KN)
+    return CostGrid(
+        seconds_per_metre=spm,
+        passable=passable,
+        speed_kn=speed,
+        ice_class="PC6",
+        open_water_speed_kn=OPEN_KN,
+    )
 
 
 def _chain(*corners):
@@ -51,8 +56,13 @@ def _chain(*corners):
 
 
 def _route(cells) -> Route:
-    return Route(cells=cells, lonlat=[(0.0, 0.0)] * len(cells), time_hours=0.0,
-                 distance_km=0.0, ice_class="PC6")
+    return Route(
+        cells=cells,
+        lonlat=[(0.0, 0.0)] * len(cells),
+        time_hours=0.0,
+        distance_km=0.0,
+        ice_class="PC6",
+    )
 
 
 def _detour():
@@ -93,8 +103,9 @@ def test_open_water_collapses_to_a_single_leg():
     r = straighten(_route(_detour()), _cost(), _grid())
     assert r.route.cells[0] == (20, 5) and r.route.cells[-1] == (20, 35)
     assert r.anchors == [(20, 5), (20, 35)], "più di una tratta"
-    assert len(r.route.lonlat) == len(r.route.cells), \
+    assert len(r.route.lonlat) == len(r.route.cells), (
         "simplify_route indicizza lonlat con indici di cells"
+    )
     assert r.metres_saved > 0 and r.seconds_saved > 0
     assert r.percent_distance > 20
 
@@ -121,7 +132,7 @@ def test_speed_is_never_bought_with_risk():
     """The straight line is open water and faster, and it is still refused:
     its worst RIO is below the worst RIO of the stretch it would replace."""
     rio = np.full((N, N), 20.0)
-    rio[18:23, 10:30] = -5.0           # fascia a rischio elevato sulla linea retta
+    rio[18:23, 10:30] = -5.0  # fascia a rischio elevato sulla linea retta
     before = _detour()
     r = straighten(_route(before), _cost(), _grid(), rio=rio)
     assert r.route.min_rio is not None and r.route.min_rio >= 20.0
@@ -155,7 +166,7 @@ def test_the_result_is_never_slower_than_what_a_star_found():
     rng = np.random.default_rng(0)
     for seed in range(5):
         blocked = rng.random((N, N)) < 0.04
-        blocked[20, :] = False                 # un corridoio sempre libero
+        blocked[20, :] = False  # un corridoio sempre libero
         cost = _cost(blocked=blocked)
         path = _chain((20, 2), (20 - seed, 18), (20, 37))
         if not all(cost.passable[c] for c in path):
@@ -163,7 +174,8 @@ def test_the_result_is_never_slower_than_what_a_star_found():
         r = straighten(_route(path), cost, _grid())
         assert r.seconds_saved >= 0.0
         assert r.route.time_hours * 3600 + r.seconds_saved == pytest.approx(
-            r.route.time_hours * 3600 + r.seconds_saved)
+            r.route.time_hours * 3600 + r.seconds_saved
+        )
 
 
 def test_the_drawn_cells_join_up_so_the_overlay_can_follow_them():
@@ -193,8 +205,9 @@ def test_unclassified_ice_is_not_crossed_to_save_time():
     rio[18:23, 10:30] = np.nan
     before = _detour()
     r = straighten(_route(before), _cost(), _grid(), rio=rio)
-    assert not any(np.isnan(rio[c]) for c in r.route.cells), \
+    assert not any(np.isnan(rio[c]) for c in r.route.cells), (
         "la scorciatoia attraversa ghiaccio non classificato"
+    )
 
 
 def test_unclassified_ice_already_on_the_route_does_not_block_the_pass():

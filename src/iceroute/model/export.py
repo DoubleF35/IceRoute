@@ -149,7 +149,10 @@ def check_parity(
 
     if ref.shape != got.shape:
         return ParityReport(
-            float("inf"), 1.0, 0, False,
+            float("inf"),
+            1.0,
+            0,
+            False,
             f"Shape diverse: torch {ref.shape} vs onnx {got.shape}.",
         )
 
@@ -171,7 +174,9 @@ def check_parity(
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Esporta il modello in ONNX fp32 e verifica la parità.")
+    ap = argparse.ArgumentParser(
+        description="Esporta il modello in ONNX fp32 e verifica la parità."
+    )
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=None)
@@ -202,7 +207,8 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info(
         "parità: max |Δlogit| %.2e, pixel discordanti %.4f%% → %s",
-        parity.max_abs_logit_diff, 100 * parity.argmax_disagreement,
+        parity.max_abs_logit_diff,
+        100 * parity.argmax_disagreement,
         "OK" if parity.passed else "FALLITA",
     )
     if not parity.passed:

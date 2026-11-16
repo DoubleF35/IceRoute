@@ -44,7 +44,7 @@ class Operation(Enum):
 
     NORMAL = "normal"
     ELEVATED = "elevated"
-    SPECIAL = "special"          # "operation subject to special consideration"
+    SPECIAL = "special"  # "operation subject to special consideration"
     UNKNOWN = "unknown"
 
 
@@ -58,8 +58,8 @@ class RioThresholds:
     which IceRoute treats as no-go.
     """
 
-    elevated_min: float = -10.0   # RIO >= 0 normal; -10 <= RIO < 0 middle band
-    special_max: float = -10.0    # RIO < -10 special consideration
+    elevated_min: float = -10.0  # RIO >= 0 normal; -10 <= RIO < 0 middle band
+    special_max: float = -10.0  # RIO < -10 special consideration
 
     def classify(self, rio: float, ice_class: str) -> Operation:
         if not np.isfinite(rio):
@@ -80,7 +80,7 @@ ELEVATED_SPEED_LIMIT_KN: dict[str, float] = {
     "PC3": 5.0,
     "PC4": 5.0,
     "PC5": 5.0,
-    "PC6": 3.0,   # "Below PC5"
+    "PC6": 3.0,  # "Below PC5"
     "PC7": 3.0,
 }
 
@@ -133,11 +133,11 @@ class PolarisTable:
         SPEC rule 2 requires these to be surfaced in the UI rather than used
         silently.
         """
-        return [
-            c for c, s in self.sources.items() if not s or "PROVVISORIO" in s.upper()
-        ]
+        return [c for c, s in self.sources.items() if not s or "PROVVISORIO" in s.upper()]
 
-    def riv_lookup(self, ice_class: str, sod_to_polaris: dict[int, str], n_classes: int = 6) -> np.ndarray:
+    def riv_lookup(
+        self, ice_class: str, sod_to_polaris: dict[int, str], n_classes: int = 6
+    ) -> np.ndarray:
         """Vector of RIV indexed by SOD class id, for vectorised lookup."""
         out = np.zeros(n_classes, dtype="float64")
         for sod_class, ice_type in sod_to_polaris.items():
@@ -232,7 +232,9 @@ def classify_rio(
     return out
 
 
-def is_navigable(rio: np.ndarray, ice_class: str, thresholds: RioThresholds | None = None) -> np.ndarray:
+def is_navigable(
+    rio: np.ndarray, ice_class: str, thresholds: RioThresholds | None = None
+) -> np.ndarray:
     """Cells a vessel of this class may enter.
 
     Normal and elevated-risk operation are navigable; special consideration is

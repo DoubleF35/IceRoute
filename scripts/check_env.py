@@ -85,7 +85,9 @@ def check_torch() -> None:
     props = torch.cuda.get_device_properties(0)
     vram_gb = props.total_memory / 1024**3
     ok(f"CUDA disponibile — {name}")
-    print(f"    {DIM}CUDA runtime {torch.version.cuda} · capability {props.major}.{props.minor}{RESET}")
+    print(
+        f"    {DIM}CUDA runtime {torch.version.cuda} · capability {props.major}.{props.minor}{RESET}"
+    )
 
     if vram_gb < 5.0:
         warn(f"VRAM {vram_gb:.1f} GB", "Sotto le attese: riduci batch size in configs/train.yaml.")

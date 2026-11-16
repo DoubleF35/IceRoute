@@ -373,7 +373,8 @@ def test_margin_flags_line_up_across_several_scenes(tmp_path):
         np.save(tmp_path / f"{stem}_f.npy", f)
 
     ds = PatchDataset(
-        tmp_path, ["20200100T000000_fake_prep.nc", "20200101T000000_fake_prep.nc"],
+        tmp_path,
+        ["20200100T000000_fake_prep.nc", "20200101T000000_fake_prep.nc"],
         augment=False,
     )
     assert len(ds) == 20

@@ -19,9 +19,18 @@ from pick_model import MIN_GAIN, SAFETY_MARGIN, choose  # noqa: E402
 
 
 def _cand(name, miou, unsafe, per_scene=None):
-    return (name, f"configs/{name}.yaml",
-            {"miou": miou, "miou_per_scene": per_scene if per_scene is not None else miou,
-             "binary": 0.9, "unsafe": unsafe, "split": "test_ufficiale", "per_class": {}})
+    return (
+        name,
+        f"configs/{name}.yaml",
+        {
+            "miou": miou,
+            "miou_per_scene": per_scene if per_scene is not None else miou,
+            "binary": 0.9,
+            "unsafe": unsafe,
+            "split": "test_ufficiale",
+            "per_class": {},
+        },
+    )
 
 
 def test_a_clear_accuracy_win_is_taken():

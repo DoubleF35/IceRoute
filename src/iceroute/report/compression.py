@@ -237,7 +237,8 @@ def downlink_route(collection: dict | None) -> dict | None:
     if not collection:
         return None
     kept = [
-        f for f in collection.get("features", [])
+        f
+        for f in collection.get("features", [])
         if (f.get("properties") or {}).get("kind") != "baseline"
     ]
     return {**collection, "features": kept} if kept else None

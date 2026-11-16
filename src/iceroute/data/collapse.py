@@ -48,9 +48,9 @@ log = logging.getLogger(__name__)
 
 # Collapsed class ids and the SOD classes each absorbs.
 GROUPS: dict[int, list[int]] = {
-    0: [0],           # open water
-    1: [1, 2, 3],     # new ice, young ice, thin first-year
-    2: [4, 5],        # thick first-year, old ice
+    0: [0],  # open water
+    1: [1, 2, 3],  # new ice, young ice, thin first-year
+    2: [4, 5],  # thick first-year, old ice
 }
 
 NAMES: dict[int, str] = {
@@ -121,10 +121,7 @@ def conservative_member(
     not a guarantee, so it is checked rather than assumed.
     """
     table = table or PolarisTable.load()
-    picks = {
-        ic: min(group, key=lambda k: table.riv(ic, sod_to_polaris[k]))
-        for ic in ice_classes
-    }
+    picks = {ic: min(group, key=lambda k: table.riv(ic, sod_to_polaris[k])) for ic in ice_classes}
     values = set(picks.values())
     return next(iter(values)) if len(values) == 1 else picks[ice_classes[0]], len(values) == 1
 

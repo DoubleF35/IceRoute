@@ -51,11 +51,16 @@ def _metrics(ratios=(281.0, 439.2, 770.0), median=439.2):
             "accuracy": {"miou_drop": 0.0046},
         },
         "compression": {
-            "ratio_median": median, "ratio_min": min(ratios), "ratio_max": max(ratios),
+            "ratio_median": median,
+            "ratio_min": min(ratios),
+            "ratio_max": max(ratios),
             "per_scene": [
-                {"scene_id": f"s{i}.nc", "ratio": r,
-                 "numerator": {"sar_channels_png": int(r * 100_000)},
-                 "denominator": {"total": 100_000}}
+                {
+                    "scene_id": f"s{i}.nc",
+                    "ratio": r,
+                    "numerator": {"sar_channels_png": int(r * 100_000)},
+                    "denominator": {"total": 100_000},
+                }
                 for i, r in enumerate(ratios)
             ],
         },
@@ -71,10 +76,12 @@ def test_every_comment_survives():
     """``yaml.safe_dump`` would delete all of these. The comments are the
     justification, and the justification is the point of the file."""
     out = asm.sync(_metrics(), SAMPLE).text
-    for comment in ("# Perché una scena sola e non tre mediane.",
-                    "# SCRITTO da pitch/assumptions.py",
-                    "Canali SAR compressi senza perdita.",
-                    "Misurata a 1 thread."):
+    for comment in (
+        "# Perché una scena sola e non tre mediane.",
+        "# SCRITTO da pitch/assumptions.py",
+        "Canali SAR compressi senza perdita.",
+        "Misurata a 1 thread.",
+    ):
         assert comment in out, f"perso: {comment}"
 
 

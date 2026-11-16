@@ -174,7 +174,7 @@ class LovaszSoftmaxLoss(nn.Module):
 
         valid = labels != self.ignore_index
         if not valid.any():
-            return logits.sum() * 0.0        # keeps the graph connected
+            return logits.sum() * 0.0  # keeps the graph connected
         probs, labels = probs[valid], labels[valid]
 
         losses = []
@@ -229,8 +229,7 @@ class CombinedLoss(nn.Module):
         self.label_smoothing = label_smoothing
         self.dice = DiceLoss(n_classes, ignore_index=ignore_index)
         self.lovasz = (
-            LovaszSoftmaxLoss(n_classes, ignore_index=ignore_index)
-            if lovasz_weight else None
+            LovaszSoftmaxLoss(n_classes, ignore_index=ignore_index) if lovasz_weight else None
         )
 
     def forward(self, logits: torch.Tensor, target: torch.Tensor) -> dict[str, torch.Tensor]:

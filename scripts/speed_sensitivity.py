@@ -53,8 +53,15 @@ DEFAULT_SPEEDS = [10.0, 12.0, 14.2, 16.0, 19.5]
 
 
 def sweep_scene(
-    scene_path: Path, *, model, data_cfg: dict, routing_cfg: dict, train_cfg: dict,
-    table: PolarisTable, device: str, speeds: list[float],
+    scene_path: Path,
+    *,
+    model,
+    data_cfg: dict,
+    routing_cfg: dict,
+    train_cfg: dict,
+    table: PolarisTable,
+    device: str,
+    speeds: list[float],
 ) -> dict:
     from iceroute.model.inference import predict_scene
 
@@ -63,9 +70,7 @@ def sweep_scene(
     astar_cfg, grid_cfg = routing_cfg["astar"], routing_cfg["grid"]
 
     scene = load_scene(scene_path, data_cfg, labels_from=resolve_labels(scene_path))
-    pred, _, _ = predict_scene(
-        model, scene.channels(channels), n_classes=N_CLASSES, device=device
-    )
+    pred, _, _ = predict_scene(model, scene.channels(channels), n_classes=N_CLASSES, device=device)
     scene.sod = pred.astype("uint8")
 
     geo = geocode_scene(scene, resolution_m=float(grid_cfg["resolution_m"]))
@@ -78,14 +83,22 @@ def sweep_scene(
 
     # RIO does not depend on speed, so it is computed once and reused.
     rios = {
-        ic: compute_rio(geo.sod, ic, mapping, table=table, sic=geo.sic,
-                        mask_valid=geo.mask_valid, n_classes=N_CLASSES)
+        ic: compute_rio(
+            geo.sod,
+            ic,
+            mapping,
+            table=table,
+            sic=geo.sic,
+            mask_valid=geo.mask_valid,
+            n_classes=N_CLASSES,
+        )
         for ic in ice_classes
     }
 
-    nominal = {ic: build_cost_grid(rios[ic], speed_model_from_config(routing_cfg, ic),
-                                   land_mask=land)
-               for ic in ice_classes}
+    nominal = {
+        ic: build_cost_grid(rios[ic], speed_model_from_config(routing_cfg, ic), land_mask=land)
+        for ic in ice_classes
+    }
     try:
         wp = choose_waypoints(geo.grid, nominal)
     except ValueError as exc:
@@ -101,7 +114,10 @@ def sweep_scene(
             row: dict = {"open_water_speed_kn": v}
             try:
                 route = find_route(
-                    cost, geo.grid, wp.start, wp.goal,
+                    cost,
+                    geo.grid,
+                    wp.start,
+                    wp.goal,
                     connectivity=int(astar_cfg["connectivity"]),
                     heuristic_weight=float(astar_cfg["heuristic_weight"]),
                     max_expansions=int(astar_cfg["max_expansions"]),
@@ -112,8 +128,14 @@ def sweep_scene(
                 continue
 
             base = geodesic_baseline(
-                geo.grid, cost, wp.start, wp.goal, open_water_speed_kn=float(v),
-                rio=rios[ic], land_mask=land, coverage=geo.mask_valid,
+                geo.grid,
+                cost,
+                wp.start,
+                wp.goal,
+                open_water_speed_kn=float(v),
+                rio=rios[ic],
+                land_mask=land,
+                coverage=geo.mask_valid,
             )
             # compare() is the demo's own logic, reused rather than reimplemented:
             # it already refuses to report a saving against an infeasible
@@ -199,10 +221,18 @@ def main(argv: list[str] | None = None) -> int:
             continue
         log.info("[%d/%d] %s", i, len(scenes), sid[:20])
         try:
-            results.append(sweep_scene(
-                path, model=model, data_cfg=data_cfg, routing_cfg=routing_cfg,
-                train_cfg=train_cfg, table=table, device=device, speeds=list(args.speeds),
-            ))
+            results.append(
+                sweep_scene(
+                    path,
+                    model=model,
+                    data_cfg=data_cfg,
+                    routing_cfg=routing_cfg,
+                    train_cfg=train_cfg,
+                    table=table,
+                    device=device,
+                    speeds=list(args.speeds),
+                )
+            )
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the sweep
             log.exception("  fallita: %s", exc)
         if device == "cuda":
@@ -210,14 +240,16 @@ def main(argv: list[str] | None = None) -> int:
 
     agg = summarise(results)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(
-        {"speeds_kn": args.speeds, "aggregate": agg, "per_scene": results}, indent=2))
+    args.out.write_text(
+        json.dumps({"speeds_kn": args.speeds, "aggregate": agg, "per_scene": results}, indent=2)
+    )
 
     log.info("=" * 66)
     hs = agg["hours_relative_spread_median"]
     if hs is not None:
-        log.info("Ore di transito: variano del %.0f%% (mediana) sull'intervallo di velocità.",
-                 100 * hs)
+        log.info(
+            "Ore di transito: variano del %.0f%% (mediana) sull'intervallo di velocità.", 100 * hs
+        )
         log.info("  → NON citabili senza una fonte per la velocità. P-05 resta su questo.")
     # A small spread means "stable" only if there is enough of it to be a
     # spread. The first version reported "0,0 punti → STABILE, usalo nel deck"
@@ -231,11 +263,15 @@ def main(argv: list[str] | None = None) -> int:
         log.info("    nella maggior parte dei casi non esiste una baseline percorribile")
         log.info("    contro cui calcolare un risparmio (SPEC regola 2).")
     elif agg["saved_percent_spread_max_points"] < 5.0:
-        log.info("  → varia di %.1f punti al massimo: STABILE rispetto alla velocità.",
-                 agg["saved_percent_spread_max_points"])
+        log.info(
+            "  → varia di %.1f punti al massimo: STABILE rispetto alla velocità.",
+            agg["saved_percent_spread_max_points"],
+        )
     else:
-        log.info("  → varia di %.1f punti: serve comunque la fonte.",
-                 agg["saved_percent_spread_max_points"])
+        log.info(
+            "  → varia di %.1f punti: serve comunque la fonte.",
+            agg["saved_percent_spread_max_points"],
+        )
 
     log.info("")
     log.info("CONSEGUENZA PER IL DECK. Nessuna delle due grandezze temporali regge da sola:")

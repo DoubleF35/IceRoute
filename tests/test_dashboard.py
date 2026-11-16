@@ -76,9 +76,7 @@ def test_download_count_is_never_negative(tmp_path):
         (test_dir / f"202001{i:02d}T000000_dmi_prep_reference.nc").touch()
 
     (tmp_path / "configs").mkdir()
-    (tmp_path / "configs/split.yaml").write_text(
-        "split:\n  train: [a.nc]\n  val: []\n  demo: []\n"
-    )
+    (tmp_path / "configs/split.yaml").write_text("split:\n  train: [a.nc]\n  val: []\n  demo: []\n")
 
     out = download_status(tmp_path)
     for key, v in out.items():
@@ -151,9 +149,7 @@ def test_real_decisions_file_parses():
 def test_runs_split_on_epoch_reset(tmp_path):
     """The CSV is append-only, so several runs share one file."""
     csv_path = tmp_path / "train_log.csv"
-    csv_path.write_text(
-        "epoch,val_miou\n1,0.1\n2,0.2\n1,0.3\n2,0.4\n3,0.5\n"
-    )
+    csv_path.write_text("epoch,val_miou\n1,0.1\n2,0.2\n1,0.3\n2,0.4\n3,0.5\n")
     runs = read_runs(csv_path)
     assert len(runs) == 2
     assert len(runs[0]) == 2
@@ -187,10 +183,12 @@ def test_line_chart_handles_a_flat_series():
 
 
 def test_line_chart_emits_one_path_per_series():
-    svg = line_chart([
-        {"label": "a", "colour": "#111", "points": [(1, 0.1), (2, 0.2)]},
-        {"label": "b", "colour": "#222", "points": [(1, 0.3), (2, 0.4)]},
-    ])
+    svg = line_chart(
+        [
+            {"label": "a", "colour": "#111", "points": [(1, 0.1), (2, 0.2)]},
+            {"label": "b", "colour": "#222", "points": [(1, 0.3), (2, 0.4)]},
+        ]
+    )
     assert svg.count("<path") == 2
 
 
@@ -219,12 +217,21 @@ def test_markdown_escapes_html():
 # ---------------------------------------------------------------------------
 
 
-CSV_HEADER = ("epoch,train_loss,train_ce,train_dice,val_loss,val_miou,"
-              "val_accuracy,val_binary_accuracy,lr,seconds,peak_vram_gb\n")
+CSV_HEADER = (
+    "epoch,train_loss,train_ce,train_dice,val_loss,val_miou,"
+    "val_accuracy,val_binary_accuracy,lr,seconds,peak_vram_gb\n"
+)
 
 
-def _repo(tmp_path, *, n_classes=3, log_csv="artifacts/logs/mine.csv",
-          val_miou=0.62, test_miou=None, picked="configs/mine.yaml"):
+def _repo(
+    tmp_path,
+    *,
+    n_classes=3,
+    log_csv="artifacts/logs/mine.csv",
+    val_miou=0.62,
+    test_miou=None,
+    picked="configs/mine.yaml",
+):
     """A repo skeleton with one training config and its own log."""
     for d in ("tests", "src", "scripts", "configs", "artifacts/logs"):
         (tmp_path / d).mkdir(parents=True, exist_ok=True)
@@ -237,10 +244,16 @@ def _repo(tmp_path, *, n_classes=3, log_csv="artifacts/logs/mine.csv",
     if test_miou is not None:
         import json
 
-        (tmp_path / "artifacts/metrics.json").write_text(json.dumps({
-            "evaluation": {"split": "test_ufficiale",
-                           "scenes": {"aggregate": {"miou": test_miou}}}
-        }))
+        (tmp_path / "artifacts/metrics.json").write_text(
+            json.dumps(
+                {
+                    "evaluation": {
+                        "split": "test_ufficiale",
+                        "scenes": {"aggregate": {"miou": test_miou}},
+                    }
+                }
+            )
+        )
     return tmp_path
 
 
@@ -254,7 +267,8 @@ def test_dashboard_reads_the_log_of_the_deployed_model_not_the_last_trained(tmp_
     repo = _repo(tmp_path, val_miou=0.62)
     # A stale log from an abandoned config, at the path the page used to read.
     (repo / "artifacts/logs/train_log.csv").write_text(
-        CSV_HEADER + "1,1,1,1,1,0.375,0.9,0.9,1e-4,10,1\n")
+        CSV_HEADER + "1,1,1,1,1,0.375,0.9,0.9,1e-4,10,1\n"
+    )
 
     ctx = collect(repo, TODAY)
     assert ctx["best_miou"] == pytest.approx(0.62)
@@ -304,8 +318,9 @@ def test_gate_4_is_never_green_from_artefacts_alone(tmp_path):
 
     repo = _repo(tmp_path, test_miou=0.535)
     (repo / "data/demo").mkdir(parents=True)
-    (repo / "data/demo/index.json").write_text(json.dumps(
-        {"scenes": [{"scene_id": f"s{i}.nc"} for i in range(5)]}))
+    (repo / "data/demo/index.json").write_text(
+        json.dumps({"scenes": [{"scene_id": f"s{i}.nc"} for i in range(5)]})
+    )
     (repo / "artifacts/figures").mkdir(parents=True)
     for i in range(4):
         (repo / f"artifacts/figures/f{i}.png").touch()
@@ -346,8 +361,8 @@ def test_page_has_no_external_resources():
 
 def test_page_reports_days_remaining():
     page = build_page(collect(Path("."), TODAY))
-    assert "32" in page          # to the pitch, 7 Oct 2026
-    assert "26" in page          # to the freeze, 1 Oct 2026
+    assert "32" in page  # to the pitch, 7 Oct 2026
+    assert "26" in page  # to the freeze, 1 Oct 2026
 
 
 def test_page_never_shows_a_number_that_was_not_measured(tmp_path):
@@ -374,20 +389,42 @@ def _repo_with_route(tmp_path, *, ice_class="PC6", blocked=True, lead_class=None
 
     repo = _repo(tmp_path)
     (repo / "artifacts/figures").mkdir(parents=True, exist_ok=True)
-    (repo / "artifacts/figures/route_lead.json").write_text(json.dumps(
-        {"scene_id": "SCENA.nc", "ice_class": lead_class or ice_class,
-         "figure": "02_useful.png"}))
+    (repo / "artifacts/figures/route_lead.json").write_text(
+        json.dumps(
+            {
+                "scene_id": "SCENA.nc",
+                "ice_class": lead_class or ice_class,
+                "figure": "02_useful.png",
+            }
+        )
+    )
     (repo / "data/demo").mkdir(parents=True, exist_ok=True)
-    (repo / "data/demo/index.json").write_text(json.dumps({"scenes": [{
-        "scene_id": "SCENA.nc", "region": "Kara",
-        "classes": {ice_class: {
-            "route_exists": True, "n_waypoints": 5,
-            "separation": {"pct_diagonal": 9.4, "max_km": 81.0},
-            "comparison": {"iceroute": {"time_hours": 23.7},
-                           "baseline": {"blocked_by_ice": blocked,
-                                        "n_no_go_cells": 104 if blocked else 0}},
-        }},
-    }]}))
+    (repo / "data/demo/index.json").write_text(
+        json.dumps(
+            {
+                "scenes": [
+                    {
+                        "scene_id": "SCENA.nc",
+                        "region": "Kara",
+                        "classes": {
+                            ice_class: {
+                                "route_exists": True,
+                                "n_waypoints": 5,
+                                "separation": {"pct_diagonal": 9.4, "max_km": 81.0},
+                                "comparison": {
+                                    "iceroute": {"time_hours": 23.7},
+                                    "baseline": {
+                                        "blocked_by_ice": blocked,
+                                        "n_no_go_cells": 104 if blocked else 0,
+                                    },
+                                },
+                            }
+                        },
+                    }
+                ]
+            }
+        )
+    )
     return repo
 
 
@@ -400,11 +437,16 @@ def test_the_route_caption_names_the_class_the_figure_was_drawn_for(tmp_path):
     """
     repo = _repo_with_route(tmp_path, ice_class="PC6")
     (repo / "data/demo/index.json").write_text(
-        (repo / "data/demo/index.json").read_text().replace(
-            '"PC6": {', '"IA": {"route_exists": true, "n_waypoints": 9,'
+        (repo / "data/demo/index.json")
+        .read_text()
+        .replace(
+            '"PC6": {',
+            '"IA": {"route_exists": true, "n_waypoints": 9,'
             '"separation": {"pct_diagonal": 30.0, "max_km": 250.0},'
             '"comparison": {"iceroute": {"time_hours": 30.0},'
-            '"baseline": {"blocked_by_ice": true, "n_no_go_cells": 999}}}, "PC6": {'))
+            '"baseline": {"blocked_by_ice": true, "n_no_go_cells": 999}}}, "PC6": {',
+        )
+    )
 
     story = collect(repo, TODAY)["route"]
     assert story["ice_class"] == "PC6", "la didascalia ha scelto una classe diversa dalla figura"
@@ -424,8 +466,9 @@ def test_a_lead_pointing_at_a_missing_scene_makes_no_claim(tmp_path):
     import json
 
     repo = _repo_with_route(tmp_path)
-    (repo / "artifacts/figures/route_lead.json").write_text(json.dumps(
-        {"scene_id": "SPARITA.nc", "ice_class": "PC6"}))
+    (repo / "artifacts/figures/route_lead.json").write_text(
+        json.dumps({"scene_id": "SPARITA.nc", "ice_class": "PC6"})
+    )
     assert collect(repo, TODAY)["route"] == {}
 
 

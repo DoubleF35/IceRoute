@@ -180,7 +180,11 @@ def simplify_route(
     log.info(
         "semplificazione: %d celle → %d waypoint (tolleranza %.0f m, "
         "deviazione massima %.0f m, %d virate strette)",
-        n_original, len(idx), tol, max_dev, len(sharp),
+        n_original,
+        len(idx),
+        tol,
+        max_dev,
+        len(sharp),
     )
 
     return SimplifiedRoute(

@@ -90,12 +90,14 @@ def parse_table(text: str, prefix: str) -> list[dict]:
             continue
         cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
         if len(cells) >= 4:
-            out.append({
-                "id": cells[0],
-                "what": cells[1],
-                "detail": cells[2],
-                "action": cells[3],
-            })
+            out.append(
+                {
+                    "id": cells[0],
+                    "what": cells[1],
+                    "detail": cells[2],
+                    "action": cells[3],
+                }
+            )
     return out
 
 
@@ -199,39 +201,64 @@ def gates(ctx: dict) -> list[Gate]:
     evaluation = metrics.get("evaluation", {})
 
     return [
-        Gate("Gate 0", "Ambiente e ispezione", True,
-             "CUDA verificata con una matmul reale, nomi delle variabili letti dal dato"),
-        Gate("Gate 1", "Pipeline dati", bool(stats.get("n_patches")),
-             f"{_it(stats.get('n_patches', 0))} patch da {stats.get('n_scenes', 0)} scene"
-             if stats else "cache non costruita",
-             "" if scenes_ok else "download incompleto"),
-        Gate("Gate 2", "Modello e quantizzazione",
-             bool(quant.get("size")) and bool(evaluation),
-             _gate2_detail(best, quant, evaluation),
-             "manca la valutazione" if not evaluation else ""),
-        Gate("Gate 3", "Routing POLARIS", bool(routes.get("scenes")),
-             f"{sum(1 for s in routes.get('scenes', []) if s.get('usable'))} scene instradate"
-             if routes else "non ancora eseguito"),
-        Gate("Gate 4", "Demo e materiali", False, _gate4_detail(ctx["demo"]),
-             # Deliberately never green from files alone. The gate is "three
-             # people who did not build it can use it, offline, after a
-             # reboot" — and no artefact on disk can attest to that. Marking it
-             # done because precompute ran is exactly how a demo reaches a
-             # stage untested.
-             "resta la prova in condizioni reali: rete staccata, macchina "
-             "riavviata, tre persone esterne che la usano da sole"),
+        Gate(
+            "Gate 0",
+            "Ambiente e ispezione",
+            True,
+            "CUDA verificata con una matmul reale, nomi delle variabili letti dal dato",
+        ),
+        Gate(
+            "Gate 1",
+            "Pipeline dati",
+            bool(stats.get("n_patches")),
+            f"{_it(stats.get('n_patches', 0))} patch da {stats.get('n_scenes', 0)} scene"
+            if stats
+            else "cache non costruita",
+            "" if scenes_ok else "download incompleto",
+        ),
+        Gate(
+            "Gate 2",
+            "Modello e quantizzazione",
+            bool(quant.get("size")) and bool(evaluation),
+            _gate2_detail(best, quant, evaluation),
+            "manca la valutazione" if not evaluation else "",
+        ),
+        Gate(
+            "Gate 3",
+            "Routing POLARIS",
+            bool(routes.get("scenes")),
+            f"{sum(1 for s in routes.get('scenes', []) if s.get('usable'))} scene instradate"
+            if routes
+            else "non ancora eseguito",
+        ),
+        Gate(
+            "Gate 4",
+            "Demo e materiali",
+            False,
+            _gate4_detail(ctx["demo"]),
+            # Deliberately never green from files alone. The gate is "three
+            # people who did not build it can use it, offline, after a
+            # reboot" — and no artefact on disk can attest to that. Marking it
+            # done because precompute ran is exactly how a demo reaches a
+            # stage untested.
+            "resta la prova in condizioni reali: rete staccata, macchina "
+            "riavviata, tre persone esterne che la usano da sole",
+        ),
     ]
 
 
 def _gate4_detail(demo: dict) -> str:
     bits = []
     if demo.get("n_scenes"):
-        bits.append(f"{demo['n_scenes']} scene precalcolate"
-                    + (" + caso peggiore" if demo.get("has_worst_case") else ""))
+        bits.append(
+            f"{demo['n_scenes']} scene precalcolate"
+            + (" + caso peggiore" if demo.get("has_worst_case") else "")
+        )
     if demo.get("n_figures"):
         bits.append(f"{demo['n_figures']} figure")
-    bits.append("video di riserva registrato" if demo.get("has_video")
-                else "video di riserva mancante")
+    bits.append(
+        "video di riserva registrato" if demo.get("has_video") else "video di riserva mancante"
+    )
     return " · ".join(bits) if bits else "non iniziato"
 
 
@@ -283,7 +310,9 @@ def line_chart(series: list[dict], width=680, height=240, pad=38) -> str:
         v = y0 + (y1 - y0) * i / 4
         y = sy(v)
         out.append(f'<line x1="{pad}" y1="{y:.1f}" x2="{width - pad}" y2="{y:.1f}" class="grid"/>')
-        out.append(f'<text x="{pad - 7}" y="{y + 3.5:.1f}" class="axis" text-anchor="end">{v:.2f}</text>')
+        out.append(
+            f'<text x="{pad - 7}" y="{y + 3.5:.1f}" class="axis" text-anchor="end">{v:.2f}</text>'
+        )
     for i in range(5):
         x = x0 + (x1 - x0) * i / 4
         out.append(
@@ -295,7 +324,7 @@ def line_chart(series: list[dict], width=680, height=240, pad=38) -> str:
         if not s["points"]:
             continue
         d = " ".join(
-            f'{"M" if i == 0 else "L"}{sx(x):.1f},{sy(y):.1f}'
+            f"{'M' if i == 0 else 'L'}{sx(x):.1f},{sy(y):.1f}"
             for i, (x, y) in enumerate(s["points"])
         )
         out.append(f'<path d="{d}" fill="none" stroke="{s["colour"]}" stroke-width="2"/>')
@@ -448,8 +477,10 @@ def route_figure(repo: Path, max_px: int = 1000) -> str:
 
     path = repo / "artifacts/figures/02_useful.png"
     if not path.exists():
-        return ('<div class="note">Figura della rotta non generata: '
-                '<span class="mono">make report</span>.</div>')
+        return (
+            '<div class="note">Figura della rotta non generata: '
+            '<span class="mono">make report</span>.</div>'
+        )
     from PIL import Image
 
     img = Image.open(path).convert("RGB")
@@ -458,8 +489,10 @@ def route_figure(repo: Path, max_px: int = 1000) -> str:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=82, optimize=True)
     uri = base64.b64encode(buf.getvalue()).decode()
-    return (f'<img src="data:image/jpeg;base64,{uri}" alt="Rotta IceRoute contro '
-            f'rotta diretta" style="width:100%;border-radius:8px;display:block">')
+    return (
+        f'<img src="data:image/jpeg;base64,{uri}" alt="Rotta IceRoute contro '
+        f'rotta diretta" style="width:100%;border-radius:8px;display:block">'
+    )
 
 
 def _route_note(r: dict) -> str:
@@ -472,18 +505,20 @@ def _route_note(r: dict) -> str:
     honest statement and the stronger one.
     """
     if not r:
-        return ('<h3>Nessun confronto disponibile</h3><div class="note">Serve '
-                '<span class="mono">make report</span>: la figura mostra la rotta '
-                'diretta contro quella calcolata, e senza scene non c\'è confronto.</div>')
+        return (
+            '<h3>Nessun confronto disponibile</h3><div class="note">Serve '
+            '<span class="mono">make report</span>: la figura mostra la rotta '
+            "diretta contro quella calcolata, e senza scene non c'è confronto.</div>"
+        )
 
     head = f"<h3>{html.escape(r['scene_id'][:15])} · nave {html.escape(r['ice_class'])}</h3>"
     if r["blocked_by_ice"]:
-        claim = f"""<div class="big">{_it(r['n_no_go'])} celle vietate</div>
+        claim = f"""<div class="big">{_it(r["n_no_go"])} celle vietate</div>
 <div class="note">La rotta diretta — la linea che seguirebbe una nave con la sola
-carta nautica — attraversa {_it(r['n_no_go'])} celle oltre il limite POLARIS per una
-nave {html.escape(r['ice_class'])}. Non è una rotta più lenta: è una rotta che quella
-nave <b>non può percorrere</b>. IceRoute ne trova una in {_fmt(r['hours'], 1)} h,
-riassunta in {r['n_waypoints']} waypoint — gli unici dati che scendono a terra.</div>"""
+carta nautica — attraversa {_it(r["n_no_go"])} celle oltre il limite POLARIS per una
+nave {html.escape(r["ice_class"])}. Non è una rotta più lenta: è una rotta che quella
+nave <b>non può percorrere</b>. IceRoute ne trova una in {_fmt(r["hours"], 1)} h,
+riassunta in {r["n_waypoints"]} waypoint — gli unici dati che scendono a terra.</div>"""
     else:
         # The figure fell back to a scene whose direct route is legal. Saying
         # anything stronger here would be describing a picture that is not on
@@ -495,7 +530,7 @@ Rigenerare con una scena in cui POLARIS vieta la linea retta.</div>"""
 
     return f"""{head}{claim}
 <div class="note" style="margin-top:11px">Le due tracce si separano fino a
-{_fmt(r['separation_km'], 0)} km, il {_fmt(r['separation_pct'], 1)}% della diagonale
+{_fmt(r["separation_km"], 0)} km, il {_fmt(r["separation_pct"], 1)}% della diagonale
 dell'immagine. La scena è scelta su questo numero: un confronto in cui le due linee
 si sovrappongono non dimostra niente, per quante celle siano vietate sotto.</div>
 <div class="note" style="margin-top:11px">Nessuna percentuale di tempo risparmiato:
@@ -529,46 +564,57 @@ def build_page(ctx: dict) -> str:
     n_cls = ctx["n_classes"]
     headline = ctx["test_miou"] if ctx["test_miou"] is not None else best
     if headline is not None and n_cls == 6:
-        miou_tag = (f'<span class="tag {"ok" if headline >= 0.60 else "prov"}">'
-                    f'{"sopra soglia" if headline >= 0.60 else "sotto 0,60"}</span>')
+        miou_tag = (
+            f'<span class="tag {"ok" if headline >= 0.60 else "prov"}">'
+            f"{'sopra soglia' if headline >= 0.60 else 'sotto 0,60'}</span>"
+        )
     elif n_cls:
         miou_tag = f'<span class="tag prov">ripiego §7.4 a {n_cls} classi</span>'
     else:
         miou_tag = ""
 
     if ctx["test_miou"] is not None:
-        miou_note = (f'su {ctx["eval_split"] or "held-out"} · '
-                     f'validazione {_fmt(best)} {miou_tag}')
+        miou_note = f"su {ctx['eval_split'] or 'held-out'} · validazione {_fmt(best)} {miou_tag}"
         miou_label = "mIoU sul test ufficiale"
     else:
-        miou_note = f'solo validazione, nessun held-out {miou_tag}'
+        miou_note = f"solo validazione, nessun held-out {miou_tag}"
         miou_label = "mIoU di validazione"
 
     int8 = size.get("int8_mb")
     ratio = ctx["compression"]
 
     cards = [
-        ("Parametri del modello",
-         _it(ctx["n_params"]) if ctx["n_params"] else "—",
-         "budget SPEC 2.000.000" + (
-             ' <span class="tag ok">entro</span>' if ctx["n_params"] and ctx["n_params"] < 2_000_000
-             else ""),
-         ),
-        ("Modello INT8 misurato",
-         f"{_it(int8, 2)} MB" if int8 else MISSING,
-         (f"{_it(size.get('bytes_per_parameter_int8', 0), 2)} byte/parametro · "
-          "il deck dichiara 58 KB") if int8
-         else "serve <span class='mono'>make quantize</span>",
-         ),
+        (
+            "Parametri del modello",
+            _it(ctx["n_params"]) if ctx["n_params"] else "—",
+            "budget SPEC 2.000.000"
+            + (
+                ' <span class="tag ok">entro</span>'
+                if ctx["n_params"] and ctx["n_params"] < 2_000_000
+                else ""
+            ),
+        ),
+        (
+            "Modello INT8 misurato",
+            f"{_it(int8, 2)} MB" if int8 else MISSING,
+            (
+                f"{_it(size.get('bytes_per_parameter_int8', 0), 2)} byte/parametro · "
+                "il deck dichiara 58 KB"
+            )
+            if int8
+            else "serve <span class='mono'>make quantize</span>",
+        ),
         (miou_label, _fmt(headline), miou_note),
-        ("Latenza per tile (1 thread)",
-         f"{_it(lat.get('int8', {}).get('median_ms_per_tile', 0))} ms"
-         if lat.get("int8") else "non ancora misurata",
-         "INT8 su CPU, mediana"),
+        (
+            "Latenza per tile (1 thread)",
+            f"{_it(lat.get('int8', {}).get('median_ms_per_tile', 0))} ms"
+            if lat.get("int8")
+            else "non ancora misurata",
+            "INT8 su CPU, mediana",
+        ),
     ]
     cards_html = "".join(
-        f'<div class="card"><h3>{h}</h3><div class="big">{v}</div>'
-        f'<div class="note">{n}</div></div>'
+        f'<div class="card"><h3>{h}</h3><div class="big">{v}</div><div class="note">{n}</div></div>'
         for h, v, n in cards
     )
 
@@ -579,14 +625,21 @@ def build_page(ctx: dict) -> str:
     for gt in ctx["gates"]:
         badge = '<span class="tag ok">verde</span>' if gt.done else ""
         blocked = (
-            '<span class="tag wait">' + html.escape(gt.blocking) + "</span>"
-            if gt.blocking else ""
+            '<span class="tag wait">' + html.escape(gt.blocking) + "</span>" if gt.blocking else ""
         )
         gate_parts.append(
             '<div class="gate"><span class="dot ' + ("y" if gt.done else "n") + '"></span>'
-            "<div><b>" + html.escape(gt.name) + " — " + html.escape(gt.label) + "</b> "
-            + badge + " " + blocked
-            + '<div class="d">' + html.escape(gt.detail) + "</div></div></div>"
+            "<div><b>"
+            + html.escape(gt.name)
+            + " — "
+            + html.escape(gt.label)
+            + "</b> "
+            + badge
+            + " "
+            + blocked
+            + '<div class="d">'
+            + html.escape(gt.detail)
+            + "</div></div></div>"
         )
     gates_html = "".join(gate_parts)
 
@@ -596,41 +649,78 @@ def build_page(ctx: dict) -> str:
     train_note = ""
     if runs:
         last = runs[-1]
-        chart = line_chart([
-            {"label": "mIoU validazione", "colour": "#5eb0ef",
-             "points": [(r["epoch"], r["val_miou"]) for r in last
-                        if isinstance(r.get("val_miou"), float)]},
-            {"label": "accuratezza ghiaccio/acqua", "colour": "#4ade9b",
-             "points": [(r["epoch"], r["val_binary_accuracy"]) for r in last
-                        if isinstance(r.get("val_binary_accuracy"), float)]},
-        ])
+        chart = line_chart(
+            [
+                {
+                    "label": "mIoU validazione",
+                    "colour": "#5eb0ef",
+                    "points": [
+                        (r["epoch"], r["val_miou"])
+                        for r in last
+                        if isinstance(r.get("val_miou"), float)
+                    ],
+                },
+                {
+                    "label": "accuratezza ghiaccio/acqua",
+                    "colour": "#4ade9b",
+                    "points": [
+                        (r["epoch"], r["val_binary_accuracy"])
+                        for r in last
+                        if isinstance(r.get("val_binary_accuracy"), float)
+                    ],
+                },
+            ]
+        )
         prev = ""
         if len(runs) > 1:
             best_prev = max(
-                (r["val_miou"] for run in runs[:-1] for r in run
-                 if isinstance(r.get("val_miou"), float)), default=None)
+                (
+                    r["val_miou"]
+                    for run in runs[:-1]
+                    for r in run
+                    if isinstance(r.get("val_miou"), float)
+                ),
+                default=None,
+            )
             if best_prev:
-                prev = (f" Il run precedente si era fermato a mIoU {_it(best_prev, 3)} "
-                        f"con la cache ridotta (vedi D-017).")
+                prev = (
+                    f" Il run precedente si era fermato a mIoU {_it(best_prev, 3)} "
+                    f"con la cache ridotta (vedi D-017)."
+                )
         train_note = (
             f'<p class="note">Run corrente: {len(last)} epoche registrate su '
-            f'{len(runs)} run totali nel log.{prev}</p>'
+            f"{len(runs)} run totali nel log.{prev}</p>"
         )
 
     # -- class distribution ------------------------------------------------
     freq = stats.get("class_frequency") or {}
     names = stats.get("class_names") or {}
-    dist = bar_rows([
-        (str(names.get(k, k)), v, f"{100 * v:.1f}%")
-        for k, v in sorted(freq.items(), key=lambda kv: str(kv[0]))
-    ]) if freq else '<p class="muted">Cache non costruita.</p>'
+    dist = (
+        bar_rows(
+            [
+                (str(names.get(k, k)), v, f"{100 * v:.1f}%")
+                for k, v in sorted(freq.items(), key=lambda kv: str(kv[0]))
+            ]
+        )
+        if freq
+        else '<p class="muted">Cache non costruita.</p>'
+    )
 
     # -- download ----------------------------------------------------------
-    dl_rows = bar_rows([
-        (k.replace("_", " "), (v["have"] / v["total"] if v["total"] else 0),
-         f"{v['have']}/{v['total']}")
-        for k, v in dl.items()
-    ]) if dl else '<p class="muted">Split non congelato.</p>'
+    dl_rows = (
+        bar_rows(
+            [
+                (
+                    k.replace("_", " "),
+                    (v["have"] / v["total"] if v["total"] else 0),
+                    f"{v['have']}/{v['total']}",
+                )
+                for k, v in dl.items()
+            ]
+        )
+        if dl
+        else '<p class="muted">Split non congelato.</p>'
+    )
 
     # -- claims and provisional -------------------------------------------
     def rows(items, closed_marker=None):
@@ -638,12 +728,15 @@ def build_page(ctx: dict) -> str:
         for it in items:
             detail = it["detail"]
             closed = closed_marker and closed_marker in detail
-            tag = ('<span class="tag ok">chiusa</span>' if closed
-                   else '<span class="tag prov">aperta</span>')
+            tag = (
+                '<span class="tag ok">chiusa</span>'
+                if closed
+                else '<span class="tag prov">aperta</span>'
+            )
             out.append(
-                f'<tr><td>{html.escape(it["id"])} {tag}</td>'
-                f'<td>{_md(it["what"])}</td><td>{_md(detail)}</td>'
-                f'<td>{_md(it["action"])}</td></tr>'
+                f"<tr><td>{html.escape(it['id'])} {tag}</td>"
+                f"<td>{_md(it['what'])}</td><td>{_md(detail)}</td>"
+                f"<td>{_md(it['action'])}</td></tr>"
             )
         return "".join(out)
 
@@ -651,14 +744,14 @@ def build_page(ctx: dict) -> str:
     prov_html = rows(ctx["provisional"], "Chiusa")
 
     decisions_html = "".join(
-        f'<tr><td>{html.escape(d["id"])}</td><td>{html.escape(d["title"])}</td>'
+        f"<tr><td>{html.escape(d['id'])}</td><td>{html.escape(d['title'])}</td>"
         f'<td class="mono">{html.escape(d["date"])}</td></tr>'
         for d in ctx["decisions"]
     )
     commits_html = "".join(
         f'<tr><td class="mono">{html.escape(c.get("hash", ""))}</td>'
         f'<td class="mono">{html.escape(c.get("date", ""))}</td>'
-        f'<td>{html.escape(c.get("subject", ""))}</td></tr>'
+        f"<td>{html.escape(c.get('subject', ''))}</td></tr>"
         for c in g.get("recent", [])
     )
 
@@ -667,7 +760,8 @@ def build_page(ctx: dict) -> str:
 
     comp_note = (
         f"{_it(ratio['value'])}:1 <span class='tag prov'>limite superiore</span>"
-        if ratio else MISSING
+        if ratio
+        else MISSING
     )
     if size.get("compression_ratio"):
         model_comp = f"{_it(size['compression_ratio'], 2)}×"
@@ -694,10 +788,10 @@ def build_page(ctx: dict) -> str:
     su disco: quello che non è stato misurato lo dice.</p>
   </div>
   <div class="count">
-    <b>{to_pitch}</b><small>giorni al pitch · {PITCH.strftime('%d/%m/%Y')}</small>
-    <div style="margin-top:13px" class="{'warn' if to_freeze < 8 else ''}">
+    <b>{to_pitch}</b><small>giorni al pitch · {PITCH.strftime("%d/%m/%Y")}</small>
+    <div style="margin-top:13px" class="{"warn" if to_freeze < 8 else ""}">
       <b style="font-size:23px">{to_freeze}</b>
-      <small>al feature freeze · {FREEZE.strftime('%d/%m')}</small>
+      <small>al feature freeze · {FREEZE.strftime("%d/%m")}</small>
     </div>
   </div>
 </header>
@@ -720,9 +814,9 @@ def build_page(ctx: dict) -> str:
   <div class="card">
     <h3>Distribuzione delle classi sui pixel annotati</h3>{dist}
     <div class="note" style="margin-top:11px">
-      {_it(stats.get('n_patches', 0))} patch da {stats.get('n_scenes', 0)} scene ·
-      margine in cache {_it(100 * stats.get('margin_fraction', 0))}%, portato al
-      {_it(100 * stats.get('margin_fraction_target', 0.4))}% dal campionamento pesato
+      {_it(stats.get("n_patches", 0))} patch da {stats.get("n_scenes", 0)} scene ·
+      margine in cache {_it(100 * stats.get("margin_fraction", 0))}%, portato al
+      {_it(100 * stats.get("margin_fraction_target", 0.4))}% dal campionamento pesato
     </div>
   </div>
 </div>
@@ -757,25 +851,25 @@ def build_page(ctx: dict) -> str:
 
 <h2>Stato del codice</h2>
 <div class="grid g4">
-  <div class="card"><h3>Commit</h3><div class="big">{g.get('n_commits', 0)}</div>
-    <div class="note">branch <span class="mono">{html.escape(g.get('branch', '?'))}</span></div></div>
-  <div class="card"><h3>Test</h3><div class="big">{ctx['n_tests']}</div>
-    <div class="note">{_it(ctx['test_lines'])} righe di test</div></div>
+  <div class="card"><h3>Commit</h3><div class="big">{g.get("n_commits", 0)}</div>
+    <div class="note">branch <span class="mono">{html.escape(g.get("branch", "?"))}</span></div></div>
+  <div class="card"><h3>Test</h3><div class="big">{ctx["n_tests"]}</div>
+    <div class="note">{_it(ctx["test_lines"])} righe di test</div></div>
   <div class="card"><h3>Righe di codice</h3><div class="big">{_it(ctx["src_lines"])}</div>
     <div class="note">src + scripts</div></div>
-  <div class="card"><h3>Decisioni registrate</h3><div class="big">{len(ctx['decisions'])}</div>
+  <div class="card"><h3>Decisioni registrate</h3><div class="big">{len(ctx["decisions"])}</div>
     <div class="note">DECISIONS.md</div></div>
 </div>
 
 <h2>Registro</h2>
-<details><summary>Decisioni tecniche ({len(ctx['decisions'])})</summary>
+<details><summary>Decisioni tecniche ({len(ctx["decisions"])})</summary>
   <div class="inner"><table><tbody>{decisions_html}</tbody></table></div></details>
 <details style="margin-top:11px"><summary>Ultimi commit</summary>
   <div class="inner"><table><tbody>{commits_html}</tbody></table></div></details>
 
 <footer>
   Generata da <span class="mono">make dashboard</span> il
-  {today.strftime('%d/%m/%Y')}. Pagina autonoma: nessuna risorsa esterna, funziona
+  {today.strftime("%d/%m/%Y")}. Pagina autonoma: nessuna risorsa esterna, funziona
   con la rete spenta. Space Eagle · Wave by Vento, OGR Torino.
 </footer>
 </div>
@@ -820,8 +914,9 @@ def route_story(repo: Path, demo_index: dict) -> dict:
     lead = _json(repo / "artifacts/figures/route_lead.json")
     if not lead:
         return {}
-    scene = next((s for s in demo_index.get("scenes") or []
-                  if s["scene_id"] == lead.get("scene_id")), None)
+    scene = next(
+        (s for s in demo_index.get("scenes") or [] if s["scene_id"] == lead.get("scene_id")), None
+    )
     entry = ((scene or {}).get("classes") or {}).get(lead.get("ice_class")) or {}
     if not entry.get("route_exists"):
         return {}
@@ -927,8 +1022,12 @@ def main(argv: list[str] | None = None) -> int:
     done = sum(1 for g in ctx["gates"] if g.done)
     log.info(
         "%s scritta — %d/%d gate verdi, %d commit, %d test, %d giorni al pitch",
-        args.out, done, len(ctx["gates"]), ctx["git"].get("n_commits", 0),
-        ctx["n_tests"], (PITCH - today).days,
+        args.out,
+        done,
+        len(ctx["gates"]),
+        ctx["git"].get("n_commits", 0),
+        ctx["n_tests"],
+        (PITCH - today).days,
     )
     return 0
 

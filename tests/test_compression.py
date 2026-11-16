@@ -80,17 +80,15 @@ def test_a_speckled_mask_compresses_worse_than_a_polygon_mask():
     """
     polygon = len(encode_mask_png(_polygon_mask(), 6))
     speckled = len(encode_mask_png(_speckled_mask(), 6))
-    assert speckled > polygon * 2, (
-        f"atteso un divario netto, ottenuto {polygon} vs {speckled} byte"
-    )
+    assert speckled > polygon * 2, f"atteso un divario netto, ottenuto {polygon} vs {speckled} byte"
 
 
 def test_rle_estimate_counts_runs_not_pixels():
     uniform = np.zeros((10, 100), dtype="uint8")
-    assert rle_estimate_bytes(uniform) == 3          # one run
+    assert rle_estimate_bytes(uniform) == 3  # one run
 
     striped = np.tile(np.arange(2, dtype="uint8"), (10, 50))
-    assert rle_estimate_bytes(striped) == 1000 * 3   # every pixel its own run
+    assert rle_estimate_bytes(striped) == 1000 * 3  # every pixel its own run
 
 
 def test_rle_handles_an_empty_mask():
@@ -116,7 +114,10 @@ def test_measure_rejects_mismatched_shapes():
     """Comparing a mask and SAR of different sizes compares two scenes."""
     with pytest.raises(ValueError, match="non coincidono"):
         measure_scene(
-            "s", np.zeros((10, 10), dtype="uint8"), _sar(), n_classes=6,
+            "s",
+            np.zeros((10, 10), dtype="uint8"),
+            _sar(),
+            n_classes=6,
             mask_source="predicted",
         )
 
@@ -137,11 +138,13 @@ def test_uncompressed_numerator_uses_sensor_precision():
 
 def test_payload_includes_the_route():
     route = {"type": "FeatureCollection", "features": [{"x": list(range(500))}]}
-    without = measure_scene(
-        "s", _polygon_mask(), _sar(), n_classes=6, mask_source="predicted"
-    )
+    without = measure_scene("s", _polygon_mask(), _sar(), n_classes=6, mask_source="predicted")
     with_route = measure_scene(
-        "s", _polygon_mask(), _sar(), n_classes=6, mask_source="predicted",
+        "s",
+        _polygon_mask(),
+        _sar(),
+        n_classes=6,
+        mask_source="predicted",
         route_geojson=route,
     )
     assert with_route.payload_bytes > without.payload_bytes
@@ -169,9 +172,7 @@ def test_sar_padding_is_disclosed():
 
 def test_ground_truth_measurement_refuses_to_produce_a_headline():
     """SPEC rule 2. An upper bound must not be quotable as the real figure."""
-    r = measure_scene(
-        "s", _polygon_mask(), _sar(), n_classes=6, mask_source="ground_truth"
-    )
+    r = measure_scene("s", _polygon_mask(), _sar(), n_classes=6, mask_source="ground_truth")
     assert r.is_provisional
     assert any("PROVVISORIO" in n for n in r.notes)
 
@@ -220,15 +221,26 @@ def test_result_dict_carries_everything_needed_to_recompute():
     d = r.as_dict()
     assert d["numerator"]["sar_channels_png"] > 0
     assert d["denominator"]["total"] == r.payload_bytes
-    assert d["denominator"]["mask_png"] + d["denominator"]["route_geojson"] \
-        + d["denominator"]["metadata"] == d["denominator"]["total"]
+    assert (
+        d["denominator"]["mask_png"]
+        + d["denominator"]["route_geojson"]
+        + d["denominator"]["metadata"]
+        == d["denominator"]["total"]
+    )
 
 
 def test_ratio_is_finite_when_the_payload_is_empty():
     """Division guard: an empty payload must not raise."""
     r = CompressionResult(
-        scene_id="s", shape=(1, 1), n_pixels=1, raw_sar_bytes=100,
-        raw_netcdf_bytes=0, raw_sar_png_bytes=100, mask_png_bytes=0,
-        route_bytes=0, metadata_bytes=0, n_classes=6,
+        scene_id="s",
+        shape=(1, 1),
+        n_pixels=1,
+        raw_sar_bytes=100,
+        raw_netcdf_bytes=0,
+        raw_sar_png_bytes=100,
+        mask_png_bytes=0,
+        route_bytes=0,
+        metadata_bytes=0,
+        n_classes=6,
     )
     assert np.isfinite(r.ratio)

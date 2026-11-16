@@ -29,7 +29,11 @@ class ConfusionMatrix:
 
     def update(self, target: torch.Tensor | np.ndarray, pred: torch.Tensor | np.ndarray) -> None:
         """Add a batch. Both arguments are class ids, not logits."""
-        t = target.detach().cpu().numpy() if isinstance(target, torch.Tensor) else np.asarray(target)
+        t = (
+            target.detach().cpu().numpy()
+            if isinstance(target, torch.Tensor)
+            else np.asarray(target)
+        )
         p = pred.detach().cpu().numpy() if isinstance(pred, torch.Tensor) else np.asarray(pred)
         t, p = t.ravel(), p.ravel()
 
@@ -71,7 +75,9 @@ class ConfusionMatrix:
         """
         iou = self.iou_per_class()
         scored = iou[self.support() > 0]
-        return float(np.nanmean(scored)) if scored.size and np.isfinite(scored).any() else float("nan")
+        return (
+            float(np.nanmean(scored)) if scored.size and np.isfinite(scored).any() else float("nan")
+        )
 
     def n_classes_scored(self) -> int:
         """How many classes the mIoU average covers, i.e. have ground truth here."""

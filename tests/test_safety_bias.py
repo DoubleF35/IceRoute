@@ -118,8 +118,7 @@ def test_sweep_returns_a_row_per_threshold():
     p = _proba([(OPEN_WATER, 0.6), (OLD_ICE, 0.4)], shape=(16, 16))
     truth = np.full((16, 16), OLD_ICE, dtype="uint8")
     sic = np.full((16, 16), 10, dtype="uint8")
-    curve = sweep_tau(p, truth, "PC6", MAPPING, taus=[1.0, 0.8, 0.5],
-                      table=TABLE, sic=sic)
+    curve = sweep_tau(p, truth, "PC6", MAPPING, taus=[1.0, 0.8, 0.5], table=TABLE, sic=sic)
     assert [t.tau for t in curve] == [1.0, 0.8, 0.5]
 
 

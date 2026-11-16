@@ -149,15 +149,26 @@ def agreement(live_overlay: dict, stored_overlay: dict) -> dict:
     a = [tuple(c) for c in ((live_overlay or {}).get("iceroute") or {}).get("path", [])]
     b = [tuple(c) for c in ((stored_overlay or {}).get("iceroute") or {}).get("path", [])]
     if not a or not b:
-        return {"comparable": False, "identical": False,
-                "note": "una delle due rotte non esiste: nessun confronto"}
+        return {
+            "comparable": False,
+            "identical": False,
+            "note": "una delle due rotte non esiste: nessun confronto",
+        }
     if a == b:
-        return {"comparable": True, "identical": True, "n_cells": len(a),
-                "note": f"identica al precomputato, {len(a)} celle"}
+        return {
+            "comparable": True,
+            "identical": True,
+            "n_cells": len(a),
+            "note": f"identica al precomputato, {len(a)} celle",
+        }
     same = sum(1 for x, y in zip(a, b, strict=False) if x == y)
     return {
-        "comparable": True, "identical": False, "n_cells": len(a),
+        "comparable": True,
+        "identical": False,
+        "n_cells": len(a),
         "n_matching": same,
-        "note": (f"DIVERSA dal precomputato: {len(a)} celle contro {len(b)}, "
-                 f"{same} coincidono. Va capito prima del palco."),
+        "note": (
+            f"DIVERSA dal precomputato: {len(a)} celle contro {len(b)}, "
+            f"{same} coincidono. Va capito prima del palco."
+        ),
     }

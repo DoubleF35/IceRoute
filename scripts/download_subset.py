@@ -265,11 +265,7 @@ def extend_train(args, cfg, scenes, regions, split_path, seed, min_free, avail) 
     than redownloading.
     """
     frozen = (yaml.safe_load(split_path.read_text()) or {}).get("split", {})
-    used = {
-        name
-        for key in ("train", "val", "demo")
-        for name in frozen.get(key, [])
-    }
+    used = {name for key in ("train", "val", "demo") for name in frozen.get(key, [])}
 
     extra_path = REPO / "configs" / "split_extra.yaml"
     if extra_path.exists():
@@ -279,9 +275,7 @@ def extend_train(args, cfg, scenes, regions, split_path, seed, min_free, avail) 
         prev = []
 
     pool = [f for f in scenes if f.name not in used]
-    log.info(
-        "Scene gia' allocate: %d · disponibili per l'estensione: %d", len(used), len(pool)
-    )
+    log.info("Scene gia' allocate: %d · disponibili per l'estensione: %d", len(used), len(pool))
     if not pool:
         log.error("Nessuna scena nuova disponibile.")
         return 1
@@ -297,7 +291,9 @@ def extend_train(args, cfg, scenes, regions, split_path, seed, min_free, avail) 
         log.error(
             "Spazio insufficiente: servono %.1f GB, liberi %.1f GB, soglia %.0f GB. "
             "Riduci --extend-train.",
-            planned / 1e9, avail / 1e9, min_free / 1e9,
+            planned / 1e9,
+            avail / 1e9,
+            min_free / 1e9,
         )
         return 1
     if args.dry_run:
@@ -331,9 +327,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="mostra la selezione senza scaricare")
     ap.add_argument("--skip-test", action="store_true")
     ap.add_argument(
-        "--extend-train", type=int, default=None,
+        "--extend-train",
+        type=int,
+        default=None,
         help="scarica N scene AGGIUNTIVE per il training, senza toccare lo split "
-             "congelato. Le nuove finiscono in configs/split_extra.yaml.",
+        "congelato. Le nuove finiscono in configs/split_extra.yaml.",
     )
     args = ap.parse_args(argv)
 
@@ -363,9 +361,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.extend_train:
-        return extend_train(
-            args, cfg, scenes, regions, split_path, seed, min_free, avail
-        )
+        return extend_train(args, cfg, scenes, regions, split_path, seed, min_free, avail)
 
     n_train = args.n_train or subset["n_train_scenes"]
     selected = stratified_select(scenes, regions, n_train, seed)

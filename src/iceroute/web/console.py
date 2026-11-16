@@ -61,8 +61,8 @@ from pathlib import Path
 
 import yaml
 
-from iceroute.web import standalone as sa
 from iceroute.routing.geocode import POLAR_CRS
+from iceroute.web import standalone as sa
 
 log = logging.getLogger("console")
 
@@ -75,7 +75,7 @@ OUT = Path("console.html")
 # data/demo/images so preflight does not count them as orphans of the build.
 CACHE_DIR = Path("data/demo/console")
 
-ARCTIC_CIRCLE = 66.5633      # definition, not a measurement
+ARCTIC_CIRCLE = 66.5633  # definition, not a measurement
 
 # S1B_EW_GRDM_1SDH_20180707T113313_20180707T113413_011704_015877_83D1
 PRODUCT = re.compile(
@@ -110,8 +110,10 @@ def azimuth(p0: tuple[float, float], p1: tuple[float, float]) -> float:
 def great_circle_km(p0: tuple[float, float], p1: tuple[float, float]) -> float:
     lo0, la0 = math.radians(p0[0]), math.radians(p0[1])
     lo1, la1 = math.radians(p1[0]), math.radians(p1[1])
-    a = (math.sin((la1 - la0) / 2) ** 2
-         + math.cos(la0) * math.cos(la1) * math.sin((lo1 - lo0) / 2) ** 2)
+    a = (
+        math.sin((la1 - la0) / 2) ** 2
+        + math.cos(la0) * math.cos(la1) * math.sin((lo1 - lo0) / 2) ** 2
+    )
     return 6371.0 * 2 * math.asin(math.sqrt(a))
 
 
@@ -142,10 +144,12 @@ def footprint(raw: Path, *, step: int = 2) -> dict | None:
         return [round(float(lo[i, j]), 4), round(float(la[i, j]), 4)]
 
     n, m = la.shape
-    ring = ([pt(0, j) for j in range(0, m, step)]
-            + [pt(i, m - 1) for i in range(0, n, step)]
-            + [pt(n - 1, j) for j in range(m - 1, -1, -step)]
-            + [pt(i, 0) for i in range(n - 1, -1, -step)])
+    ring = (
+        [pt(0, j) for j in range(0, m, step)]
+        + [pt(i, m - 1) for i in range(0, n, step)]
+        + [pt(n - 1, j) for j in range(m - 1, -1, -step)]
+        + [pt(i, 0) for i in range(n - 1, -1, -step)]
+    )
 
     mid = n // 2, m // 2
     # Axis 0 is along-track. Measured, not taken from the dimension name: its
@@ -168,14 +172,26 @@ def footprint(raw: Path, *, step: int = 2) -> dict | None:
         "pass": "discendente" if 90 < track < 270 else "ascendente",
         "pixel_spacing_m": spacing,
     }
-    if (m_ := PRODUCT.match(original)):
+    if m_ := PRODUCT.match(original):
         g = m_.groupdict()
         out |= {
-            "platform": g["platform"], "mode": g["mode"], "level": g["product"],
-            "pol": g["pol"], "orbit": int(g["orbit"]), "take": g["take"],
-            "uid": g["uid"], "t0": _stamp(g["t0"]), "t1": _stamp(g["t1"]),
-            "seconds": round((int(g["t1"][13:15]) - int(g["t0"][13:15])
-                              + 60 * (int(g["t1"][11:13]) - int(g["t0"][11:13]))), 0),
+            "platform": g["platform"],
+            "mode": g["mode"],
+            "level": g["product"],
+            "pol": g["pol"],
+            "orbit": int(g["orbit"]),
+            "take": g["take"],
+            "uid": g["uid"],
+            "t0": _stamp(g["t0"]),
+            "t1": _stamp(g["t1"]),
+            "seconds": round(
+                (
+                    int(g["t1"][13:15])
+                    - int(g["t0"][13:15])
+                    + 60 * (int(g["t1"][11:13]) - int(g["t0"][11:13]))
+                ),
+                0,
+            ),
         }
     return out
 
@@ -212,8 +228,9 @@ def sar_geocoded(raw: Path, grid_shape, resolution_m: float, cache: Path) -> Pat
             cached = [im.height, im.width]
         if cached == list(grid_shape):
             return out
-        log.info("  cache obsoleta per %s (%s contro %s): rigenero",
-                 raw.name, cached, list(grid_shape))
+        log.info(
+            "  cache obsoleta per %s (%s contro %s): rigenero", raw.name, cached, list(grid_shape)
+        )
         out.unlink()
     if not raw.is_file():
         return None
@@ -222,13 +239,16 @@ def sar_geocoded(raw: Path, grid_shape, resolution_m: float, cache: Path) -> Pat
     from iceroute.demo.precompute import resolve_labels, save_png, stretch
     from iceroute.routing.geocode import geocode_scene
 
-    scene = load_scene(raw, load_config(Path("configs/data.yaml")),
-                       labels_from=resolve_labels(raw))
+    scene = load_scene(raw, load_config(Path("configs/data.yaml")), labels_from=resolve_labels(raw))
     hv8 = stretch(scene.hv, scene.mask_valid)
     geo = geocode_scene(scene, resolution_m=resolution_m, extra={"sar": hv8})
     if list(geo.shape) != list(grid_shape):
-        log.warning("  %s: griglia %s contro %s dell'overlay — livello non generato",
-                    raw.name, list(geo.shape), list(grid_shape))
+        log.warning(
+            "  %s: griglia %s contro %s dell'overlay — livello non generato",
+            raw.name,
+            list(geo.shape),
+            list(grid_shape),
+        )
         return None
 
     img = geo.extra["sar"].copy()
@@ -331,17 +351,25 @@ def admissibility(overlay: dict, buckets: int = 180) -> dict | None:
     size = max(1, math.ceil(len(path) / buckets))
     bars = []
     for i in range(0, len(path), size):
-        chunk = path[i:i + size]
-        bars.append([
-            round(sum(c in no_go for c in chunk) / len(chunk), 3),
-            round(sum(c in no_data for c in chunk) / len(chunk), 3),
-        ])
-    return {"bars": bars, "n_cells": len(path), "n_no_go": len(no_go),
-            "n_no_data": len(no_data)}
+        chunk = path[i : i + size]
+        bars.append(
+            [
+                round(sum(c in no_go for c in chunk) / len(chunk), 3),
+                round(sum(c in no_data for c in chunk) / len(chunk), 3),
+            ]
+        )
+    return {"bars": bars, "n_cells": len(path), "n_no_go": len(no_go), "n_no_data": len(no_data)}
 
 
-def event_log(scene: dict, ice_class: str, entry: dict, stats: dict | None,
-              fp: dict | None, overlay: dict, adm: dict | None) -> list[list[str]]:
+def event_log(
+    scene: dict,
+    ice_class: str,
+    entry: dict,
+    stats: dict | None,
+    fp: dict | None,
+    overlay: dict,
+    adm: dict | None,
+) -> list[list[str]]:
     """One line per fact the build actually recorded. No invented timestamps.
 
     A console log reads as a clock ticking, and this one deliberately does not
@@ -356,46 +384,74 @@ def event_log(scene: dict, ice_class: str, entry: dict, stats: dict | None,
     shape = scene.get("shape") or (stats or {}).get("scene_shape")
     if shape:
         px = (fp or {}).get("pixel_spacing_m")
-        extent = (f" · {it(shape[0] * px / 1000)}{NBSP}×{NBSP}{it(shape[1] * px / 1000)} km"
-                  if px else "")
+        extent = (
+            f" · {it(shape[0] * px / 1000)}{NBSP}×{NBSP}{it(shape[1] * px / 1000)} km" if px else ""
+        )
         add("SCENE", f"{scene['id']} · {it(shape[0])}×{it(shape[1])} px{extent}")
     if fp and fp.get("platform"):
-        add("PRODOTTO", f"{fp['platform']} {fp['mode']} {fp['level']} {fp['pol']} · "
-                        f"orbita assoluta {it(fp['orbit'])} · take {fp['take']}")
-        add("ACQUIS.", f"{fp['t0']} → {fp['t1']} · {it(fp.get('seconds') or 0)} s · "
-                       f"passaggio {fp['pass']} · traccia {it(fp['track_az'], 1)}°")
+        add(
+            "PRODOTTO",
+            f"{fp['platform']} {fp['mode']} {fp['level']} {fp['pol']} · "
+            f"orbita assoluta {it(fp['orbit'])} · take {fp['take']}",
+        )
+        add(
+            "ACQUIS.",
+            f"{fp['t0']} → {fp['t1']} · {it(fp.get('seconds') or 0)} s · "
+            f"passaggio {fp['pass']} · traccia {it(fp['track_az'], 1)}°",
+        )
     if fp:
-        add("IMPRONTA", f"{it(fp['along_km'], 1)} km lungo traccia × "
-                        f"{it(fp['across_km'], 1)} km in range · centro "
-                        f"{it(fp['centre'][1], 2)}°N {it(abs(fp['centre'][0]), 2)}°O")
+        add(
+            "IMPRONTA",
+            f"{it(fp['along_km'], 1)} km lungo traccia × "
+            f"{it(fp['across_km'], 1)} km in range · centro "
+            f"{it(fp['centre'][1], 2)}°N {it(abs(fp['centre'][0]), 2)}°O",
+        )
     if stats:
-        add("TILE", f"{it(stats['n_tiles'])} tile da {stats['tile_size']} px · "
-                    f"sovrapposizione {stats['overlap']} · batch {stats['batch_size']}")
-        add("INFER", f"{it(stats['seconds'], 3)} s su {str(stats['device']).upper()} · "
-                     f"picco {it(stats['peak_accumulator_mb'], 1)} MB contro "
-                     f"{it(stats['naive_accumulator_mb'], 1)} MB del metodo ingenuo")
+        add(
+            "TILE",
+            f"{it(stats['n_tiles'])} tile da {stats['tile_size']} px · "
+            f"sovrapposizione {stats['overlap']} · batch {stats['batch_size']}",
+        )
+        add(
+            "INFER",
+            f"{it(stats['seconds'], 3)} s su {str(stats['device']).upper()} · "
+            f"picco {it(stats['peak_accumulator_mb'], 1)} MB contro "
+            f"{it(stats['naive_accumulator_mb'], 1)} MB del metodo ingenuo",
+        )
     gs, res = overlay.get("grid_shape"), overlay.get("resolution_m")
     if gs and res:
         add("GEOCODE", f"{it(gs[0])}×{it(gs[1])} celle a {it(res)} m")
     pol = entry.get("polaris") or {}
     cond = entry.get("conditions") or {}
     if pol:
-        add("POLARIS", f"{ice_class} · RIO min {it(pol.get('rio_min') or 0, 0)} · "
-                       f"max {it(pol.get('rio_max') or 0, 0)} · normale "
-                       f"{it((cond.get('fraction_normal') or 0) * 100)}%")
+        add(
+            "POLARIS",
+            f"{ice_class} · RIO min {it(pol.get('rio_min') or 0, 0)} · "
+            f"max {it(pol.get('rio_max') or 0, 0)} · normale "
+            f"{it((cond.get('fraction_normal') or 0) * 100)}%",
+        )
     cmp_ = entry.get("comparison") or {}
     ours = cmp_.get("iceroute") or {}
     if entry.get("route_exists") and ours:
-        add("A*", f"{it(cond.get('n_cells') or 0)} celle · {entry.get('n_waypoints')} "
-                  f"waypoint · {it(ours.get('distance_km') or 0)} km")
+        add(
+            "A*",
+            f"{it(cond.get('n_cells') or 0)} celle · {entry.get('n_waypoints')} "
+            f"waypoint · {it(ours.get('distance_km') or 0)} km",
+        )
     if adm:
         verdict = "NON PERCORRIBILE" if adm["n_no_go"] else "percorribile"
-        add("DIRETTA", f"{it(adm['n_cells'])} celle · {it(adm['n_no_go'])} vietate · "
-                       f"{it(adm['n_no_data'])} fuori copertura · {verdict}")
+        add(
+            "DIRETTA",
+            f"{it(adm['n_cells'])} celle · {it(adm['n_no_go'])} vietate · "
+            f"{it(adm['n_no_data'])} fuori copertura · {verdict}",
+        )
     pay = entry.get("payload") or {}
     if pay.get("total"):
-        add("PAYLOAD", f"maschera {it(pay['mask'])} B + rotta {it(pay['route'])} B + "
-                       f"metadati {it(pay['meta'])} B = {it(pay['total'] / 1000)} KB")
+        add(
+            "PAYLOAD",
+            f"maschera {it(pay['mask'])} B + rotta {it(pay['route'])} B + "
+            f"metadati {it(pay['meta'])} B = {it(pay['total'] / 1000)} KB",
+        )
     for w in scene.get("warnings") or []:
         add("AVVISO", str(w)[:120])
     return rows
@@ -414,7 +470,7 @@ def tint(chunk: str) -> str:
     """
     out, i = [], 0
     for m in _TOKENS.finditer(chunk):
-        out.append(html.escape(chunk[i:m.start()]))
+        out.append(html.escape(chunk[i : m.start()]))
         cls = "s" if m.group(1) else "n"
         out.append(f'<i class="{cls}">{html.escape(m.group(0))}</i>')
         i = m.end()
@@ -444,34 +500,40 @@ def bridge(entry: dict, width: int = 64) -> dict | None:
     # if that ever stops holding the ruler would quietly start lying, so it is
     # checked and the ruler is dropped instead.
     ruler = flat.isascii()
-    lines = [[f"{i:04x}" if ruler else "", tint(flat[i:i + width])]
-             for i in range(0, len(flat), width)]
+    lines = [
+        [f"{i:04x}" if ruler else "", tint(flat[i : i + width])] for i in range(0, len(flat), width)
+    ]
 
     link = pay.get("link") or {}
     rows = [
         ["maschera del ghiaccio", f"{it(pay['mask'])} B"] if pay.get("mask") else None,
         [f"rotta · {pay.get('n_waypoints')} waypoint", f"{it(pay['route'])} B"]
-        if pay.get("route") else None,
+        if pay.get("route")
+        else None,
         ["metadati", f"{it(pay['meta'])} B"] if pay.get("meta") else None,
         ["totale trasmesso", f"{it(pay['total'] / 1000)} KB"] if pay.get("total") else None,
         ["contro il radar", f"{it(pay['sar'] / 1e6, 1)} MB"] if pay.get("sar") else None,
         ["compressione", f"{it(pay['ratio'], 1)}:1"] if pay.get("ratio") else None,
         ["sul collegamento", f"≈ {it(link['s'])} s · {link['terminal']}"]
-        if link.get("s") is not None else None,
+        if link.get("s") is not None
+        else None,
         ["in messaggi SBD", f"{it(link['sbd'])}"] if link.get("sbd") else None,
     ]
     return {
-        "lines": lines, "bytes": n, "ruler": ruler,
+        "lines": lines,
+        "bytes": n,
+        "ruler": ruler,
         "n_waypoints": pay.get("n_waypoints"),
-        "head": (f"{it(n)} byte · {pay.get('n_waypoints')} waypoint"
-                 + (f" · {it(link['sbd'])} messaggi SBD" if link.get("sbd") else "")),
+        "head": (
+            f"{it(n)} byte · {pay.get('n_waypoints')} waypoint"
+            + (f" · {it(link['sbd'])} messaggi SBD" if link.get("sbd") else "")
+        ),
         "rows": [[*r, ""] for r in rows if r],
         "note": pay.get("note") or "",
     }
 
 
-def panels(entry: dict, fp: dict | None, stats: dict | None,
-           adm: dict | None, pal: dict) -> dict:
+def panels(entry: dict, fp: dict | None, stats: dict | None, adm: dict | None, pal: dict) -> dict:
     """Every row and every bar width, resolved here.
 
     The browser places strings and percentages it was handed. Computing a bar
@@ -486,23 +548,45 @@ def panels(entry: dict, fp: dict | None, stats: dict | None,
         return None if v in (None, "") else [k, v, "sm" if small else ""]
 
     prod = [
-        row("piattaforma", f"{f.get('platform','')} · {f.get('mode','')} "
-                           f"{f.get('level','')} {f.get('pol','')}".strip(), True)
-        if f.get("platform") else None,
+        row(
+            "piattaforma",
+            f"{f.get('platform', '')} · {f.get('mode', '')} "
+            f"{f.get('level', '')} {f.get('pol', '')}".strip(),
+            True,
+        )
+        if f.get("platform")
+        else None,
         row("orbita assoluta", it(f["orbit"]) if f.get("orbit") else None),
         row("acquisizione", f.get("t0"), True),
         row("fine", f.get("t1"), True),
         row("durata", f"{it(f['seconds'])} s" if f.get("seconds") else None, True),
-        row("passaggio", f"{f.get('pass','')} · {it(f['track_az'], 1)}°"
-            if f.get("track_az") is not None else None, True),
-        row("vista", f"destra · {it(f['look_az'], 1)}°"
-            if f.get("look_az") is not None else None, True),
-        row("impronta", f"{it(f['along_km'], 1)} × {it(f['across_km'], 1)} km"
-            if f.get("along_km") else None, True),
-        row("centro", f"{it(f['centre'][1], 2)}° {it(f['centre'][0], 2)}°"
-            if f.get("centre") else None, True),
-        row("passo pixel", f"{it(f['pixel_spacing_m'])} m"
-            if f.get("pixel_spacing_m") else None, True),
+        row(
+            "passaggio",
+            f"{f.get('pass', '')} · {it(f['track_az'], 1)}°"
+            if f.get("track_az") is not None
+            else None,
+            True,
+        ),
+        row(
+            "vista",
+            f"destra · {it(f['look_az'], 1)}°" if f.get("look_az") is not None else None,
+            True,
+        ),
+        row(
+            "impronta",
+            f"{it(f['along_km'], 1)} × {it(f['across_km'], 1)} km" if f.get("along_km") else None,
+            True,
+        ),
+        row(
+            "centro",
+            f"{it(f['centre'][1], 2)}° {it(f['centre'][0], 2)}°" if f.get("centre") else None,
+            True,
+        ),
+        row(
+            "passo pixel",
+            f"{it(f['pixel_spacing_m'])} m" if f.get("pixel_spacing_m") else None,
+            True,
+        ),
     ]
 
     onboard = [
@@ -511,10 +595,15 @@ def panels(entry: dict, fp: dict | None, stats: dict | None,
         row("batch", str(s["batch_size"]) if s.get("batch_size") else None, True),
         row("inferenza", f"{it(s['seconds'], 3)} s" if s.get("seconds") else None),
         row("dispositivo", str(s["device"]).upper() if s.get("device") else None, True),
-        row("picco memoria", f"{it(s['peak_accumulator_mb'], 1)} MB"
-            if s.get("peak_accumulator_mb") else None),
-        row("metodo ingenuo", f"{it(s['naive_accumulator_mb'], 1)} MB"
-            if s.get("naive_accumulator_mb") else None, True),
+        row(
+            "picco memoria",
+            f"{it(s['peak_accumulator_mb'], 1)} MB" if s.get("peak_accumulator_mb") else None,
+        ),
+        row(
+            "metodo ingenuo",
+            f"{it(s['naive_accumulator_mb'], 1)} MB" if s.get("naive_accumulator_mb") else None,
+            True,
+        ),
     ]
 
     def pct(v):
@@ -525,49 +614,76 @@ def panels(entry: dict, fp: dict | None, stats: dict | None,
         rio_meter = {
             "label": "celle della rotta per livello POLARIS",
             "value": f"{it(cond['n_cells'])} celle",
-            "segs": [[pct(cond.get("fraction_normal")), pal["rio"][0]],
-                     [pct(cond.get("fraction_elevated")), pal["rio"][1]],
-                     [pct(cond.get("fraction_no_go")), pal["rio"][2]]],
+            "segs": [
+                [pct(cond.get("fraction_normal")), pal["rio"][0]],
+                [pct(cond.get("fraction_elevated")), pal["rio"][1]],
+                [pct(cond.get("fraction_no_go")), pal["rio"][2]],
+            ],
         }
     rio_rows = [
         row("rio minimo", it(pol["rio_min"]) if pol.get("rio_min") is not None else None),
-        row("rio mediano", it(cond["rio_median"])
-            if cond.get("rio_median") is not None else None),
+        row("rio mediano", it(cond["rio_median"]) if cond.get("rio_median") is not None else None),
         row("rio massimo", it(pol["rio_max"]) if pol.get("rio_max") is not None else None),
         row("classe peggiore", cond.get("worst_class"), True),
-        row("sua concentrazione", f"{it(cond['worst_class_sic_median'])}/10"
-            if cond.get("worst_class_sic_median") is not None else None, True),
-        row("suo rio mediano", it(cond["worst_class_rio_median"])
-            if cond.get("worst_class_rio_median") is not None else None, True),
+        row(
+            "sua concentrazione",
+            f"{it(cond['worst_class_sic_median'])}/10"
+            if cond.get("worst_class_sic_median") is not None
+            else None,
+            True,
+        ),
+        row(
+            "suo rio mediano",
+            it(cond["worst_class_rio_median"])
+            if cond.get("worst_class_rio_median") is not None
+            else None,
+            True,
+        ),
     ]
 
     by = cond.get("by_class") or {}
     total = sum(by.values())
     mix = None
     if total:
-        mix = {"label": "tipi di ghiaccio attraversati",
-               "value": f"{it(total)} celle",
-               "segs": [[round(100 * by[k] / total, 2), pal["classes"][int(k)]]
-                        for k in sorted(by, key=int) if int(k) < len(pal["classes"])]}
+        mix = {
+            "label": "tipi di ghiaccio attraversati",
+            "value": f"{it(total)} celle",
+            "segs": [
+                [round(100 * by[k] / total, 2), pal["classes"][int(k)]]
+                for k in sorted(by, key=int)
+                if int(k) < len(pal["classes"])
+            ],
+        }
 
     trace = None
     if adm:
         trace = {
-            "bars": [[round(max(3.0, 100 * (g or d)), 1),
-                      "g" if g else ("d" if d else "")] for g, d in adm["bars"]],
-            "note": (f"{it(adm['n_cells'])} celle lungo la rotta diretta · "
-                     f"{it(adm['n_no_go'])} vietate da POLARIS · "
-                     f"{it(adm['n_no_data'])} fuori copertura. Ogni barra è una porzione "
-                     f"del percorso: l'altezza è la frazione delle sue celle vietate."),
+            "bars": [
+                [round(max(3.0, 100 * (g or d)), 1), "g" if g else ("d" if d else "")]
+                for g, d in adm["bars"]
+            ],
+            "note": (
+                f"{it(adm['n_cells'])} celle lungo la rotta diretta · "
+                f"{it(adm['n_no_go'])} vietate da POLARIS · "
+                f"{it(adm['n_no_data'])} fuori copertura. Ogni barra è una porzione "
+                f"del percorso: l'altezza è la frazione delle sue celle vietate."
+            ),
         }
 
-    return {"prod": [r for r in prod if r], "onboard": [r for r in onboard if r],
-            "rio_meter": rio_meter, "rio_rows": [r for r in rio_rows if r],
-            "mix": mix, "trace": trace, "bridge": bridge(entry)}
+    return {
+        "prod": [r for r in prod if r],
+        "onboard": [r for r in onboard if r],
+        "rio_meter": rio_meter,
+        "rio_rows": [r for r in rio_rows if r],
+        "mix": mix,
+        "trace": trace,
+        "bridge": bridge(entry),
+    }
 
 
-def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
-            cache_dir: Path = CACHE_DIR) -> dict:
+def collect(
+    demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path, cache_dir: Path = CACHE_DIR
+) -> dict:
     """standalone's context, plus geography and the console's own strings."""
     ctx = sa.collect(demo_dir, metrics, assumptions)
     index = json.loads((demo_dir / "index.json").read_text())
@@ -580,9 +696,13 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
         if fp is None:
             missing_raw.append(scene["id"])
         stats = inference_stats(src.get("files") or {})
-        scene |= {"footprint": fp, "stats": stats, "shape": src.get("shape"),
-                  "warnings": src.get("warnings") or [],
-                  "inference_seconds": src.get("inference_seconds")}
+        scene |= {
+            "footprint": fp,
+            "stats": stats,
+            "shape": src.get("shape"),
+            "warnings": src.get("warnings") or [],
+            "inference_seconds": src.get("inference_seconds"),
+        }
 
         grid_shape = grid_res = None
         for ic, entry in scene["classes"].items():
@@ -596,10 +716,8 @@ def collect(demo_dir: Path, metrics: dict, assumptions: dict, raw_dir: Path,
             adm = admissibility(overlay) if overlay else None
             entry |= {
                 "adm": adm,
-                "route_lonlat": route_lonlat(demo_dir / "routes",
-                                             raw_entry.get("geojson") or ""),
-                "grid": {"shape": overlay.get("grid_shape"),
-                         "res": overlay.get("resolution_m")},
+                "route_lonlat": route_lonlat(demo_dir / "routes", raw_entry.get("geojson") or ""),
+                "grid": {"shape": overlay.get("grid_shape"), "res": overlay.get("resolution_m")},
                 "log": event_log(scene, ic, entry, stats, fp, overlay, adm),
             }
             entry["panels"] = panels(entry, fp, stats, adm, sa.palette())
@@ -1176,27 +1294,35 @@ render(); tick();
 def build_page(ctx: dict) -> str:
     pal = ctx["palette"]
     agg = ctx["aggregate"]
-    root = (f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};"
-            f"--c-nogo:{pal['nogo']};--c-ours-fill:{pal['ours']}22}}")
+    root = (
+        f":root{{--c-ours:{pal['ours']};--c-base:{pal['base']};"
+        f"--c-nogo:{pal['nogo']};--c-ours-fill:{pal['ours']}22}}"
+    )
 
     def cell(k: str, v: str, eid: str = "") -> str:
         i = f' id="{eid}"' if eid else ""
-        return (f'<div class="cell"><span class="k">{html.escape(k)}</span>'
-                f'<span class="v"{i}>{v}</span></div>')
+        return (
+            f'<div class="cell"><span class="k">{html.escape(k)}</span>'
+            f'<span class="v"{i}>{v}</span></div>'
+        )
 
     leg_cls = "".join(
         f'<span><i style="background:{c}"></i>{html.escape(n)}</span>'
-        for n, c in zip(["acqua libera", "ghiaccio sottile", "ghiaccio spesso"],
-                        pal["classes"], strict=False))
+        for n, c in zip(
+            ["acqua libera", "ghiaccio sottile", "ghiaccio spesso"], pal["classes"], strict=False
+        )
+    )
 
     miou = sa.dec(agg.get("miou")) if isinstance(agg.get("miou"), float) else "—"
     ckpt = Path(str(ctx.get("checkpoint") or "")).name or "—"
 
     warn = ""
     if ctx["missing_raw"]:
-        warn = ('<div class="note" style="color:var(--warn-t)">Scene grezze assenti: '
-                + html.escape(", ".join(s[:14] for s in ctx["missing_raw"]))
-                + " — niente impronta sul globo per queste.</div>")
+        warn = (
+            '<div class="note" style="color:var(--warn-t)">Scene grezze assenti: '
+            + html.escape(", ".join(s[:14] for s in ctx["missing_raw"]))
+            + " — niente impronta sul globo per queste.</div>"
+        )
 
     return f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
 <title>IceRoute — console</title>
@@ -1238,12 +1364,12 @@ def build_page(ctx: dict) -> str:
       <span><i class="ln" style="background:var(--geo-scene)"></i>impronta swath</span>
       <span><i class="ln" style="background:var(--geo-track)"></i>acquisizione (60&#8239;s)</span>
       <span><i class="ln" style="background:var(--geo-track-dim)"></i>cerchio massimo del passaggio</span>
-      <span><i class="ln" style="background:{pal['ours']}"></i>rotta</span>
+      <span><i class="ln" style="background:{pal["ours"]}"></i>rotta</span>
       <span><i class="ln" style="background:var(--geo-arc)"></i>Circolo Polare Artico</span>
     </div>
     <div class="bd" style="flex:0 0 auto;border-top:1px solid var(--rule)">
       <div class="note">Reticolato ogni 30°/20° e Circolo Polare Artico a
-      {sa.dec(ctx['arctic_circle'], 4)}°: definizioni, non misure. <b>Nessuna linea di
+      {sa.dec(ctx["arctic_circle"], 4)}°: definizioni, non misure. <b>Nessuna linea di
       costa</b> — in questo progetto non c'è un dataset di coste e la pagina non va in rete.
       Impronte, traccia e rotta sono alle coordinate vere lette dalle scene. Il tratto
       pieno è l'acquisizione vera; il tratteggio è <b>lo stesso cerchio massimo
@@ -1260,9 +1386,9 @@ def build_page(ctx: dict) -> str:
     <div class="bd flush"><div class="map"><div class="mapin" id="mapin">
       <img id="img" alt="livello"><div id="ov" class="ovwrap"></div></div></div></div>
     <div class="legend">{leg_cls}
-      <span><i class="ln" style="background:{pal['base']}"></i>diretta</span>
-      <span><i class="ln" style="background:{pal['nogo']}"></i>vietata</span>
-      <span><i class="ln" style="background:{pal['ours']}"></i>IceRoute</span>
+      <span><i class="ln" style="background:{pal["base"]}"></i>diretta</span>
+      <span><i class="ln" style="background:{pal["nogo"]}"></i>vietata</span>
+      <span><i class="ln" style="background:{pal["ours"]}"></i>IceRoute</span>
     </div>
   </div>
 
@@ -1330,11 +1456,15 @@ def main(argv: list[str] | None = None) -> int:
     args.out.write_text(build_page(ctx), encoding="utf-8")
 
     with_fp = sum(1 for s in ctx["scenes"] if s.get("footprint"))
-    log.info("%s — %.1f MB, %d scene, %d con impronta reale",
-             args.out, args.out.stat().st_size / 1e6, len(ctx["scenes"]), with_fp)
+    log.info(
+        "%s — %.1f MB, %d scene, %d con impronta reale",
+        args.out,
+        args.out.stat().st_size / 1e6,
+        len(ctx["scenes"]),
+        with_fp,
+    )
     if ctx["missing_raw"]:
-        log.info("  senza NetCDF grezzo: %s",
-                 ", ".join(s[:14] for s in ctx["missing_raw"]))
+        log.info("  senza NetCDF grezzo: %s", ", ".join(s[:14] for s in ctx["missing_raw"]))
     log.info("  Doppio clic per aprirla. Nessun server, nessuna rete.")
     return 0
 

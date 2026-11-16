@@ -42,7 +42,7 @@ def test_lovasz_tracks_iou_not_just_accuracy():
 
     good = F.one_hot(target, 2).permute(0, 3, 1, 2).float() * 10 - 5
     bad = good.clone()
-    bad[:, :, :2] = good[:, :, :2].flip(1)      # half of class 1 mislabelled
+    bad[:, :, :2] = good[:, :, :2].flip(1)  # half of class 1 mislabelled
     assert loss(bad, target) > loss(good, target)
 
 
@@ -52,7 +52,7 @@ def test_lovasz_ignores_masked_pixels():
     target = torch.zeros(1, 8, 8, dtype=torch.long)
     target[:, 4:] = IGNORE_INDEX
     logits = torch.full((1, 2, 8, 8), -15.0)
-    logits[:, 0] = 15.0                          # correct on every valid pixel
+    logits[:, 0] = 15.0  # correct on every valid pixel
     assert LovaszSoftmaxLoss(2)(logits, target).item() == pytest.approx(0.0, abs=1e-5)
 
 
@@ -73,7 +73,7 @@ def test_lovasz_skips_classes_absent_from_the_batch():
     when a rare class disappears — the failure this project already has."""
     from iceroute.model.losses import LovaszSoftmaxLoss
 
-    target = torch.zeros(1, 8, 8, dtype=torch.long)      # only class 0 present
+    target = torch.zeros(1, 8, 8, dtype=torch.long)  # only class 0 present
     logits = torch.full((1, 4, 8, 8), -15.0)
     logits[:, 0] = 15.0
     assert LovaszSoftmaxLoss(4)(logits, target).item() == pytest.approx(0.0, abs=1e-5)

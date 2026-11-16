@@ -45,10 +45,18 @@ class Waypoints:
 
     def as_dict(self) -> dict:
         return {
-            "start": {"row": self.start[0], "col": self.start[1],
-                      "lon": round(self.start_lonlat[0], 5), "lat": round(self.start_lonlat[1], 5)},
-            "goal": {"row": self.goal[0], "col": self.goal[1],
-                     "lon": round(self.goal_lonlat[0], 5), "lat": round(self.goal_lonlat[1], 5)},
+            "start": {
+                "row": self.start[0],
+                "col": self.start[1],
+                "lon": round(self.start_lonlat[0], 5),
+                "lat": round(self.start_lonlat[1], 5),
+            },
+            "goal": {
+                "row": self.goal[0],
+                "col": self.goal[1],
+                "lon": round(self.goal_lonlat[0], 5),
+                "lat": round(self.goal_lonlat[1], 5),
+            },
             "straight_km": round(self.straight_km, 2),
             "component_cells": self.component_cells,
             "n_components": self.n_components,
@@ -140,7 +148,12 @@ def choose_waypoints(
     log.info(
         "waypoint automatici: %s → %s, %.0f km in linea retta "
         "(componente di %d celle su %d componenti, classe limitante %s)",
-        start, goal, straight_km, size, n_comp, limiting_class,
+        start,
+        goal,
+        straight_km,
+        size,
+        n_comp,
+        limiting_class,
     )
 
     return Waypoints(
@@ -155,9 +168,7 @@ def choose_waypoints(
     )
 
 
-def waypoints_from_config(
-    grid: GeoGrid, entry: dict, limiting_class: str = ""
-) -> Waypoints:
+def waypoints_from_config(grid: GeoGrid, entry: dict, limiting_class: str = "") -> Waypoints:
     """Build waypoints from explicit lon/lat in ``configs/routing.yaml``.
 
     Hand-picked waypoints take precedence over automatic ones: real port pairs

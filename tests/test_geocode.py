@@ -169,7 +169,12 @@ def test_interpolation_reproduces_the_nodes():
     assert np.allclose(xf[np.ix_(rows, cols)], x_gcp, atol=100.0, rtol=0)
     assert np.allclose(yf[np.ix_(rows, cols)], y_gcp, atol=100.0, rtol=0)
 
-    for r, c, gr, gc in [(0, 0, 0, 0), (0, w - 1, 0, -1), (h - 1, 0, -1, 0), (h - 1, w - 1, -1, -1)]:
+    for r, c, gr, gc in [
+        (0, 0, 0, 0),
+        (0, w - 1, 0, -1),
+        (h - 1, 0, -1, 0),
+        (h - 1, w - 1, -1, -1),
+    ]:
         assert xf[r, c] == pytest.approx(x_gcp[gr, gc], abs=1e-3)
         assert yf[r, c] == pytest.approx(y_gcp[gr, gc], abs=1e-3)
 

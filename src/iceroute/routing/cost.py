@@ -97,8 +97,7 @@ class SpeedModel:
                 # Linear ramp across RIO in [-10, 0).
                 frac = np.clip(rio / self.thresholds.elevated_min, 0.0, 1.0)
                 speed[elevated] = (
-                    self.open_water_speed_kn
-                    + (cap - self.open_water_speed_kn) * frac
+                    self.open_water_speed_kn + (cap - self.open_water_speed_kn) * frac
                 )[elevated]
 
         # codes 2 (special consideration) and 3 (unknown) stay at zero.

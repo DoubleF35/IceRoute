@@ -43,9 +43,9 @@ MIN_GAIN = 0.01
 SAFETY_MARGIN = 0.05
 
 CANDIDATES = [
-    ("baseline",  "configs/train3.yaml",        "artifacts/metrics.json"),
-    ("lovasz",    "configs/train3_lovasz.yaml", "artifacts/eval_lovasz/metrics.json"),
-    ("piu_dati",  "configs/train3_more.yaml",   "artifacts/eval_more/metrics.json"),
+    ("baseline", "configs/train3.yaml", "artifacts/metrics.json"),
+    ("lovasz", "configs/train3_lovasz.yaml", "artifacts/eval_lovasz/metrics.json"),
+    ("piu_dati", "configs/train3_more.yaml", "artifacts/eval_more/metrics.json"),
 ]
 
 
@@ -110,29 +110,46 @@ def choose(found: list, incumbent: tuple) -> tuple:
         if gain > MIN_GAIN and not_worse:
             clear.append((f, gain))
         elif gain > MIN_GAIN:
-            log.info("\n%s ha mIoU migliore (%+.4f) ma frazione permissiva peggiore "
-                     "(%.2f%% contro %.2f%%): SCARTATO.", f[0], gain, 100 * u, 100 * ui)
+            log.info(
+                "\n%s ha mIoU migliore (%+.4f) ma frazione permissiva peggiore "
+                "(%.2f%% contro %.2f%%): SCARTATO.",
+                f[0],
+                gain,
+                100 * u,
+                100 * ui,
+            )
     if clear:
         f, gain = max(clear, key=lambda x: x[1])
-        log.info("\n%s batte %s di %+.4f di mIoU senza peggiorare la sicurezza.",
-                 f[0], inc_name, gain)
+        log.info(
+            "\n%s batte %s di %+.4f di mIoU senza peggiorare la sicurezza.", f[0], inc_name, gain
+        )
         return f
 
     # -- 2. accuracy indistinguishable: the safety metric decides -----------
     ceiling = max([inc["miou"]] + [f[2]["miou"] for f in challengers])
-    tied = [f for f in challengers
-            if ceiling - f[2]["miou"] <= MIN_GAIN and _unsafe(f[2]) is not None]
+    tied = [
+        f for f in challengers if ceiling - f[2]["miou"] <= MIN_GAIN and _unsafe(f[2]) is not None
+    ]
     ui = _unsafe(inc)
     if tied and ui is not None:
         f = min(tied, key=lambda f: _unsafe(f[2]))
         safety_gain = ui - _unsafe(f[2])
         if safety_gain >= SAFETY_MARGIN:
-            log.info("\n%s ha mIoU indistinguibile da %s (%+.4f, sotto la soglia di %.2f) "
-                     "ma è più sicuro di %.1f punti (%.2f%% contro %.2f%%).",
-                     f[0], inc_name, f[2]["miou"] - inc["miou"], MIN_GAIN,
-                     100 * safety_gain, 100 * _unsafe(f[2]), 100 * ui)
-            log.info("Un errore troppo cauto costa tempo, uno troppo permissivo costa la "
-                     "nave: a parità di accuratezza decide la sicurezza.")
+            log.info(
+                "\n%s ha mIoU indistinguibile da %s (%+.4f, sotto la soglia di %.2f) "
+                "ma è più sicuro di %.1f punti (%.2f%% contro %.2f%%).",
+                f[0],
+                inc_name,
+                f[2]["miou"] - inc["miou"],
+                MIN_GAIN,
+                100 * safety_gain,
+                100 * _unsafe(f[2]),
+                100 * ui,
+            )
+            log.info(
+                "Un errore troppo cauto costa tempo, uno troppo permissivo costa la "
+                "nave: a parità di accuratezza decide la sicurezza."
+            )
             return f
 
     # -- 3. nothing convincing ---------------------------------------------
@@ -150,13 +167,13 @@ def main() -> int:
             log.info("%-10s nessuna valutazione", name)
             continue
         if r["split"] != "test_ufficiale":
-            log.info("%-10s valutato su '%s', non sul test ufficiale: escluso",
-                     name, r["split"])
+            log.info("%-10s valutato su '%s', non sul test ufficiale: escluso", name, r["split"])
             continue
         found.append((name, cfg, r))
         log.info(
             "%-10s mIoU %.4f (per scena %.4f) · gh/acqua %.4f · permissiva peggiore %s",
-            name, r["miou"],
+            name,
+            r["miou"],
             r["miou_per_scene"] if isinstance(r["miou_per_scene"], float) else float("nan"),
             r["binary"],
             f"{r['unsafe']:.2%}" if isinstance(r["unsafe"], float) else "n/d",
@@ -172,11 +189,13 @@ def main() -> int:
 
     Path("artifacts/best_config.txt").write_text(best_cfg + "\n")
     log.info("\nSCELTO: %s (%s)", best_name, best_cfg)
-    log.info("mIoU %.4f (per scena %.4f) · ghiaccio/acqua %.4f · permissiva peggiore %s",
-             best["miou"],
-             best["miou_per_scene"] if isinstance(best["miou_per_scene"], float) else float("nan"),
-             best["binary"],
-             f"{best['unsafe']:.2%}" if isinstance(best["unsafe"], float) else "n/d")
+    log.info(
+        "mIoU %.4f (per scena %.4f) · ghiaccio/acqua %.4f · permissiva peggiore %s",
+        best["miou"],
+        best["miou_per_scene"] if isinstance(best["miou_per_scene"], float) else float("nan"),
+        best["binary"],
+        f"{best['unsafe']:.2%}" if isinstance(best["unsafe"], float) else "n/d",
+    )
     return 0
 
 

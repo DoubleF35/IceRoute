@@ -41,7 +41,10 @@ log = logging.getLogger(__name__)
 
 
 def danger_order(
-    ice_class: str, sod_to_polaris: dict[int, str], *, table: PolarisTable | None = None,
+    ice_class: str,
+    sod_to_polaris: dict[int, str],
+    *,
+    table: PolarisTable | None = None,
     n_classes: int = 6,
 ) -> np.ndarray:
     """RIV per SOD class id. Lower means more dangerous for this vessel."""
@@ -78,9 +81,7 @@ def safety_biased_labels(
     if proba.ndim != 3:
         raise ValueError(f"Attese (n_classes, H, W), ricevuto {proba.shape}")
     if len(riv) != proba.shape[0]:
-        raise ValueError(
-            f"{len(riv)} risk value per {proba.shape[0]} classi: non corrispondono."
-        )
+        raise ValueError(f"{len(riv)} risk value per {proba.shape[0]} classi: non corrispondono.")
 
     if tau == 1.0:
         return proba.argmax(axis=0).astype("uint8")
@@ -90,9 +91,9 @@ def safety_biased_labels(
 
     # Among plausible classes pick the lowest RIV. Implemented by ranking:
     # order classes by danger, then take the first plausible one.
-    order = np.argsort(riv, kind="stable")          # most dangerous first
-    ranked = plausible[order]                        # (n_classes, H, W)
-    first = ranked.argmax(axis=0)                    # index into `order`
+    order = np.argsort(riv, kind="stable")  # most dangerous first
+    ranked = plausible[order]  # (n_classes, H, W)
+    first = ranked.argmax(axis=0)  # index into `order`
     return order[first].astype("uint8")
 
 
@@ -149,21 +150,29 @@ def sweep_tau(
         cm.update(truth, pred)
         try:
             err = rio_error(
-                truth, pred, ice_class, sod_to_polaris, table=table, sic=sic,
-                mask_valid=mask_valid, n_classes=n_classes,
+                truth,
+                pred,
+                ice_class,
+                sod_to_polaris,
+                table=table,
+                sic=sic,
+                mask_valid=mask_valid,
+                n_classes=n_classes,
             )
         except ValueError as exc:
             log.warning("tau=%.2f: errore RIO non calcolabile — %s", tau, exc)
             continue
-        out.append(TradeOff(
-            tau=tau,
-            miou=cm.miou(),
-            binary_accuracy=cm.binary_accuracy(),
-            unsafe_fraction=err.unsafe_fraction,
-            overcautious_fraction=err.overcautious_fraction,
-            rio_mae=err.rio_mae,
-            rio_bias=err.rio_bias,
-        ))
+        out.append(
+            TradeOff(
+                tau=tau,
+                miou=cm.miou(),
+                binary_accuracy=cm.binary_accuracy(),
+                unsafe_fraction=err.unsafe_fraction,
+                overcautious_fraction=err.overcautious_fraction,
+                rio_mae=err.rio_mae,
+                rio_bias=err.rio_bias,
+            )
+        )
     return out
 
 
@@ -217,7 +226,9 @@ def choose_tau(
 
 
 def format_curve(curve: list[TradeOff]) -> str:
-    lines = [f"  {'tau':>5}{'mIoU':>9}{'gh/acqua':>11}{'PERMISSIVA':>13}{'cauta':>9}{'RIO MAE':>10}"]
+    lines = [
+        f"  {'tau':>5}{'mIoU':>9}{'gh/acqua':>11}{'PERMISSIVA':>13}{'cauta':>9}{'RIO MAE':>10}"
+    ]
     lines.append("  " + "-" * 57)
     for t in curve:
         lines.append(

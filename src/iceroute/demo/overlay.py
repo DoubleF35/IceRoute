@@ -54,10 +54,10 @@ log = logging.getLogger(__name__)
 OVERLAY_DIR = "overlays"
 
 # Casing first, core on top. Widths are for a 1:1 grid and scale with the image.
-CASING = (8, 12, 20)          # near-black, the demo background
+CASING = (8, 12, 20)  # near-black, the demo background
 COL_ICEROUTE = (255, 45, 149)  # magenta: absent from both palettes
 COL_BASELINE = (245, 245, 245)  # white, dashed — reads as a line, not a region
-COL_NO_GO = (255, 32, 32)     # red: the cells POLARIS forbids
+COL_NO_GO = (255, 32, 32)  # red: the cells POLARIS forbids
 COL_ENDPOINT = (255, 255, 255)
 
 DASH_ON, DASH_OFF = 14, 10
@@ -111,6 +111,7 @@ def build(grid, route, simplified, baseline, start, goal) -> dict:
     down and its size is part of a measured claim; a per-cell list would grow
     it by two orders of magnitude to carry something only the ground UI wants.
     """
+
     def rc(lon: float, lat: float) -> list[int] | None:
         try:
             r, c = grid.index_of(lon, lat)
@@ -239,11 +240,15 @@ def no_go_runs(cells: list, gap: int = 2) -> list[list]:
 
 def _cross(d, xy, size: float, colour, width: int) -> None:
     x, y = xy
-    for a, b in (((x - size, y - size), (x + size, y + size)),
-                 ((x - size, y + size), (x + size, y - size))):
+    for a, b in (
+        ((x - size, y - size), (x + size, y + size)),
+        ((x - size, y + size), (x + size, y - size)),
+    ):
         d.line([a, b], fill=CASING, width=width + 4)
-    for a, b in (((x - size, y - size), (x + size, y + size)),
-                 ((x - size, y + size), (x + size, y - size))):
+    for a, b in (
+        ((x - size, y - size), (x + size, y + size)),
+        ((x - size, y + size), (x + size, y - size)),
+    ):
         d.line([a, b], fill=colour, width=width)
 
 
