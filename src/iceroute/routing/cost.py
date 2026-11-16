@@ -1,8 +1,8 @@
-"""From RIO to a traversal cost in time. SPEC §8.3.
+"""From RIO to a traversal cost in time.
 
 The cost of crossing a cell is **time**, not distance. That is the whole point:
 it is what makes the shortest route and the fastest route different, and the
-difference is what the demo shows.
+difference is what the comparison against the baseline measures.
 
 The speed model is not a curve someone invented. It is the three levels of
 operation of MSC.1/Circ.1519 §1.3.2 made executable:
@@ -13,7 +13,7 @@ operation of MSC.1/Circ.1519 §1.3.2 made executable:
 
 Only one number in the chain lacks a normative source: the open-water speed,
 which depends on the vessel and not on the regulation. It is marked
-PROVVISORIO in ``configs/routing.yaml`` and :func:`provisional_parameters`
+PROVISIONAL in ``configs/routing.yaml`` and :func:`provisional_parameters`
 surfaces it so the UI can say so out loud.
 """
 
@@ -63,9 +63,9 @@ class SpeedModel:
 
     def __post_init__(self):
         if self.open_water_speed_kn <= 0:
-            raise ValueError("open_water_speed_kn deve essere positiva")
+            raise ValueError("open_water_speed_kn must be positive")
         if self.band_profile not in ("step", "linear"):
-            raise ValueError(f"band_profile sconosciuto: {self.band_profile}")
+            raise ValueError(f"unknown band_profile: {self.band_profile}")
 
     @property
     def elevated_cap_kn(self) -> float | None:
@@ -146,7 +146,7 @@ def build_land_mask(
     minimum is attained on land. When no threshold is given, cells sitting at
     the array minimum are treated as land.
 
-    SPEC §8.3 allows an external coastline (GSHHG / Natural Earth) instead. The
+    An external coastline (GSHHG / Natural Earth) would also do. The
     dataset layer is used here because it is already co-registered with the
     scene; a mis-registered external coastline would be worse than none.
     """
@@ -192,7 +192,7 @@ def build_cost_grid(
         spm = np.where(passable, 1.0 / speed_ms, IMPASSABLE)
 
     log.info(
-        "costo %s: %.1f%% praticabile (%.1f%% a velocità piena, %.1f%% a velocità ridotta)",
+        "cost %s: %.1f%% passable (%.1f%% at full speed, %.1f%% at reduced speed)",
         speed_model.ice_class,
         100 * passable.mean(),
         100 * np.mean(speed == speed_model.open_water_speed_kn),
@@ -222,9 +222,10 @@ def speed_model_from_config(cfg: dict, ice_class: str) -> SpeedModel:
 
 
 def provisional_parameters(cfg: dict) -> list[str]:
-    """Config keys marked ``[PROVVISORIO]``, for the UI to declare.
+    """Config keys marked ``[PROVISIONAL]``, for the UI to declare.
 
-    SPEC rule 2: a value without a source is shown as such, not shown silently.
+    A value without a source is shown as such, never silently (see
+    docs/decisions.md, *Provisional values*).
     Parsed from the comments so that the marker and the value cannot drift
     apart — there is only one place to change.
     """
@@ -238,7 +239,13 @@ def provisional_parameters(cfg: dict) -> list[str]:
     pending: str | None = None
     for line in Path(path).read_text().splitlines():
         stripped = line.strip()
-        if "[PROVVISORIO]" in stripped:
+        if not stripped:
+            # A tag in a comment applies to the key right below it. A blank line
+            # ends that block, so the tag legend in the file header does not
+            # mark the first key of the file as provisional.
+            pending = None
+            continue
+        if "[PROVISIONAL]" in stripped:
             if not stripped.startswith("#"):
                 key = stripped.split(":", 1)[0].strip()
                 out.append(key)

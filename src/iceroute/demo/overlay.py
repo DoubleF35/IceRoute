@@ -1,4 +1,4 @@
-"""The two routes, drawn. SPEC §9.3.
+"""The two routes, drawn.
 
 Every ``data/demo/routes/*.geojson`` has always held two tracks — ours and the
 geodesic a master would steer with only a paper chart — and until now nothing
@@ -29,14 +29,14 @@ Two rules about what gets drawn
   points.
 * **A forbidden cell gets a marker.** "POLARIS blocks this track" is an
   assertion; twelve crosses on twelve pixels is evidence. The count already
-  lived in the index — the positions are what make it arguable on stage.
+  lived in the index — the positions are what make it checkable by eye.
 
 Colours are chosen against the two backdrops this can be drawn on, not for
 looks. The ice mask uses deep blue / cyan / white and RIO uses green / yellow /
 red, so both of those hue families are unusable for a line. Magenta appears in
 neither. Every stroke also gets a dark casing underneath, the way road maps do
 it, which is what makes a thin line survive an arbitrary background on a washed
-out projector.
+out screen.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class GridMismatch(ValueError):
 def separation(ours: list, base: list, grid) -> dict:
     """How far the two tracks visibly pull apart.
 
-    The deck's route figure has one job — show that IceRoute goes somewhere the
+    The route figure has one job — show that IceRoute goes somewhere the
     direct track cannot — and a scene where the two lines sit on top of each
     other does not do it, however many cells POLARIS forbids underneath. That
     is a property of the picture, so it gets measured rather than eyeballed,
@@ -87,7 +87,7 @@ def separation(ours: list, base: list, grid) -> dict:
     instead of whichever one happened to come first in the index.
 
     Reported as a fraction of the image diagonal as well as in kilometres:
-    what makes a slide readable is angular separation on the wall, not ground
+    what makes a figure readable is the separation on the page, not ground
     distance, and the two do not rank scenes the same way.
     """
     import numpy as np
@@ -161,7 +161,7 @@ def _project(overlay: dict, img: Image) -> tuple[float, float]:
     """
     rows, cols = overlay.get("grid_shape") or (0, 0)
     if not rows or not cols:
-        raise GridMismatch("l'overlay non dichiara grid_shape: non è disegnabile")
+        raise GridMismatch("the overlay does not declare grid_shape: it cannot be drawn")
     sx, sy = img.width / cols, img.height / rows
     # 1%, not a round 5%. A legitimately decimated raster is ceil(n/k) on each
     # axis, so the two scale factors differ only by that rounding — under 0.5%
@@ -171,9 +171,9 @@ def _project(overlay: dict, img: Image) -> tuple[float, float]:
     # catches, not just above the thing it tolerates.
     if abs(sx - sy) > 0.01 * max(sx, sy):
         raise GridMismatch(
-            f"immagine {img.width}x{img.height} incompatibile con la griglia "
-            f"{cols}x{rows}: fattori di scala {sx:.3f} e {sy:.3f}. Quasi certamente "
-            f"è un raster della scena grezza invece che di quella geocodificata."
+            f"image {img.width}x{img.height} incompatible with the grid "
+            f"{cols}x{rows}: scale factors {sx:.3f} and {sy:.3f}. Almost certainly "
+            f"a raster of the raw scene instead of the geocoded one."
         )
     return sx, sy
 

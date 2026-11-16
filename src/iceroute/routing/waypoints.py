@@ -1,4 +1,4 @@
-"""Choose origin and destination for a scene. Closes DECISIONS.md P-07.
+"""Choose origin and destination for a scene. Closes docs/decisions.md P-07.
 
 The demo compares the same voyage across ice classes, and that only works if
 both endpoints are navigable for **every** class shown. Pick them for PC6 and a
@@ -108,7 +108,7 @@ def choose_waypoints(
         that renders as a dot.
     """
     if not costs:
-        raise ValueError("Serve almeno una CostGrid.")
+        raise ValueError("At least one CostGrid is required.")
 
     if limiting_class is None:
         limiting_class = min(costs, key=lambda k: int(costs[k].passable.sum()))
@@ -121,8 +121,8 @@ def choose_waypoints(
     mask, size, n_comp = largest_component(common)
     if size == 0:
         raise ValueError(
-            "Nessuna cella navigabile da tutte le classi richieste: "
-            f"{sorted(costs)}. La scena non è utilizzabile per il confronto."
+            "No cell is navigable for all the requested classes: "
+            f"{sorted(costs)}. The scene cannot be used for the comparison."
         )
 
     cells = np.argwhere(mask)
@@ -141,13 +141,13 @@ def choose_waypoints(
 
     if straight_km < min_separation_km:
         raise ValueError(
-            f"La componente navigabile più grande misura solo {straight_km:.0f} km "
-            f"(minimo richiesto {min_separation_km:.0f} km). Scena non adatta alla demo."
+            f"The largest navigable component spans only {straight_km:.0f} km "
+            f"(minimum required {min_separation_km:.0f} km). Scene not suitable for the demo."
         )
 
     log.info(
-        "waypoint automatici: %s → %s, %.0f km in linea retta "
-        "(componente di %d celle su %d componenti, classe limitante %s)",
+        "automatic waypoints: %s → %s, %.0f km in a straight line "
+        "(component of %d cells out of %d components, limiting class %s)",
         start,
         goal,
         straight_km,
@@ -172,8 +172,8 @@ def waypoints_from_config(grid: GeoGrid, entry: dict, limiting_class: str = "") 
     """Build waypoints from explicit lon/lat in ``configs/routing.yaml``.
 
     Hand-picked waypoints take precedence over automatic ones: real port pairs
-    on the Northern Sea Route tell a better story than the extremes of a
-    connected component.
+    on the Northern Sea Route are a more representative voyage than the
+    extremes of a connected component.
     """
     from iceroute.routing.geocode import geodesic_distance_m
 

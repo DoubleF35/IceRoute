@@ -1,4 +1,4 @@
-"""Pull the slack out of an A* path. SPEC §8.5.
+"""Pull the slack out of an A* path.
 
 A* on a 16-connected grid returns an optimal path *for that grid*, and the
 grid is the problem: every step has to land on a cell centre, so a leg that
@@ -146,7 +146,7 @@ def _worst_rio(cells, rio) -> tuple[float, bool]:
     return worst, unknown
 
 
-def _leg(a, b, spm, rio, inv_scale, res) -> tuple[float, float, float, list] | None:
+def _leg(a, b, spm, rio, inv_scale, res) -> tuple[float, float, float, bool, list] | None:
     """Ground length, time and worst RIO of a straight leg, or None if blocked.
 
     A leg that *is* one of A*'s own moves is judged by A*'s own rule — the
@@ -208,7 +208,7 @@ def _straight_chain(anchors, spm, rio, inv_scale, res):
     return total_d, total_t, worst, unknown
 
 
-def _subpath(cells, spm, rio, inv_scale, res) -> tuple[float, float, float]:
+def _subpath(cells, spm, rio, inv_scale, res) -> tuple[float, float, float, bool]:
     """Ground length, time and worst RIO of a stretch of the A* path."""
     total_d = total_t = 0.0
     for (r0, c0), (r1, c1) in zip(cells, cells[1:], strict=False):
@@ -299,14 +299,15 @@ def straighten(
         )
 
     chain = _straight_chain(anchors, spm, rio, inv_scale, res)
-    if chain is None:  # non dovrebbe accadere: ogni tratta e' stata verificata
-        log.warning("raddrizzamento %s: catena non percorribile, tengo A*", route.ice_class)
+    if chain is None:  # should not happen: every leg has already been checked
+        log.warning("straightening %s: chain not passable, keeping A*", route.ice_class)
         return Straightened(
             route=route,
             n_legs=len(route.cells),
             n_cells_before=n_before,
             seconds_saved=0.0,
             metres_saved=0.0,
+            anchors=list(route.cells),
         )
     d_after, t_after, worst_after, _ = chain
 
@@ -325,14 +326,15 @@ def straighten(
         time_hours=t_after / 3600.0,
         distance_km=d_after / 1000.0,
         ice_class=route.ice_class,
-        min_rio=None if rio is None else worst_after,
+        # every crossed cell NaN leaves worst at +inf: that is "unknown", not a RIO
+        min_rio=None if rio is None or not np.isfinite(worst_after) else worst_after,
         mean_speed_kn=(d_after / t_after / KNOT_TO_MS) if t_after > 0 else None,
         expanded_nodes=route.expanded_nodes,
         segment_speeds_kn=list(route.segment_speeds_kn),
     )
     saved_s, saved_m = t_before - t_after, d_before - d_after
     log.info(
-        "raddrizzamento %s: %d celle -> %d tratte, %.2f km e %.1f min in meno (%.2f%% tempo)",
+        "straightening %s: %d cells -> %d legs, %.2f km and %.1f min less (%.2f%% time)",
         route.ice_class,
         n_before,
         len(anchors) - 1,

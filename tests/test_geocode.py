@@ -1,8 +1,8 @@
-"""Geocoding tests — SPEC §8.1 makes this a hard gate.
+"""Geocoding tests — a hard gate for everything downstream.
 
 The mandatory one is ``test_distance_error_under_one_percent``. If it fails the
-routing is meaningless and the phase is not closed, because every transit time
-the demo shows is derived from these distances.
+routing is meaningless, because every transit time the demo shows is derived
+from these distances.
 
 The subtlety it guards: EPSG:3413 is true-scale at 70°N only. At 78°N a planar
 measurement understates ground distance by 1.9% and at 85°N by 2.8%, so the
@@ -31,17 +31,17 @@ TO_POLAR = Transformer.from_crs("EPSG:4326", POLAR_CRS, always_xy=True)
 CASES = [
     ("Fram Strait E-W", -10.0, 78.0, -5.0, 78.0),
     ("Fram Strait N-S", -10.0, 78.0, -10.0, 79.0),
-    ("NE Greenland diagonale", -20.0, 76.0, -15.0, 77.5),
-    ("vicino al parallelo standard", -45.0, 70.0, -40.0, 70.5),
-    ("alto artico", -30.0, 83.0, -25.0, 83.5),
-    ("attraverso il meridiano centrale", -50.0, 75.0, -40.0, 75.0),
-    ("tratta lunga", -25.0, 72.0, -10.0, 79.0),
+    ("NE Greenland diagonal", -20.0, 76.0, -15.0, 77.5),
+    ("near the standard parallel", -45.0, 70.0, -40.0, 70.5),
+    ("high Arctic", -30.0, 83.0, -25.0, 83.5),
+    ("across the central meridian", -50.0, 75.0, -40.0, 75.0),
+    ("long leg", -25.0, 72.0, -10.0, 79.0),
 ]
 
 
 @pytest.mark.parametrize("name,lon0,lat0,lon1,lat1", CASES)
 def test_distance_error_under_one_percent(name, lon0, lat0, lon1, lat1):
-    """SPEC §8.1 gate: scale-corrected planar distance within 1% of geodesic."""
+    """The gate: scale-corrected planar distance within 1% of geodesic."""
     x0, y0 = TO_POLAR.transform(lon0, lat0)
     x1, y1 = TO_POLAR.transform(lon1, lat1)
 
@@ -50,8 +50,8 @@ def test_distance_error_under_one_percent(name, lon0, lat0, lon1, lat1):
 
     rel = abs(corrected - geodesic) / geodesic
     assert rel < 0.01, (
-        f"{name}: errore relativo {100 * rel:.2f}% (geodetica {geodesic:.0f} m, "
-        f"corretta {corrected:.0f} m). SPEC §8.1 richiede < 1%."
+        f"{name}: relative error {100 * rel:.2f}% (geodesic {geodesic:.0f} m, "
+        f"corrected {corrected:.0f} m). The gate requires < 1%."
     )
 
 
@@ -69,7 +69,7 @@ def test_uncorrected_distance_is_the_trap(name, lon0, lat0, lon1, lat1):
     planar = float(np.hypot(x1 - x0, y1 - y0))
     corrected = ground_distance_m(x0, y0, x1, y1, lat_mid=(lat0 + lat1) / 2)
 
-    assert planar <= geodesic * 1.0001, "la distanza piana dovrebbe sottostimare"
+    assert planar <= geodesic * 1.0001, "the planar distance should underestimate"
     assert abs(corrected - geodesic) <= abs(planar - geodesic) + 1.0
 
 
@@ -128,7 +128,7 @@ def test_point_outside_grid_raises():
     grid = build_target_grid(
         *TO_POLAR.transform(np.array([-20.0, -19.0]), np.array([76.0, 76.5])), 500.0
     )
-    with pytest.raises(ValueError, match="fuori dalla griglia"):
+    with pytest.raises(ValueError, match="outside the grid"):
         grid.index_of(30.0, 60.0)
 
 
@@ -186,7 +186,7 @@ def test_interpolation_output_shape():
 
 
 def test_interpolation_rejects_degenerate_grid():
-    with pytest.raises(ValueError, match="troppo piccola"):
+    with pytest.raises(ValueError, match="too small"):
         interpolate_gcp_grid(np.array([[75.0]]), np.array([[-20.0]]), (100, 100))
 
 
@@ -205,7 +205,7 @@ def test_implied_pixel_spacing_matches_declaration():
     step_x = abs(xf[mid, w // 2 + 100] - xf[mid, w // 2]) / 100
     lat_mid = 77.0
     ground = step_x / scale_factor(lat_mid)
-    assert 60.0 < ground < 110.0, f"passo implicito {ground:.1f} m, atteso ~80 m"
+    assert 60.0 < ground < 110.0, f"implied step {ground:.1f} m, expected ~80 m"
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def test_nearest_resampling_invents_no_class():
     out = _resample_nearest(xs, ys, vals, grid, 255, "uint8")
 
     present = set(np.unique(out).tolist()) - {255}
-    assert present <= {2, 4}, f"classi inventate: {sorted(present - {2, 4})}"
+    assert present <= {2, 4}, f"invented classes: {sorted(present - {2, 4})}"
 
 
 def test_resampling_marks_uncovered_cells_with_fill():

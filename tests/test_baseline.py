@@ -1,9 +1,9 @@
 """Tests for the baseline route and waypoint simplification.
 
-The one that protects the pitch is
+The one that protects every public claim is
 ``test_no_time_saving_is_claimed_against_an_impossible_route``: reporting hours
 saved against a voyage POLARIS says cannot be made would be a fabricated
-number, and it is exactly the sort of thing a due-diligence reader pulls on.
+number, and it is exactly the sort of thing a careful reviewer pulls on.
 """
 
 from __future__ import annotations
@@ -150,7 +150,8 @@ def test_saving_is_reported_when_the_baseline_is_feasible():
 
 
 def test_no_time_saving_is_claimed_against_an_impossible_route():
-    """SPEC rule 2. You cannot save hours against a voyage that cannot be made.
+    """No unsourced or fabricated number. You cannot save hours against a voyage
+    that cannot be made.
 
     The honest claim in this case is stronger anyway: IceRoute finds a route
     where the naive one does not exist.
@@ -169,7 +170,7 @@ def test_no_time_saving_is_claimed_against_an_impossible_route():
     assert out["time_saved_hours"] is None
     assert out["time_saved_percent"] is None
     assert out["baseline"]["time_hours"] is None
-    assert "non è percorribile" in out["headline"]
+    assert "not navigable" in out["headline"]
 
 
 def test_comparison_reports_the_detour():
@@ -233,7 +234,7 @@ def _long_route(grid, n=60):
 
 
 def test_simplification_respects_the_waypoint_cap():
-    """SPEC §8.5: at most 40 waypoints."""
+    """At most 40 waypoints, the cap in configs/routing.yaml."""
     grid = make_grid(80, 80)
     out = simplify_route(_long_route(grid, 70), grid, tolerance_m=1.0, max_waypoints=40)
     assert len(out) <= 40
@@ -246,7 +247,7 @@ def test_simplification_preserves_the_endpoints():
     out = simplify_route(route, grid, tolerance_m=2000.0)
     assert out.lonlat[0] == pytest.approx(route.lonlat[0])
     assert out.lonlat[-1] == pytest.approx(route.lonlat[-1])
-    assert not any("arrivo" in w for w in out.warnings)
+    assert not any("destination" in w for w in out.warnings)
 
 
 def test_simplification_reduces_a_straight_route_to_two_points():
@@ -263,7 +264,7 @@ def test_simplification_reports_deviation_and_sharp_turns():
     out = simplify_route(route, grid, tolerance_m=500.0, max_turn_deg=45.0)
     assert out.max_turn_deg > 45.0
     assert out.sharp_turns
-    assert any("virate" in w for w in out.warnings)
+    assert any("turns" in w for w in out.warnings)
 
 
 def test_simplified_geojson_is_wellformed():
@@ -272,3 +273,23 @@ def test_simplified_geojson_is_wellformed():
     assert gj["geometry"]["type"] == "LineString"
     assert gj["properties"]["kind"] == "iceroute"
     assert gj["properties"]["n_original_cells"] == 40
+
+
+def test_tag_legend_in_the_header_marks_nothing(tmp_path):
+    """The legend line `# [PROVISIONAL] ...` in a file header is not a tag on
+    the first key below it; a tag in a comment covers only the next key."""
+    from iceroute.routing.cost import provisional_parameters
+
+    cfg = tmp_path / "routing.yaml"
+    cfg.write_text(
+        "# Legend:\n"
+        "#   [PROVISIONAL]  has no source\n"
+        "\n"
+        "grid:\n"
+        "  resolution_m: 500\n"
+        "vessel:\n"
+        "  speed_kn: 12.0   # [PROVISIONAL]\n"
+        "# [PROVISIONAL] fixed later\n"
+        "waypoints: {}\n"
+    )
+    assert provisional_parameters({"__path__": str(cfg)}) == ["speed_kn", "waypoints"]

@@ -64,7 +64,7 @@ def test_the_comparison_track_is_not_part_of_the_payload():
 def test_stripping_the_baseline_shrinks_the_payload_by_orders_of_magnitude():
     whole = len(json.dumps(_collection(), separators=(",", ":")))
     sent = len(json.dumps(downlink_route(_collection()), separators=(",", ":")))
-    assert sent * 10 < whole, "il payload non si è ridotto: la baseline è ancora dentro"
+    assert sent * 10 < whole, "the payload did not shrink: the baseline is still inside"
 
 
 def test_a_collection_with_only_a_baseline_yields_no_payload():
@@ -85,11 +85,11 @@ def test_payload_counts_the_route_and_says_what_it_could_not_measure(tmp_path):
     routes.mkdir()
     (routes / "r.geojson").write_text(json.dumps(_collection()))
 
-    p = payload({"geojson": "r.geojson"}, routes, {}, "SCENA.nc")
+    p = payload({"geojson": "r.geojson"}, routes, {}, "SCENE.nc")
     assert p.n_waypoints == 3
     assert 0 < p.route_bytes < 400
     assert p.mask_bytes is None and p.total_bytes is None and p.ratio is None
-    assert not p.measured and "non misurat" in p.note
+    assert not p.measured and "not measured" in p.note
 
 
 def test_payload_uses_the_measured_mask_and_sar_when_they_exist(tmp_path):
@@ -100,7 +100,7 @@ def test_payload_uses_the_measured_mask_and_sar_when_they_exist(tmp_path):
         "compression": {
             "per_scene": [
                 {
-                    "scene_id": "SCENA.nc",
+                    "scene_id": "SCENE.nc",
                     "denominator": {"mask_png": 100_000, "metadata": 60},
                     "numerator": {"sar_channels_png": 50_000_000},
                 }
@@ -108,14 +108,14 @@ def test_payload_uses_the_measured_mask_and_sar_when_they_exist(tmp_path):
         }
     }
 
-    p = payload({"geojson": "r.geojson"}, routes, metrics, "SCENA.nc")
+    p = payload({"geojson": "r.geojson"}, routes, metrics, "SCENE.nc")
     assert p.measured
     assert p.total_bytes == 100_000 + p.route_bytes + 60
     assert p.ratio == pytest.approx(50_000_000 / p.total_bytes)
 
 
 def test_a_missing_route_file_is_no_payload_not_a_crash(tmp_path):
-    assert payload({"geojson": "assente.geojson"}, tmp_path, {}, "S.nc") is None
+    assert payload({"geojson": "missing.geojson"}, tmp_path, {}, "S.nc") is None
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ def test_a_route_through_the_elevated_band_is_refused_not_approximated():
     t = rescale_transit(23.7, -4.0, nominal_kn=12.0, chosen_kn=18.0, ice_class="PC6")
     assert t.hours is None
     assert not t.exact
-    assert "3 kn" in t.reason and "inventerebbe" in t.reason
+    assert "3 kn" in t.reason and "would invent" in t.reason
 
 
 @pytest.mark.parametrize("ice_class", ["PC6", "PC7"])
@@ -166,7 +166,7 @@ def test_an_unknown_min_rio_blocks_the_rescale():
     """Absent evidence that the route stayed in normal operation is not
     evidence that it did."""
     t = rescale_transit(20.0, None, nominal_kn=12.0, chosen_kn=15.0, ice_class="PC6")
-    assert t.hours is None and "non noto" in t.reason
+    assert t.hours is None and "not known" in t.reason
 
 
 @pytest.mark.parametrize("hours,chosen", [(None, 12.0), (20.0, 0.0), (20.0, -3.0)])
@@ -195,7 +195,7 @@ def test_no_consumption_means_no_fuel_figure_and_never_a_zero():
 
 
 # ---------------------------------------------------------------------------
-# What the payload costs on the link — A-10
+# What the payload costs on the link — docs/decisions.md A-10
 # ---------------------------------------------------------------------------
 
 ASM_LINK = {
@@ -242,13 +242,13 @@ def test_a_missing_sbd_size_still_gives_the_seconds():
 
 def test_the_real_assumptions_put_the_payload_in_seconds_not_minutes():
     """This is the answer to the only serious objection A-10 invites. If it ever
-    stops being a small number, the deck claim needs revisiting, not the wording."""
+    stops being a small number, the public claim needs revisiting, not the wording."""
     from pathlib import Path
 
     import yaml
 
     if not Path("configs/assumptions.yaml").exists():
-        pytest.skip("assumptions.yaml assente")
+        pytest.skip("assumptions.yaml missing")
     a = yaml.safe_load(Path("configs/assumptions.yaml").read_text())
     lt = estimate.link_time(a["downlink"]["payload_bytes"], 431, a)
-    assert lt.seconds is not None and lt.seconds < 60, f"{lt.seconds:.0f} s non è più 'tredici'"
+    assert lt.seconds is not None and lt.seconds < 60, f"{lt.seconds:.0f} s is no longer 'thirteen'"

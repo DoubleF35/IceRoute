@@ -84,7 +84,7 @@ def test_a_line_is_contiguous_and_ends_where_it_was_told_to():
     cells = line_cells((2, 2), (9, 20))
     assert cells[0] == (2, 2) and cells[-1] == (9, 20)
     for (r0, c0), (r1, c1) in zip(cells, cells[1:], strict=False):
-        assert max(abs(r1 - r0), abs(c1 - c0)) == 1, "la linea salta una cella"
+        assert max(abs(r1 - r0), abs(c1 - c0)) == 1, "the line skips a cell"
 
 
 def test_a_line_cannot_slip_between_two_blocked_cells():
@@ -102,9 +102,9 @@ def test_a_line_cannot_slip_between_two_blocked_cells():
 def test_open_water_collapses_to_a_single_leg():
     r = straighten(_route(_detour()), _cost(), _grid())
     assert r.route.cells[0] == (20, 5) and r.route.cells[-1] == (20, 35)
-    assert r.anchors == [(20, 5), (20, 35)], "più di una tratta"
+    assert r.anchors == [(20, 5), (20, 35)], "more than one leg"
     assert len(r.route.lonlat) == len(r.route.cells), (
-        "simplify_route indicizza lonlat con indici di cells"
+        "simplify_route indexes lonlat with indices into cells"
     )
     assert r.metres_saved > 0 and r.seconds_saved > 0
     assert r.percent_distance > 20
@@ -125,14 +125,14 @@ def test_a_wall_is_not_cut_through():
     cost = _cost(blocked=blocked)
     r = straighten(_route(_detour()), cost, _grid())
     for cell in r.route.cells:
-        assert cost.passable[cell], f"la rotta raddrizzata attraversa {cell}, impraticabile"
+        assert cost.passable[cell], f"the straightened route crosses {cell}, which is impassable"
 
 
 def test_speed_is_never_bought_with_risk():
     """The straight line is open water and faster, and it is still refused:
     its worst RIO is below the worst RIO of the stretch it would replace."""
     rio = np.full((N, N), 20.0)
-    rio[18:23, 10:30] = -5.0  # fascia a rischio elevato sulla linea retta
+    rio[18:23, 10:30] = -5.0  # elevated-risk band across the straight line
     before = _detour()
     r = straighten(_route(before), _cost(), _grid(), rio=rio)
     assert r.route.min_rio is not None and r.route.min_rio >= 20.0
@@ -157,7 +157,7 @@ def test_a_band_slow_enough_is_not_driven_straight_through():
     slow = np.zeros((N, N), dtype=bool)
     slow[15:26, 8:33] = True
     r = straighten(_route(_detour()), _cost(slow=slow, slow_kn=0.5), _grid())
-    assert len(r.anchors) > 2, "ha tirato dritto attraverso il banco lento"
+    assert len(r.anchors) > 2, "it went straight through the slow band"
     assert r.seconds_saved >= 0.0
 
 
@@ -166,7 +166,7 @@ def test_the_result_is_never_slower_than_what_a_star_found():
     rng = np.random.default_rng(0)
     for seed in range(5):
         blocked = rng.random((N, N)) < 0.04
-        blocked[20, :] = False  # un corridoio sempre libero
+        blocked[20, :] = False  # a corridor that is always clear
         cost = _cost(blocked=blocked)
         path = _chain((20, 2), (20 - seed, 18), (20, 37))
         if not all(cost.passable[c] for c in path):
@@ -205,9 +205,7 @@ def test_unclassified_ice_is_not_crossed_to_save_time():
     rio[18:23, 10:30] = np.nan
     before = _detour()
     r = straighten(_route(before), _cost(), _grid(), rio=rio)
-    assert not any(np.isnan(rio[c]) for c in r.route.cells), (
-        "la scorciatoia attraversa ghiaccio non classificato"
-    )
+    assert not any(np.isnan(rio[c]) for c in r.route.cells), "the shortcut crosses unclassified ice"
 
 
 def test_unclassified_ice_already_on_the_route_does_not_block_the_pass():
@@ -230,5 +228,5 @@ def test_the_route_contains_only_cells_that_were_checked():
     cost = _cost(blocked=blocked)
     r = straighten(_route(_detour()), cost, _grid(), rio=rio)
     for cell in r.route.cells:
-        assert cost.passable[cell], f"{cell} disegnata ma non praticabile"
-        assert not np.isnan(rio[cell]), f"{cell} disegnata ma di classe ignota"
+        assert cost.passable[cell], f"{cell} drawn but not passable"
+        assert not np.isnan(rio[cell]), f"{cell} drawn but of unknown class"

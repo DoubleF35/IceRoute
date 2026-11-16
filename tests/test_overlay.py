@@ -1,6 +1,6 @@
 """Tests for the route overlay.
 
-The bug these exist to prevent is not a crash. For weeks the deck's route
+The bug these exist to prevent is not a crash. For weeks the published route
 figure and the demo both drew *nothing*: the drawing code looked up a property
 nobody wrote, skipped every track, saved a clean PNG and reported success. A
 figure captioned "the direct route is forbidden" shipped with no route on it.
@@ -72,7 +72,7 @@ def test_drawing_a_route_actually_changes_pixels():
     """The test that was missing. Everything else here is detail."""
     img = _blank()
     out = ov.draw(img, _overlay(), show="both")
-    assert _changed(img, out) > 50, "la rotta non è stata disegnata"
+    assert _changed(img, out) > 50, "the route was not drawn"
 
 
 def test_nothing_is_drawn_when_nothing_is_asked_for():
@@ -98,7 +98,7 @@ def test_every_mode_draws_something_and_they_differ(mode):
 def test_the_wrong_grid_raises_instead_of_drawing_nothing():
     """A route belongs to the geocoded grid. Paired with the raw swath it is
     meaningless, and the old code's answer was to quietly draw nothing."""
-    with pytest.raises(ov.GridMismatch, match="incompatibile"):
+    with pytest.raises(ov.GridMismatch, match="incompatible"):
         ov.draw(_blank(90, 40), _overlay(), show="both")
 
 
@@ -148,11 +148,11 @@ def test_forbidden_cells_are_painted_over_the_direct_route():
     plain = ov.draw(_blank(), _overlay(), show="baseline")
     marked = ov.draw(_blank(), _overlay(no_go=[[20, c] for c in range(20, 40)]), show="baseline")
     assert _changed(plain, marked) > 10
-    assert _has_colour(marked, ov.COL_NO_GO), "il tratto vietato non è rosso"
+    assert _has_colour(marked, ov.COL_NO_GO), "the forbidden stretch is not red"
 
 
 # ---------------------------------------------------------------------------
-# Separation — the measurement that picks the deck's lead scene
+# Separation — the measurement that picks the lead scene of the route figure
 # ---------------------------------------------------------------------------
 
 
@@ -213,9 +213,9 @@ def test_the_geojson_does_not_carry_the_per_cell_lists():
     )
 
     props = res.as_geojson()["properties"]
-    assert props["n_no_go_cells"] == 2, "il conteggio serve e deve restare"
+    assert props["n_no_go_cells"] == 2, "the count is needed and must stay"
     for banned in ("no_go_cells", "no_data_cells", "cells"):
-        assert banned not in props, f"{banned} gonfia il prodotto del downlink"
+        assert banned not in props, f"{banned} inflates the downlink product"
 
 
 def test_the_baseline_still_counts_what_it_now_also_lists():
@@ -248,7 +248,7 @@ def test_the_baseline_still_counts_what_it_now_also_lists():
 
 
 def test_a_missing_overlay_loads_as_empty(tmp_path):
-    assert ov.load(tmp_path / "assente.json") == {}
+    assert ov.load(tmp_path / "missing.json") == {}
 
 
 def test_loading_a_directory_is_empty_not_an_exception(tmp_path):
@@ -280,26 +280,24 @@ def test_every_route_in_the_demo_can_actually_be_drawn():
 
     index_path = Path("data/demo/index.json")
     if not index_path.exists():
-        pytest.skip("precompute non ancora eseguito")
+        pytest.skip("precompute not run yet")
     index = json.loads(index_path.read_text())
 
     checked = 0
     for scene in index.get("scenes", []):
         geo_png = Path("data/demo/images") / (scene.get("files") or {}).get("mask_geo", "")
         if not geo_png.is_file():
-            pytest.fail(
-                f"{scene['scene_id']}: manca la maschera geocodificata, nessuna rotta è disegnabile"
-            )
+            pytest.fail(f"{scene['scene_id']}: geocoded mask missing, no route can be drawn")
         for ice_class, entry in (scene.get("classes") or {}).items():
             if not entry.get("route_exists"):
                 continue
             name = entry.get("overlay")
-            assert name, f"{scene['scene_id']}/{ice_class}: rotta senza overlay"
+            assert name, f"{scene['scene_id']}/{ice_class}: route without overlay"
             data = ov.load(Path("data/demo/overlays") / name)
-            assert data, f"{name} assente o vuoto"
+            assert data, f"{name} missing or empty"
 
             img = Image.open(geo_png)
             assert _changed(img, ov.draw(img, data, show="both")) > 100
             checked += 1
 
-    assert checked, "nessuna rotta verificata: la demo non ha rotte"
+    assert checked, "no route checked: the demo has no routes"

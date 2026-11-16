@@ -1,6 +1,6 @@
 """Tests for the live-computation path.
 
-The claim this code makes on stage is "what you are watching is the real
+The claim this code makes in a live demo is "what you are watching is the real
 pipeline, not pictures I made earlier". That claim is only worth anything if
 two things hold: it runs the same function the product runs, and when it
 disagrees with the precomputed result it *says so* rather than showing whichever
@@ -32,13 +32,13 @@ def test_the_live_path_calls_process_scene_rather_than_reimplementing_it():
     assert "process_scene" in src
     for reimplemented in ("predict_scene", "find_route", "geocode_scene"):
         assert reimplemented not in src, (
-            f"live.compute chiama {reimplemented} direttamente: "
-            f"sta rifacendo la catena invece di eseguirla"
+            f"live.compute calls {reimplemented} directly: "
+            f"it is re-implementing the chain instead of running it"
         )
 
 
 def test_process_scene_accepts_the_progress_hook():
-    """The only thing the live path adds. If the signature drifts, the stage
+    """The only thing the live path adds. If the signature drifts, the progress
     display silently stops updating and the run looks frozen."""
     from iceroute.demo.precompute import process_scene
 
@@ -58,10 +58,10 @@ def test_process_scene_runs_without_a_hook():
 
 
 def test_a_broken_run_returns_an_error_instead_of_raising(tmp_path):
-    """This sits behind a button on a stage. A traceback across the projector
+    """This sits behind a button in a live demo. A traceback across the screen
     is a worse outcome than a red box."""
     run = live.compute(
-        tmp_path / "non-esiste.nc",
+        tmp_path / "does-not-exist.nc",
         model=None,
         device="cpu",
         out_dir=tmp_path,
@@ -74,8 +74,8 @@ def test_a_broken_run_returns_an_error_instead_of_raising(tmp_path):
 
 def test_a_missing_checkpoint_is_a_clear_error(tmp_path):
     cfg = tmp_path / "t.yaml"
-    cfg.write_text("output:\n  best_checkpoint: /non/esiste.pt\n")
-    with pytest.raises(FileNotFoundError, match="Checkpoint assente"):
+    cfg.write_text("output:\n  best_checkpoint: /does/not/exist.pt\n")
+    with pytest.raises(FileNotFoundError, match="Checkpoint missing"):
         live.load_model(cfg)
 
 
@@ -91,11 +91,11 @@ def test_an_identical_route_is_reported_as_identical():
 
 
 def test_a_different_route_is_flagged_loudly_not_swallowed():
-    """If the two ever diverge, that is a Tuesday problem — but only if the
-    demo says so instead of quietly displaying the newer answer."""
+    """If the two ever diverge, that is a development-time problem — but only if
+    the demo says so instead of quietly displaying the newer answer."""
     v = live.agreement(_ov([[r, r] for r in range(20)]), _ov([[r, r + 1] for r in range(20)]))
     assert v["comparable"] and not v["identical"]
-    assert "DIVERSA" in v["note"]
+    assert "DIFFERENT" in v["note"]
 
 
 def test_a_route_of_a_different_length_is_a_difference():
@@ -130,7 +130,7 @@ def test_the_live_run_reproduces_the_precomputed_route():
     raw = Path("data/raw/test/20200701T114012_cis_prep.nc")
     stored_dir = Path("data/demo/overlays")
     if not (picked.exists() and raw.exists() and stored_dir.exists()):
-        pytest.skip("scena grezza, modello o precomputato assenti")
+        pytest.skip("raw scene, model or precomputed output missing")
 
     cfg = Path(picked.read_text().strip())
     model, device = live.load_model(cfg)
@@ -138,7 +138,7 @@ def test_the_live_run_reproduces_the_precomputed_route():
     run = live.compute(raw, model=model, device=device, out_dir=out, train_config=cfg)
 
     assert run.ok, run.error
-    assert [s.name for s in run.stages], "nessuna fase riportata"
+    assert [s.name for s in run.stages], "no stage reported"
     assert all(s.done for s in run.stages)
 
     stem = raw.name.replace(".nc", "")

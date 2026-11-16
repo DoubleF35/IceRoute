@@ -1,8 +1,9 @@
-"""Generate everything the demo displays, ahead of time. SPEC §9.2.
+"""Generate everything the demo displays, ahead of time.
 
 The UI reads **only** files produced here. Nothing is inferred, geocoded or
 routed while someone is watching, because the demo has to start in under two
-seconds and must not depend on PyTorch initialising correctly on a stage.
+seconds and must not depend on PyTorch initialising correctly on whatever
+machine it is shown from.
 
 The one thing that matters most in this file
 --------------------------------------------
@@ -56,12 +57,12 @@ from iceroute.routing.waypoints import choose_waypoints, waypoints_from_config
 
 log = logging.getLogger("precompute")
 
-# High contrast, no pastels: a conference projector washes out mid tones and
-# these have to stay separable from the back of the room (SPEC §9.4).
+# High contrast, no pastels: a projector washes out mid tones and these have to
+# stay separable from across a room.
 CLASS_COLOURS = {
-    0: (10, 40, 90),  # acqua libera — blu profondo
-    1: (0, 200, 255),  # ghiaccio sottile — ciano acceso
-    2: (255, 255, 255),  # ghiaccio spesso — bianco
+    0: (10, 40, 90),  # open water — deep blue
+    1: (0, 200, 255),  # thin ice — bright cyan
+    2: (255, 255, 255),  # thick ice — white
 }
 NODATA_COLOUR = (26, 26, 26)
 
@@ -92,10 +93,10 @@ SIC_COLOURS = {
 # RIO is rendered around the two POLARIS decision boundaries, not on a smooth
 # ramp: the eye should read "may I go here", not "what number is this".
 RIO_COLOURS = {
-    0: (46, 204, 113),  # normale
-    1: (241, 196, 15),  # rischio elevato
-    2: (231, 76, 60),  # considerazione speciale
-    3: (40, 40, 40),  # ignoto / fuori copertura
+    0: (46, 204, 113),  # normal
+    1: (241, 196, 15),  # elevated risk
+    2: (231, 76, 60),  # special consideration
+    3: (40, 40, 40),  # unknown / outside coverage
 }
 
 
@@ -247,7 +248,7 @@ def process_scene(
     compute" a claim about code the product does not use.
     """
     step = on_stage or (lambda _name: None)
-    step("Lettura della scena dal disco")
+    step("Reading the scene from disk")
     labels_from = resolve_labels(scene_path)
     scene = load_scene(scene_path, data_cfg, labels_from=labels_from)
     stem = scene.meta.scene_id.replace(".nc", "")
@@ -261,7 +262,7 @@ def process_scene(
     if use_chart:
         pred, inf_stats, infer_s = truth, None, 0.0
     else:
-        step("Inferenza U-Net sulla scena intera")
+        step("U-Net inference on the full scene")
         t0 = time.monotonic()
         pred, inf_stats = predict_mask(model, scene, channels, train_cfg.get("eval", {}), device)
         infer_s = time.monotonic() - t0
@@ -277,7 +278,7 @@ def process_scene(
     )
 
     # -- rasters ------------------------------------------------------------
-    step("Rendering delle maschere")
+    step("Rendering the masks")
     img_dir = out_dir / "images"
     hv8 = stretch(scene.hv, scene.mask_valid)
     assets.files["sar"] = save_png(hv8, img_dir / f"{stem}_sar.png", downscale=downscale)
@@ -291,7 +292,7 @@ def process_scene(
     # -- geocode, on the PREDICTED mask ------------------------------------
     # geocode_scene resamples whatever sits in scene.sod, so the prediction is
     # substituted before geocoding. The chart stays available as scene.sic etc.
-    step("Geocodifica in EPSG:3413 a 500 m")
+    step("Geocoding to EPSG:3413 at 500 m")
     scene.sod = pred.astype("uint8")
     geo = geocode_scene(scene, resolution_m=float(routing_cfg["grid"]["resolution_m"]))
     land = build_land_mask(
@@ -314,7 +315,7 @@ def process_scene(
             colour_sic(geo.sic, geo.mask_valid), img_dir / f"{stem}_sic.png", downscale=1
         )
 
-    step("RIO POLARIS e griglia di costo")
+    step("POLARIS RIO and cost grid")
     rios, costs = {}, {}
     for ic in ice_classes:
         rio = compute_rio(
@@ -333,18 +334,18 @@ def process_scene(
         )
 
     # -- waypoints ----------------------------------------------------------
-    step("Scelta dei waypoint")
+    step("Choosing the waypoints")
     entry = (routing_cfg.get("waypoints") or {}).get(scene.meta.scene_id)
     try:
         wp = waypoints_from_config(geo.grid, entry) if entry else choose_waypoints(geo.grid, costs)
     except ValueError as exc:
-        assets.warnings.append(f"Waypoint non selezionabili: {exc}")
+        assets.warnings.append(f"Waypoints could not be selected: {exc}")
         log.warning("  %s", assets.warnings[-1])
         return assets
     assets.waypoints = wp.as_dict()
 
     # -- routes -------------------------------------------------------------
-    step("A*, semplificazione e confronto con la rotta diretta")
+    step("A*, simplification and comparison with the direct route")
     routes_dir = out_dir / "routes"
     signatures = []
     for ic in ice_classes:
@@ -362,11 +363,12 @@ def process_scene(
                 rio=rio,
             )
         except NoRouteFound as exc:
-            # An expected, and rhetorically useful, outcome: SPEC §8.4.
+            # An expected outcome, and an informative one: "with this class
+            # the route does not exist" is a result, not a failure.
             entry_out.update({"route_exists": False, "reason": exc.reason, "message": str(exc)})
             assets.classes[ic] = entry_out
             signatures.append(None)
-            log.info("  %s: nessuna rotta (%s)", ic, exc.reason)
+            log.info("  %s: no route (%s)", ic, exc.reason)
             continue
 
         # String pulling, before anything is measured off the route: A* is
@@ -435,7 +437,7 @@ def process_scene(
         entry_out["separation"] = ov.get("separation") or {}
         # The answer to "but your route goes through the thick ice". Measured
         # here, where the rasters exist, so the UI states it instead of the
-        # audience inferring the opposite from a class map.
+        # viewer inferring the opposite from a class map.
         entry_out["conditions"] = conditions_along(
             route.cells, geo.sod, geo.sic, rio, ic, CLASS_NAMES
         )
@@ -454,14 +456,15 @@ def process_scene(
         signatures.append(tuple(route.cells))
         log.info("  %s: %s", ic, entry_out["comparison"]["headline"])
 
-    # D-012: the demo's strongest moment needs the route to actually change with
-    # the vessel class. Recorded per scene so the five can be picked on evidence.
+    # docs/decisions.md D-012: the vessel-class comparison only means something
+    # if the route actually changes with the class. Recorded per scene so the
+    # five demo scenes can be picked on evidence.
     distinct = {s for s in signatures if s is not None}
     assets.routes_differ = len(distinct) > 1 or None in signatures
     if not assets.routes_differ:
         assets.warnings.append(
-            "Tutte le classi di nave producono la stessa rotta: questa scena non "
-            "sostiene il momento 'cambio classe e non si passa' (D-012)."
+            "Every vessel class produces the same route: this scene does not "
+            "support the 'change class and there is no way through' comparison (D-012)."
         )
 
     if inf_stats is not None:
@@ -475,27 +478,27 @@ def process_scene(
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Genera data/demo/ per la UI. SPEC §9.2.")
+    ap = argparse.ArgumentParser(description="Generate data/demo/ for the UI.")
     ap.add_argument("--config", type=Path, default=Path("configs/routing.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument(
         "--train-config",
         type=Path,
         default=None,
-        help="default: il config schierato, da artifacts/best_config.txt",
+        help="default: the deployed config, from artifacts/best_config.txt",
     )
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=Path("data/demo"))
     ap.add_argument("--demo-config", type=Path, default=Path("configs/demo.yaml"))
     ap.add_argument("--raw-dir", type=Path, default=None)
     ap.add_argument("--scenes", nargs="*", default=None)
-    ap.add_argument("--downscale", type=int, default=4, help="fattore di riduzione dei PNG")
+    ap.add_argument("--downscale", type=int, default=4, help="PNG downscale factor")
     ap.add_argument("--device", default=None)
     ap.add_argument(
         "--use-chart",
         action="store_true",
-        help="instrada sull'ice chart invece che sul modello: serve a CLASSIFICARE "
-        "le scene candidate, non a costruire la demo",
+        help="route on the ice chart instead of the model: used to RANK "
+        "candidate scenes, not to build the demo",
     )
     args = ap.parse_args(argv)
 
@@ -513,20 +516,20 @@ def main(argv: list[str] | None = None) -> int:
 
     train_path = args.train_config or deployed_config()
     train_cfg = yaml.safe_load(train_path.read_text())
-    log.info("Modello: %s", train_path)
+    log.info("Model: %s", train_path)
     table = PolarisTable.load()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     model, ckpt_path = None, None
     if args.use_chart:
         log.warning(
-            "MODALITA' CLASSIFICA: le rotte sono calcolate sull'ice chart, non sul "
-            "modello. Serve a scegliere le scene candidate. NON usare l'output come demo."
+            "RANKING MODE: routes are computed on the ice chart, not on the "
+            "model. Used to choose candidate scenes. Do NOT use the output as the demo."
         )
     else:
         ckpt_path = args.checkpoint or Path(train_cfg["output"]["best_checkpoint"])
         if not ckpt_path.exists():
-            log.error("Checkpoint assente: %s. Lancia prima 'make train'.", ckpt_path)
+            log.error("Checkpoint missing: %s. Run 'make train' first.", ckpt_path)
             return 1
         model, _ = load_checkpoint(ckpt_path, device)
 
@@ -539,8 +542,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Each entry is (scene_id, is_worst_case). The worst case is built alongside
     # the carousel rather than in a separate run: a scene that only gets
-    # regenerated when someone remembers to is a scene that will be stale on
-    # stage, and this one exists to be shown under questioning.
+    # regenerated when someone remembers to is a scene that will be stale when
+    # it is needed, and this one exists to be shown under questioning.
     worst_id = ((demo_cfg.get("worst_case") or {}).get("id")) if demo_cfg else None
 
     if args.scenes:
@@ -550,10 +553,10 @@ def main(argv: list[str] | None = None) -> int:
         if worst_id and worst_id not in scenes:
             scenes.append(worst_id)
         log.info(
-            "Scene demo da %s: %d%s",
+            "Demo scenes from %s: %d%s",
             args.demo_config,
             len(scenes),
-            f" (di cui 1 caso peggiore: {worst_id[:18]})" if worst_id else "",
+            f" (including 1 worst case: {worst_id[:18]})" if worst_id else "",
         )
     elif args.raw_dir.name == "test":
         # Official test scenes are not in the frozen split; enumerate from disk,
@@ -569,14 +572,14 @@ def main(argv: list[str] | None = None) -> int:
 
     present = [s for s in scenes if (args.raw_dir / s).exists()]
     if not present:
-        log.error("Nessuna scena demo in %s.", args.raw_dir)
+        log.error("No demo scene in %s.", args.raw_dir)
         return 1
 
     args.out.mkdir(parents=True, exist_ok=True)
     results = []
     for i, sid in enumerate(present, 1):
         is_worst = sid == worst_id
-        log.info("[%d/%d] %s%s", i, len(present), sid, "  [CASO PEGGIORE]" if is_worst else "")
+        log.info("[%d/%d] %s%s", i, len(present), sid, "  [WORST CASE]" if is_worst else "")
         try:
             results.append(
                 process_scene(
@@ -594,19 +597,19 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the batch
-            log.exception("  fallita: %s", exc)
+            log.exception("  failed: %s", exc)
 
     index = {
         "generated_from_predicted_mask": not args.use_chart,
         "note": (
-            "Le rotte sono calcolate sulla maschera PREDETTA dal modello, non sull'ice "
-            "chart. Instradare sulla carta dimostrerebbe un'analisi che non abbiamo "
-            "prodotto noi."
+            "Routes are computed on the mask PREDICTED by the model, not on the ice "
+            "chart. Routing on the chart would demonstrate an analysis we did not "
+            "produce ourselves."
             if not args.use_chart
-            else "CLASSIFICA: rotte calcolate sull'ICE CHART, non sul modello. Serve solo a "
-            "scegliere le scene candidate. Non e' un output utilizzabile come demo."
+            else "RANKING: routes computed on the ICE CHART, not on the model. Only used "
+            "to choose candidate scenes. Not an output usable as the demo."
         ),
-        "scheme": "3 classi (ripiego SPEC §7.4)",
+        "scheme": "3 classes (fallback, docs/decisions.md D-020)",
         "class_names": CLASS_NAMES,
         "ice_classes": routing_cfg["vessel"]["classes"],
         "open_water_speed_kn": routing_cfg["vessel"]["open_water_speed_kn"],
@@ -625,21 +628,21 @@ def main(argv: list[str] | None = None) -> int:
     differing = [a.scene_id for a in carousel if a.routes_differ]
     log.info("=" * 66)
     log.info(
-        "Scene generate: %d (%d nel carosello + %d caso peggiore)",
+        "Scenes generated: %d (%d in the carousel + %d worst case)",
         len(results),
         len(carousel),
         len(results) - len(carousel),
     )
     log.info(
-        "Scene in cui la rotta CAMBIA con la classe di nave: %d/%d%s",
+        "Scenes where the route CHANGES with the vessel class: %d/%d%s",
         len(differing),
         len(carousel),
         f" — {', '.join(s[:15] for s in differing)}" if differing else "",
     )
     # Which scene actually *looks* like the claim. A scene can forbid the
     # direct route in three hundred cells and still draw two lines on top of
-    # each other; on a projector that argues nothing. Ranked here so the choice
-    # of what to open on stage is made against a measurement.
+    # each other; on screen that argues nothing. Ranked here so the choice of
+    # which scene to open first is made against a measurement.
     ranked = sorted(
         (
             (a.scene_id, ic, (e.get("separation") or {}).get("pct_diagonal") or 0.0)
@@ -650,17 +653,17 @@ def main(argv: list[str] | None = None) -> int:
         key=lambda t: -t[2],
     )
     if ranked:
-        log.info("Separazione visibile fra le due rotte (% della diagonale):")
+        log.info("Visible separation between the two routes (% of the diagonal):")
         for sid, ic, pct in ranked[:4]:
             log.info("    %-16s %-4s %5.2f%%", sid[:16], ic, pct)
 
     if not differing:
         log.warning(
-            "Nessuna scena sostiene il momento 'cambio classe e non si passa'. "
-            "SPEC §11.4: valutare di togliere il selettore di classe dalla UI "
-            "PRIMA di costruirci attorno l'interfaccia."
+            "No scene supports the 'change class and there is no way through' "
+            "comparison. Consider removing the vessel-class selector from the UI "
+            "BEFORE building the interface around it."
         )
-    log.info("Indice in %s", args.out / "index.json")
+    log.info("Index written to %s", args.out / "index.json")
     return 0
 
 

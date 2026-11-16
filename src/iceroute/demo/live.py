@@ -1,9 +1,9 @@
-"""Run the real pipeline while somebody is watching. SPEC §9.2, the exception.
+"""Run the real pipeline while somebody is watching: the one exception to precompute.
 
-The demo reads precomputed files so it starts instantly and cannot fail on
-stage. That is the right default and it stays the default. It also invites the
-one question this module answers: *how do I know these aren't just pictures you
-made earlier?*
+The demo reads precomputed files so it starts instantly and cannot fail during
+a live run. That is the right default and it stays the default. It also invites
+the one question this module answers: *how do I know these aren't just pictures
+you made earlier?*
 
 So: the scene opens from ``data/demo/`` immediately, and a button re-runs the
 entire chain — read, infer, geocode, RIO, A\\*, simplify, compare — on the raw
@@ -19,13 +19,13 @@ already reads — so the live result is displayed by the same code that displays
 the precomputed one.
 
 **The result is compared against the precomputed route, and the verdict is
-shown either way.** If the live run disagrees, that is worth knowing on a
-Tuesday rather than discovering in front of investors. Measured, not asserted:
-:func:`agreement` reports the cells that differ.
+shown either way.** If the live run disagrees, that is worth knowing during
+development rather than discovering in the middle of a demo. Measured, not
+asserted: :func:`agreement` reports the cells that differ.
 
 Roughly fifteen seconds on a GPU for all three vessel classes, most of it in
-A\\*. Slower on CPU. Whatever it costs, it costs it in front of the audience,
-which is the point.
+A\\*. Slower on CPU. Whatever it costs, it costs it in front of whoever is
+watching, which is the point.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def load_model(train_config: Path, device: str | None = None):
     cfg = yaml.safe_load(Path(train_config).read_text())
     ckpt = Path(cfg["output"]["best_checkpoint"])
     if not ckpt.exists():
-        raise FileNotFoundError(f"Checkpoint assente: {ckpt}")
+        raise FileNotFoundError(f"Checkpoint missing: {ckpt}")
     dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
     model, _ = load_checkpoint(ckpt, dev)
     return model, dev
@@ -92,8 +92,8 @@ def compute(
 ) -> LiveRun:
     """The whole chain, on the raw scene, now.
 
-    Failures are returned rather than raised. This runs behind a button on a
-    stage; a traceback across the projector is a worse outcome than a red box
+    Failures are returned rather than raised. This runs behind a button in a
+    live demo; a traceback across the screen is a worse outcome than a red box
     saying what broke, and the precomputed result is still on screen behind it.
     """
     from iceroute.data.loader import load_config
@@ -129,7 +129,7 @@ def compute(
         )
     except Exception as exc:  # noqa: BLE001 — must never break the demo
         run.error = f"{type(exc).__name__}: {exc}"
-        log.exception("calcolo dal vivo fallito")
+        log.exception("live computation failed")
 
     if run.stages:
         run.stages[-1].seconds = time.monotonic() - clock["t0"]
@@ -152,14 +152,14 @@ def agreement(live_overlay: dict, stored_overlay: dict) -> dict:
         return {
             "comparable": False,
             "identical": False,
-            "note": "una delle due rotte non esiste: nessun confronto",
+            "note": "one of the two routes does not exist: no comparison",
         }
     if a == b:
         return {
             "comparable": True,
             "identical": True,
             "n_cells": len(a),
-            "note": f"identica al precomputato, {len(a)} celle",
+            "note": f"identical to the precomputed route, {len(a)} cells",
         }
     same = sum(1 for x, y in zip(a, b, strict=False) if x == y)
     return {
@@ -168,7 +168,7 @@ def agreement(live_overlay: dict, stored_overlay: dict) -> dict:
         "n_cells": len(a),
         "n_matching": same,
         "note": (
-            f"DIVERSA dal precomputato: {len(a)} celle contro {len(b)}, "
-            f"{same} coincidono. Va capito prima del palco."
+            f"DIFFERENT from the precomputed route: {len(a)} cells against {len(b)}, "
+            f"{same} match. This must be understood before the demo is shown."
         ),
     }

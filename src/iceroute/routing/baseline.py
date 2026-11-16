@@ -1,4 +1,4 @@
-"""The comparison route: what a ship would do without IceRoute. SPEC §8.5.
+"""The comparison route: what a ship would do without IceRoute.
 
 A great-circle track between the same two waypoints, with the land mask
 applied but the ice ignored. That is the honest comparison — "what would a
@@ -46,7 +46,7 @@ class BaselineResult:
     # Cells the track crosses where the model made no prediction. Counted apart
     # from ice-blocked cells because the two mean completely different things:
     # one is "POLARIS forbids this", the other is "we have no chart here". A
-    # pitch that conflates them is claiming the ice stopped a voyage that was
+    # public claim that conflates them says the ice stopped a voyage that was
     # really stopped by a gap in coverage.
     n_no_data_cells: int = 0
     blocked_by_ice: bool = False
@@ -85,7 +85,7 @@ def geodesic_points(
 ) -> list[tuple[float, float]]:
     """Points along the great circle, endpoints included."""
     if n_points < 2:
-        raise ValueError("n_points deve essere almeno 2")
+        raise ValueError("n_points must be at least 2")
     inter = GEOD.npts(lon0, lat0, lon1, lat1, n_points - 2)
     return [(lon0, lat0), *[(float(a), float(b)) for a, b in inter], (lon1, lat1)]
 
@@ -138,7 +138,7 @@ def geodesic_baseline(
     cells = _densify_cells(grid, points)
 
     if not cells:
-        raise ValueError("La rotta geodetica non interseca la griglia.")
+        raise ValueError("The geodesic route does not intersect the grid.")
 
     blocked = [(r, c) for r, c in cells if not cost.passable[r, c]]
     on_land = bool(any(land_mask[r, c] for r, c in cells)) if land_mask is not None else False
@@ -168,29 +168,29 @@ def geodesic_baseline(
 
     feasible = n_no_go == 0 and n_no_data == 0 and not on_land
     if on_land:
-        note = "La rotta geodetica attraversa terraferma: non percorribile."
+        note = "The geodesic route crosses land: not navigable."
     elif n_no_go:
         note = (
-            f"La rotta geodetica attraversa {n_no_go} celle oltre il limite POLARIS "
-            f"per una nave {cost.ice_class}. Il tempo di transito non è definito: "
-            f"quella rotta non si può percorrere."
+            f"The geodesic route crosses {n_no_go} cells beyond the POLARIS limit "
+            f"for a {cost.ice_class} vessel. The transit time is undefined: "
+            f"that route cannot be sailed."
         )
         if n_no_data:
-            note += f" (Altre {n_no_data} celle sono fuori copertura.)"
+            note += f" (Another {n_no_data} cells are outside coverage.)"
     elif n_no_data:
         # The honest statement. Saying "the ice blocks it" here would be false.
         note = (
-            f"La rotta geodetica esce dalla copertura dell'ice chart per {n_no_data} "
-            f"celle. Non è il ghiaccio a impedirla: semplicemente lì non abbiamo una "
-            f"mappa. Nessun confronto di tempi è difendibile su questa coppia di punti."
+            f"The geodesic route leaves the ice chart coverage for {n_no_data} "
+            f"cells. It is not the ice that blocks it: we simply have no map "
+            f"there. No time comparison is defensible for this pair of points."
         )
     elif n_slow:
         note = (
-            f"Percorribile, ma {n_slow} celle sono in regime di rischio elevato: "
-            f"il tempo mostrato assume velocità piena e quindi è ottimistico."
+            f"Navigable, but {n_slow} cells are in the elevated-risk regime: "
+            f"the time shown assumes full speed and is therefore optimistic."
         )
     else:
-        note = "Percorribile in acqua libera per tutta la lunghezza."
+        note = "Navigable in open water along its whole length."
 
     route = Route(
         cells=cells,
@@ -203,10 +203,10 @@ def geodesic_baseline(
     )
 
     log.info(
-        "baseline %s: %.0f km, %s (%d celle no-go, %d a velocità ridotta)",
+        "baseline %s: %.0f km, %s (%d no-go cells, %d at reduced speed)",
         cost.ice_class,
         total_m / 1000,
-        "percorribile" if feasible else "NON percorribile",
+        "navigable" if feasible else "NOT navigable",
         n_no_go,
         n_slow,
     )
@@ -265,15 +265,18 @@ def compare(route: Route, baseline: BaselineResult) -> dict:
         )
         out["comparable"] = True
         out["headline"] = (
-            f"{abs(saved):.1f} h {'risparmiate' if saved > 0 else 'in più'} "
+            f"{abs(saved):.1f} h {'saved' if saved > 0 else 'longer'} "
             f"({abs(out['time_saved_percent']):.0f}%)"
         )
     elif baseline.blocked_by_ice:
         out["time_saved_hours"] = None
         out["time_saved_percent"] = None
+        # No time to compare against: the direct route does not exist for this
+        # vessel. Same key as the other branches, so consumers never KeyError.
+        out["comparable"] = False
         out["headline"] = (
-            f"La rotta diretta non è percorribile da una nave {route.ice_class}. "
-            f"IceRoute ne trova una in {route.time_hours:.1f} h."
+            f"The direct route is not navigable for a {route.ice_class} vessel. "
+            f"IceRoute finds one in {route.time_hours:.1f} h."
         )
     else:
         # Out of chart coverage, not blocked by ice. Claiming a win here would
@@ -282,8 +285,8 @@ def compare(route: Route, baseline: BaselineResult) -> dict:
         out["time_saved_percent"] = None
         out["comparable"] = False
         out["headline"] = (
-            f"Confronto non disponibile: la rotta diretta esce dalla copertura "
-            f"dell'ice chart. IceRoute impiega {route.time_hours:.1f} h."
+            f"Comparison not available: the direct route leaves the ice chart "
+            f"coverage. IceRoute takes {route.time_hours:.1f} h."
         )
 
     return out

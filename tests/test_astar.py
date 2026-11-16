@@ -3,7 +3,7 @@
 The two that matter most for credibility:
 
 * ``test_16_connectivity_beats_8_on_a_diagonal`` — quantifies the digitisation
-  error the spec warns about, on a case where the true answer is known exactly.
+  error 16-connectivity exists to remove, on a case where the true answer is known exactly.
 * ``test_long_step_cannot_jump_a_one_cell_barrier`` — a knight move that
   tunnels through a coastline produces a route that is optimal on the grid and
   impossible at sea.
@@ -176,7 +176,7 @@ def test_travel_time_matches_distance_over_speed():
 
 
 def test_16_connectivity_beats_8_on_a_diagonal():
-    """The digitisation error SPEC §8.4 warns about, measured.
+    """The digitisation error of an 8-connected grid, measured.
 
     A 1:2 slope is representable exactly on a 16-connected grid and only
     approximable on an 8-connected one, which must therefore travel further.
@@ -191,14 +191,14 @@ def test_16_connectivity_beats_8_on_a_diagonal():
 
     # Ground truth is the geodesic between the endpoints, not the planar hypot.
     # Using the planar figure here would silently reintroduce the 0.5% scale
-    # error that D-010 exists to remove.
+    # error that docs/decisions.md D-010 exists to remove.
     lon0, lat0 = grid.lonlat_of(*start)
     lon1, lat1 = grid.lonlat_of(*goal)
     true_km = geodesic_distance_m(lon0, lat0, lon1, lat1) / 1000
 
     assert r16.distance_km == pytest.approx(true_km, rel=0.005)
     assert r8.distance_km > r16.distance_km
-    # The 8-connected excess is the ~8% the spec cites.
+    # The 8-connected excess is the ~8% quoted in routing/astar.py.
     assert (r8.distance_km / true_km - 1) > 0.03
 
 
@@ -219,7 +219,7 @@ def test_route_prefers_open_water_over_slow_ice():
     route = find_route(cost, grid, (5, 20), (35, 20), rio=rio)
     straight = np.hypot(30, 0) * RES / 1000
 
-    assert route.distance_km > straight, "avrebbe dovuto deviare"
+    assert route.distance_km > straight, "it should have detoured"
     slow_h = (5 * RES) / (3.0 * KNOT_TO_MS) / 3600
     assert route.time_hours < (straight * 1000) / (12 * KNOT_TO_MS) / 3600 + slow_h
 
@@ -256,7 +256,7 @@ def test_route_passes_through_a_gap_in_the_barrier():
 
 
 def test_ice_class_changes_feasibility():
-    """SPEC §8.4 and §10.5: the moment the demo is built around.
+    """The comparison the demo is built around: the vessel class decides feasibility.
 
     A corridor of ice scores in the elevated band. PC6 may transit it under a
     speed cap; IA may not, because below PC7 that band is already special
@@ -285,7 +285,7 @@ def test_blocked_endpoint_says_so_clearly():
     with pytest.raises(NoRouteFound) as exc:
         find_route(cost, grid, (2, 2), (8, 8))
     assert exc.value.reason == "endpoint_blocked"
-    assert "partenza" in str(exc.value)
+    assert "Start" in str(exc.value)
 
 
 def test_out_of_bounds_endpoint():

@@ -8,15 +8,16 @@ The payload
 -----------
 The satellite sends a mask, a route and a few bytes of metadata — not the
 scene. That is the product. :func:`payload` reports the byte counts, taking the
-route from :func:`compression.downlink_route` so the panel and the compression
-figure in the deck are computing the same thing from the same function.
+route from :func:`compression.downlink_route` so the panel and the published
+compression figure are computing the same thing from the same function.
 
 Time and fuel
 -------------
 These have no source. ``open_water_speed_kn: 12.0`` is the one unsourced value
 in ``configs/routing.yaml`` (P-05), fuel consumption is not in the project at
-all (P-09), and SPEC §10.1 forbids putting a currency on either. Measurement
-last night (D-026) put numbers on how bad it is: transit hours move 95% across
+all (P-09), and no currency is ever put on either: there is no sourced cost
+model to put one on. A measurement (docs/decisions.md D-026) put numbers on how
+bad it is: transit hours move 95% across
 10–19.5 kn, and on four of five demo scenes the direct route is forbidden, so
 there is no reference voyage to be faster than.
 
@@ -123,8 +124,8 @@ def payload(entry: dict, routes_dir: Path, metrics: dict, scene_id: str) -> Payl
     row = next((r for r in per if r.get("scene_id") == scene_id), None)
     if not row:
         out.note = (
-            "Maschera e SAR non misurati per questa scena: "
-            "`make report` copre solo le prime scene dell'indice."
+            "Mask and SAR not measured for this scene: "
+            "`make report` only covers the first scenes of the index."
         )
         return out
 
@@ -157,7 +158,8 @@ class LinkTime:
 def link_time(payload_bytes: int | None, route_bytes: int | None, assumptions: dict) -> LinkTime:
     """Seconds on the *smallest* terminal a ship is likely to carry.
 
-    This exists because of A-10. Stating that the downlink is 148 KB invites
+    This exists because of docs/decisions.md A-10. Stating that the downlink is
+    148 KB invites
     exactly one objection — "can the ship's link carry that?" — and the honest
     answer is thirteen seconds, which is better than the question expects. A
     panel that gives the size and not the cost leaves the objection standing.
@@ -177,7 +179,7 @@ def link_time(payload_bytes: int | None, route_bytes: int | None, assumptions: d
         if k.endswith("_kbps") and isinstance(v, int | float) and v > 0
     ]
     if not rates or not payload_bytes:
-        return LinkTime(reason="Velocità del collegamento non in configs/assumptions.yaml.")
+        return LinkTime(reason="Link speed not in configs/assumptions.yaml.")
 
     kbps, key = min(rates)
     msgs = None
@@ -221,24 +223,24 @@ def rescale_transit(
     time on the part of the voyage the regulation, not the vessel, controls.
     """
     if hours is None or chosen_kn <= 0 or nominal_kn <= 0:
-        return Transit(reason="Nessun tempo di transito da riscalare.")
+        return Transit(reason="No transit time to rescale.")
     if min_rio is None:
         return Transit(
-            reason="RIO minimo sulla rotta non noto: non si può "
-            "sapere se la rotta resta in operazione normale."
+            reason="Minimum RIO on the route not known: there is no way "
+            "to tell whether the route stays in normal operation."
         )
     if min_rio < 0:
         cap = ELEVATED_CAP_KN.get(ice_class)
         detail = (
-            f"limitata a {cap:.0f} kn dalla Tabella 1.2 IMO"
+            f"capped at {cap:.0f} kn by IMO Table 1.2"
             if cap
-            else "già oltre il limite per questa classe"
+            else "already beyond the limit for this class"
         )
         return Transit(
             reason=(
-                f"La rotta entra in rischio elevato (RIO minimo {min_rio:+.0f}), dove la "
-                f"velocità è {detail} e non dipende da questo cursore. Riscalare il totale "
-                f"inventerebbe del tempo: il numero non viene mostrato."
+                f"The route enters elevated risk (minimum RIO {min_rio:+.0f}), where the "
+                f"speed is {detail} and does not depend on this slider. Rescaling the total "
+                f"would invent time: the number is not shown."
             )
         )
     return Transit(hours=hours * nominal_kn / chosen_kn, exact=True)

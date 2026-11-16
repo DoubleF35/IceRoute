@@ -1,4 +1,4 @@
-"""POLARIS Risk Index Outcome from a predicted ice chart. SPEC §8.2.
+"""POLARIS Risk Index Outcome from a predicted ice chart.
 
 Implements IMO MSC.1/Circ.1519, "Guidance on Methodologies for Assessing
 Operational Capabilities and Limitations in Ice".
@@ -15,7 +15,7 @@ that term and every partially-covered cell scores far more dangerous than it
 is, which would push routes away from perfectly navigable water.
 
 Every number here comes from the circular. See ``data/polaris_rv.csv`` and
-DECISIONS.md D-007.
+docs/decisions.md D-007.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ class PolarisTable:
             sources[name] = (rec.pop("source", "") or "").strip()
             rows[name] = {k: int(v) for k, v in rec.items() if v not in (None, "")}
         if not rows:
-            raise ValueError(f"{path}: nessuna riga di risk value trovata")
+            raise ValueError(f"{path}: no risk value rows found")
         return cls(rows, sources)
 
     @property
@@ -123,17 +123,17 @@ class PolarisTable:
             return self.rows[ice_class][ice_type]
         except KeyError as exc:
             raise KeyError(
-                f"Nessun risk value per ({ice_class}, {ice_type}). "
-                f"Classi: {self.ice_classes}. Tipi: {self.ice_types}."
+                f"No risk value for ({ice_class}, {ice_type}). "
+                f"Classes: {self.ice_classes}. Types: {self.ice_types}."
             ) from exc
 
     def provisional_classes(self) -> list[str]:
-        """Ice classes whose source line is missing or marked PROVVISORIO.
+        """Ice classes whose source line is missing or marked PROVISIONAL.
 
-        SPEC rule 2 requires these to be surfaced in the UI rather than used
-        silently.
+        A value without a source must be surfaced in the UI rather than used
+        silently (docs/decisions.md, *Provisional values*).
         """
-        return [c for c, s in self.sources.items() if not s or "PROVVISORIO" in s.upper()]
+        return [c for c, s in self.sources.items() if not s or "PROVISIONAL" in s.upper()]
 
     def riv_lookup(
         self, ice_class: str, sod_to_polaris: dict[int, str], n_classes: int = 6
@@ -169,12 +169,12 @@ def compute_rio(
     sod_to_polaris
         Mapping from SOD class id to a column of the risk value table. See
         ``configs/data.yaml``; the mapping always picks the most conservative
-        column of those a SOD class spans (DECISIONS.md D-008).
+        column of those a SOD class spans (docs/decisions.md D-008).
     sic
         Sea ice concentration in tenths, 0-10. **If omitted, full concentration
         is assumed wherever ice is predicted.** That is the pessimistic
-        assumption and SPEC §8.2 requires it to be declared as a known
-        limitation rather than buried — a 6/10 regime scored as 10/10 yields a
+        assumption, and it must be declared as a known limitation rather than
+        buried — a 6/10 regime scored as 10/10 yields a
         route more cautious than reality demands.
     mask_valid
         Cells with a usable prediction. Elsewhere the result is NaN, never a

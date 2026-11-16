@@ -1,11 +1,11 @@
-"""Run the full routing pipeline over the demo scenes. SPEC Gate 3.
+"""Run the full routing pipeline over the demo scenes.
 
     scene -> geocode -> POLARIS RIO -> cost -> A* -> baseline -> simplify
 
 Produces, for every (scene, ice class) pair in ``data/demo/routes/``:
 GeoJSON for the IceRoute track and for the baseline, transit time and distance
 for both, and the minimum RIO encountered — the safety metric that says the
-route is not merely faster but inside operational limits (SPEC §8.6).
+route is not merely faster but inside operational limits.
 
 Run with ``make route``.
 """
@@ -68,7 +68,7 @@ def process_scene(
     try:
         wp = waypoints_from_config(geo.grid, entry) if entry else choose_waypoints(geo.grid, costs)
     except ValueError as exc:
-        log.warning("%s: waypoint non selezionabili — %s", scene.meta.scene_id, exc)
+        log.warning("%s: waypoints could not be selected — %s", scene.meta.scene_id, exc)
         return {
             "scene_id": scene.meta.scene_id,
             "region": scene.meta.region,
@@ -113,8 +113,8 @@ def process_scene(
             )
             elapsed = time.monotonic() - t0
         except NoRouteFound as exc:
-            # An expected outcome, not a failure: SPEC §8.4 wants this shown.
-            log.info("  %s: nessuna rotta (%s)", ice_class, exc.reason)
+            # An expected outcome, not a failure, and one worth showing.
+            log.info("  %s: no route (%s)", ice_class, exc.reason)
             entry_out.update({"route_exists": False, "reason": exc.reason, "message": str(exc)})
             result["classes"][ice_class] = entry_out
             continue
@@ -172,7 +172,7 @@ def process_scene(
         )
         result["classes"][ice_class] = entry_out
         log.info(
-            "  %s: %s  (%d waypoint, A* %.1fs)",
+            "  %s: %s  (%d waypoints, A* %.1fs)",
             ice_class,
             entry_out["comparison"]["headline"],
             len(simple),
@@ -183,12 +183,12 @@ def process_scene(
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Geocodifica, POLARIS e A* sulle scene demo.")
+    ap = argparse.ArgumentParser(description="Geocoding, POLARIS and A* over the demo scenes.")
     ap.add_argument("--config", type=Path, default=Path("configs/routing.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--out", type=Path, default=Path("data/demo"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
-    ap.add_argument("--scenes", nargs="*", default=None, help="override delle scene demo")
+    ap.add_argument("--scenes", nargs="*", default=None, help="override the demo scenes")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -201,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
 
     provisional = table.provisional_classes()
     if provisional:
-        log.warning("Risk value PROVVISORI per: %s — la demo deve dichiararlo.", provisional)
+        log.warning("PROVISIONAL risk values for: %s — the demo must declare this.", provisional)
 
     if args.scenes:
         scenes = list(args.scenes)
@@ -214,12 +214,12 @@ def main(argv: list[str] | None = None) -> int:
     present = [s for s in scenes if (args.raw_dir / s).exists()]
     if len(present) < len(scenes):
         log.warning(
-            "%d scene demo non ancora scaricate: %s",
+            "%d demo scenes not downloaded yet: %s",
             len(scenes) - len(present),
             ", ".join(s for s in scenes if s not in present),
         )
     if not present:
-        log.error("Nessuna scena demo disponibile in %s.", args.raw_dir)
+        log.error("No demo scene available in %s.", args.raw_dir)
         return 1
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -231,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
                 process_scene(args.raw_dir / sid, data_cfg, routing_cfg, args.out, table)
             )
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the batch
-            log.exception("  fallita: %s", exc)
+            log.exception("  failed: %s", exc)
             results.append({"scene_id": sid, "usable": False, "reason": str(exc)})
 
     index_path = args.out / "routes_index.json"
@@ -243,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
                 "grid_resolution_m": routing_cfg["grid"]["resolution_m"],
                 "crs": routing_cfg["grid"]["crs"],
                 "ice_classes": routing_cfg["vessel"]["classes"],
-                "polaris_source": "IMO MSC.1/Circ.1519 Tabelle 1.1, 1.2, 1.3",
+                "polaris_source": "IMO MSC.1/Circ.1519 Tables 1.1, 1.2, 1.3",
                 "scenes": results,
             },
             indent=2,
@@ -253,13 +253,13 @@ def main(argv: list[str] | None = None) -> int:
     usable = [r for r in results if r.get("usable")]
     n_routes = sum(1 for r in usable for c in r["classes"].values() if c.get("route_exists"))
     log.info("=" * 66)
-    log.info("Scene utilizzabili: %d/%d", len(usable), len(present))
+    log.info("Usable scenes: %d/%d", len(usable), len(present))
     log.info(
-        "Rotte trovate: %d su %d combinazioni",
+        "Routes found: %d of %d combinations",
         n_routes,
         len(usable) * len(routing_cfg["vessel"]["classes"]),
     )
-    log.info("Indice in %s", index_path)
+    log.info("Index written to %s", index_path)
     return 0 if usable else 1
 
 

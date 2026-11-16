@@ -1,4 +1,4 @@
-"""Reduce a grid path to a waypoint list a bridge could actually use. SPEC §8.5.
+"""Reduce a grid path to a waypoint list a bridge could actually use.
 
 An A* path over a 500 m grid has hundreds of cells and turns at every step.
 That is not a route, it is a raster. Douglas-Peucker reduces it to the corners
@@ -140,7 +140,8 @@ def simplify_route(
     else:
         tol = tolerance_m
         idx = douglas_peucker(xy, tol)
-        # Doubling converges quickly and keeps the geometry honest, where
+        # Growing the tolerance geometrically (x1.6 per round) converges
+        # quickly and keeps the geometry honest, where
         # truncation would silently relocate the destination.
         for _ in range(20):
             if len(idx) <= max_waypoints:
@@ -164,22 +165,22 @@ def simplify_route(
     warnings: list[str] = []
     if len(idx) > max_waypoints:
         warnings.append(
-            f"{len(idx)} waypoint dopo la semplificazione, oltre il massimo di "
-            f"{max_waypoints}: la tolleranza non è bastata."
+            f"{len(idx)} waypoints after simplification, above the maximum of "
+            f"{max_waypoints}: the tolerance was not enough."
         )
     if sharp:
         warnings.append(
-            f"{len(sharp)} virate oltre {max_turn_deg:.0f}°: verificare che siano "
-            f"realistiche per una nave."
+            f"{len(sharp)} turns sharper than {max_turn_deg:.0f}°: check that they "
+            f"are realistic for a ship."
         )
     if len(lonlat) >= 2:
         endpoint_shift = geodesic_distance_m(*route.lonlat[-1], *lonlat[-1])
         if endpoint_shift > 1.0:
-            warnings.append(f"L'arrivo si è spostato di {endpoint_shift:.0f} m.")
+            warnings.append(f"The destination shifted by {endpoint_shift:.0f} m.")
 
     log.info(
-        "semplificazione: %d celle → %d waypoint (tolleranza %.0f m, "
-        "deviazione massima %.0f m, %d virate strette)",
+        "simplification: %d cells → %d waypoints (tolerance %.0f m, "
+        "max deviation %.0f m, %d sharp turns)",
         n_original,
         len(idx),
         tol,

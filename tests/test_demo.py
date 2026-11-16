@@ -1,8 +1,8 @@
 """Tests for precompute and the demo's KPI cards.
 
 The card tests are the ones that matter. A KPI card is the last thing between a
-measurement and an investor, and the failure mode is not a crash — it is a
-plausible number appearing where no measurement exists.
+measurement and the person reading it, and the failure mode is not a crash — it
+is a plausible number appearing where no measurement exists.
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ def test_saved_png_has_the_expected_size(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# KPI cards — where a fabricated number would reach the room
+# KPI cards — where a fabricated number would reach the viewer
 # ---------------------------------------------------------------------------
 
 
@@ -148,7 +148,7 @@ def test_transit_card_shows_the_saving_when_it_is_real():
 
 
 def test_transit_card_claims_nothing_against_an_impossible_route():
-    """SPEC rule 2: you cannot save hours against a voyage POLARIS forbids."""
+    """No fabricated number: you cannot save hours against a voyage POLARIS forbids."""
     e = _entry(
         comparison={
             "baseline": {
@@ -163,7 +163,7 @@ def test_transit_card_claims_nothing_against_an_impossible_route():
         }
     )
     html = transit_card(e, provisional_speed=False)
-    assert "vietata dal ghiaccio" in html
+    assert "blocked by ice" in html
     assert "93" in html
     assert "+" not in html.split("</div>")[1]  # no fabricated delta
 
@@ -184,24 +184,24 @@ def test_transit_card_distinguishes_no_coverage_from_blocked_by_ice():
         }
     )
     html = transit_card(e, provisional_speed=False)
-    assert "non è il ghiaccio" in html
-    assert "vietata dal ghiaccio" not in html
+    assert "not the ice" in html
+    assert "blocked by ice" not in html
 
 
 def test_transit_card_discloses_the_provisional_speed():
     """The absolute hours scale with an assumption that has no source (P-05)."""
-    assert "senza fonte" in transit_card(_entry(), provisional_speed=True)
-    assert "senza fonte" not in transit_card(_entry(), provisional_speed=False)
+    assert "unsourced" in transit_card(_entry(), provisional_speed=True)
+    assert "unsourced" not in transit_card(_entry(), provisional_speed=False)
 
 
 def test_transit_card_handles_a_missing_route():
-    html = transit_card({"route_exists": False, "message": "disconnessa"}, False)
-    assert "nessuna rotta" in html
+    html = transit_card({"route_exists": False, "message": "disconnected"}, False)
+    assert "no route" in html
 
 
 @pytest.mark.parametrize(
     ("rio", "expected"),
-    [(10.0, "normale"), (-5.0, "elevato"), (-20.0, "speciale")],
+    [(10.0, "normal"), (-5.0, "elevated"), (-20.0, "special")],
 )
 def test_rio_card_labels_the_polaris_band(rio, expected):
     html = rio_card(
@@ -211,9 +211,9 @@ def test_rio_card_labels_the_polaris_band(rio, expected):
 
 
 def test_cards_say_not_measured_rather_than_zero():
-    """The project's central rule, at the last point before the audience."""
-    assert "non misurato" in downlink_card({})
-    assert "non misurata" in onboard_card({})
+    """The project's central rule, at the last point before the viewer."""
+    assert "not measured" in downlink_card({})
+    assert "not measured" in onboard_card({})
     assert "0.00" not in downlink_card({})
     assert "0.00" not in onboard_card({})
 
@@ -223,7 +223,7 @@ def test_downlink_card_flags_a_provisional_ratio():
         {"compression": {"ratio_median": 1012.0, "provisional": True, "n_scenes": 3}}
     )
     assert "1012:1" in html
-    assert "limite superiore" in html
+    assert "upper bound" in html
 
 
 def test_downlink_card_without_the_flag_makes_no_caveat():
@@ -231,7 +231,7 @@ def test_downlink_card_without_the_flag_makes_no_caveat():
         {"compression": {"ratio_median": 640.0, "provisional": False, "n_scenes": 5}}
     )
     assert "640:1" in html
-    assert "limite superiore" not in html
+    assert "upper bound" not in html
 
 
 def test_onboard_card_reports_measured_size_and_latency():
@@ -246,12 +246,12 @@ def test_onboard_card_reports_measured_size_and_latency():
     )
     assert "2.05 MB" in html
     assert "36 ms" in html
-    assert "non degrada" in html
+    assert "does not degrade" in html
 
 
 def test_fmt_never_prints_a_number_it_was_not_given():
-    assert fmt(None) == "non misurato"
-    assert fmt("boh") == "non misurato"
+    assert fmt(None) == "not measured"
+    assert fmt("n/a") == "not measured"
     assert fmt(3.14159) == "3.1"
 
 
@@ -299,10 +299,10 @@ def test_index_declares_it_routed_on_the_prediction():
 
     path = Path("data/demo/index.json")
     if not path.exists():
-        pytest.skip("precompute non ancora eseguito")
+        pytest.skip("precompute not run yet")
     index = json.loads(path.read_text())
     assert index.get("generated_from_predicted_mask") is True
-    assert "maschera PREDETTA" in index.get("note", "")
+    assert "mask PREDICTED" in index.get("note", "")
 
 
 def test_scene_scores_reads_the_evaluation_not_the_demo_index():
@@ -328,7 +328,7 @@ def test_scene_scores_reads_the_evaluation_not_the_demo_index():
 
 
 def test_scene_scores_returns_nothing_when_the_scene_was_not_evaluated():
-    """So the banner says 'non misurato' rather than showing another scene's
+    """So the banner says 'not measured' rather than showing another scene's
     numbers under this scene's name."""
     from iceroute.demo.app import scene_scores
 
@@ -347,12 +347,12 @@ def test_the_worst_case_scene_is_not_also_in_the_carousel():
 
     cfg = yaml.safe_load(Path("configs/demo.yaml").read_text())
     worst = (cfg.get("worst_case") or {}).get("id")
-    assert worst, "configs/demo.yaml deve dichiarare un caso peggiore"
+    assert worst, "configs/demo.yaml must declare a worst case"
     assert worst not in [s["id"] for s in cfg["scenes"]]
 
 
 def test_the_designated_worst_case_really_is_the_worst(tmp_path):
-    """D-024: the carousel is chosen partly on model performance, so that claim
+    """docs/decisions.md D-024: the carousel is chosen partly on model performance, so that claim
     has to keep being true.
 
     The original selection used only ice-chart structure and put the single
@@ -367,7 +367,7 @@ def test_the_designated_worst_case_really_is_the_worst(tmp_path):
 
     metrics_path = Path("artifacts/metrics.json")
     if not metrics_path.exists():
-        pytest.skip("valutazione non ancora eseguita")
+        pytest.skip("evaluation not run yet")
     per = ((json.loads(metrics_path.read_text()).get("evaluation") or {}).get("scenes") or {}).get(
         "per_scene"
     ) or []
@@ -376,26 +376,26 @@ def test_the_designated_worst_case_really_is_the_worst(tmp_path):
     cfg = yaml.safe_load(Path("configs/demo.yaml").read_text())
     worst_id = cfg["worst_case"]["id"]
     if not isinstance(scored.get(worst_id), float):
-        pytest.skip("il caso peggiore non compare nella valutazione corrente")
+        pytest.skip("the worst case does not appear in the current evaluation")
 
     for entry in cfg["scenes"]:
         got = scored.get(entry["id"])
         if isinstance(got, float):
             assert got < scored[worst_id], (
-                f"{entry['id']} è più permissiva ({got:.1%}) del caso peggiore "
-                f"dichiarato {worst_id} ({scored[worst_id]:.1%}): "
-                "aggiorna configs/demo.yaml"
+                f"{entry['id']} is more permissive ({got:.1%}) than the declared "
+                f"worst case {worst_id} ({scored[worst_id]:.1%}): "
+                "update configs/demo.yaml"
             )
 
 
 def test_index_records_whether_routes_differ_by_vessel_class():
-    """D-012: the demo's strongest moment needs this, so it is recorded per
-    scene and decided on evidence rather than hope."""
+    """docs/decisions.md D-012: the vessel-class comparison needs this, so it is
+    recorded per scene and decided on evidence rather than hope."""
     from pathlib import Path
 
     path = Path("data/demo/index.json")
     if not path.exists():
-        pytest.skip("precompute non ancora eseguito")
+        pytest.skip("precompute not run yet")
     for s in json.loads(path.read_text())["scenes"]:
         assert "routes_differ" in s
 
@@ -416,7 +416,7 @@ def test_conditions_along_separates_ice_type_from_concentration():
 
     from iceroute.routing.polaris import conditions_along
 
-    names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
+    names = ["Open water", "Thin ice", "Thick ice"]
     sod = np.full((4, 4), 2, dtype="uint8")  # all thick ice
     sic = np.full((4, 4), 3.0)  # ...at 3/10
     # RIO = 3(-3) + 7(+3) = +12 for a PC6
@@ -424,7 +424,7 @@ def test_conditions_along_separates_ice_type_from_concentration():
     cells = [(0, i) for i in range(4)]
 
     c = conditions_along(cells, sod, sic, rio, "PC6", names)
-    assert c["by_class"] == {"Ghiaccio spesso": 4}
+    assert c["by_class"] == {"Thick ice": 4}
     assert c["worst_class_cells"] == 4
     assert c["worst_class_sic_median"] == 3.0
     assert c["fraction_normal"] == 1.0
@@ -436,13 +436,13 @@ def test_the_same_ice_type_at_high_concentration_is_reported_as_forbidden():
 
     from iceroute.routing.polaris import conditions_along
 
-    names = ["Acqua libera", "Ghiaccio sottile", "Ghiaccio spesso"]
+    names = ["Open water", "Thin ice", "Thick ice"]
     sod = np.full((4, 4), 2, dtype="uint8")
     sic = np.full((4, 4), 8.0)
     rio = np.full((4, 4), -18.0)  # 8(-3) + 2(+3)
     c = conditions_along([(0, i) for i in range(4)], sod, sic, rio, "PC6", names)
 
-    assert c["by_class"] == {"Ghiaccio spesso": 4}  # same class as above
+    assert c["by_class"] == {"Thick ice": 4}  # same class as above
     assert c["worst_class_sic_median"] == 8.0  # different concentration
     assert c["fraction_no_go"] == 1.0  # opposite verdict
 
@@ -458,14 +458,14 @@ def test_conditions_of_an_empty_route_are_empty():
 def test_every_demo_route_stays_in_normal_operation():
     """The claim the UI now makes out loud, checked against the real build.
 
-    If a route ever does cross a forbidden cell, the banner saying "attraversa
-    il bianco, ed è regolare" becomes a false statement on a projector.
+    If a route ever does cross a forbidden cell, the banner saying "the route
+    crosses the white, and it is legal" becomes a false statement on screen.
     """
     from pathlib import Path
 
     path = Path("data/demo/index.json")
     if not path.exists():
-        pytest.skip("precompute non ancora eseguito")
+        pytest.skip("precompute not run yet")
 
     checked = 0
     for scene in json.loads(path.read_text()).get("scenes", []):
@@ -473,16 +473,16 @@ def test_every_demo_route_stays_in_normal_operation():
             if not entry.get("route_exists"):
                 continue
             c = entry.get("conditions") or {}
-            assert c, f"{scene['scene_id']}/{ice_class}: condizioni non misurate"
+            assert c, f"{scene['scene_id']}/{ice_class}: conditions not measured"
             assert c["fraction_no_go"] == 0.0, (
-                f"{scene['scene_id']}/{ice_class}: la rotta attraversa "
-                f"{100 * c['fraction_no_go']:.0f}% di celle vietate"
+                f"{scene['scene_id']}/{ice_class}: the route crosses "
+                f"{100 * c['fraction_no_go']:.0f}% forbidden cells"
             )
             assert c["rio_min"] is not None and c["rio_min"] >= 0, (
-                f"{scene['scene_id']}/{ice_class}: RIO minimo {c['rio_min']}"
+                f"{scene['scene_id']}/{ice_class}: minimum RIO {c['rio_min']}"
             )
             checked += 1
-    assert checked, "nessuna rotta verificata"
+    assert checked, "no route checked"
 
 
 def test_the_layer_that_decides_is_the_one_shown_first():
@@ -491,13 +491,13 @@ def test_the_layer_that_decides_is_the_one_shown_first():
     from iceroute.demo.app import LAYERS
 
     first = next(iter(LAYERS))
-    assert first.startswith("RIO"), f"il primo livello è {first!r}, non RIO"
-    assert LAYERS[first][1], "il livello RIO deve poter mostrare le rotte"
+    assert first.startswith("RIO"), f"the first layer is {first!r}, not RIO"
+    assert LAYERS[first][1], "the RIO layer must be able to show the routes"
 
 
 def test_concentration_is_available_as_its_own_layer():
     """Without it the demo can assert why the route is legal but not show it."""
     from iceroute.demo.app import LAYERS
 
-    assert "Concentrazione" in LAYERS
-    assert LAYERS["Concentrazione"] == ("sic", True)
+    assert "Concentration" in LAYERS
+    assert LAYERS["Concentration"] == ("sic", True)

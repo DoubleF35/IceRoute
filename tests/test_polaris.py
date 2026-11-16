@@ -1,4 +1,4 @@
-"""POLARIS tests — SPEC §8.2 requires hand-computed cases.
+"""POLARIS tests — checked against hand-computed cases.
 
 Every expected value below is worked out by hand from MSC.1/Circ.1519 Table 1.3
 and written into the test, so the test checks the implementation against the
@@ -24,7 +24,7 @@ from iceroute.routing.polaris import (
 )
 
 # The mapping from configs/data.yaml: always the most conservative column of
-# those a SOD class spans (DECISIONS.md D-008).
+# those a SOD class spans (docs/decisions.md D-008).
 MAPPING = {
     0: "ice_free",
     1: "new_ice",
@@ -71,7 +71,7 @@ def test_risk_never_increases_with_thicker_ice(table):
     for cls in table.ice_classes:
         values = [table.riv(cls, t) for t in table.ice_types]
         assert all(a >= b for a, b in zip(values, values[1:], strict=False)), (
-            f"{cls}: la riga non è monotona: {values}"
+            f"{cls}: the row is not monotonic: {values}"
         )
 
 
@@ -86,12 +86,12 @@ def test_stronger_class_is_never_worse(table):
 
 
 def test_every_class_has_a_source(table):
-    """SPEC rule 2: an unsourced value must be flagged, not used silently."""
+    """An unsourced value must be flagged, not used silently."""
     assert table.provisional_classes() == []
 
 
 def test_required_demo_classes_exist(table):
-    """SPEC §8.2: PC6, PC7 and a reinforced non-PC class."""
+    """The demo classes: PC6, PC7 and a reinforced non-PC class."""
     for cls in ("PC6", "PC7", "IA"):
         assert cls in table.ice_classes
 
@@ -102,14 +102,14 @@ def test_required_demo_classes_exist(table):
 
 
 def test_all_open_water_is_maximum_rio():
-    """SPEC §8.2 named case. 10/10 ice-free at RIV +3 gives RIO = 30."""
+    """Named case. 10/10 ice-free at RIV +3 gives RIO = 30."""
     sod = np.zeros((4, 4), dtype="uint8")
     rio = compute_rio(sod, "PC7", MAPPING)
     assert np.allclose(rio, 30.0)
 
 
 def test_old_ice_full_concentration_pc7_is_no_go():
-    """SPEC §8.2 named case.
+    """Named case.
 
     10/10 heavy multi-year ice, PC7: RIV = -3, so RIO = 10 * -3 = -30.
     That is below -10, hence special consideration: no-go.
@@ -156,7 +156,7 @@ def test_same_ice_different_class_changes_the_verdict():
 
 
 def test_missing_sic_assumes_full_concentration():
-    """SPEC §8.2: a known, declared limitation — the pessimistic assumption."""
+    """A known, declared limitation — the pessimistic assumption."""
     sod = np.full((2, 2), 4, dtype="uint8")
     without = compute_rio(sod, "PC6", MAPPING)
     with_full = compute_rio(sod, "PC6", MAPPING, sic=np.full((2, 2), 10, dtype="uint8"))

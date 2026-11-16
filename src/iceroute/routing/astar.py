@@ -1,10 +1,10 @@
-"""A* over the cost grid. SPEC §8.4.
+"""A* over the cost grid: least-time path for one ice class.
 
 Sixteen-connected, not eight. On an 8-connected grid the optimal path
 overestimates the true length of a diagonal route by about 8% — the
 digitisation error of restricting headings to multiples of 45 degrees — and on
 a demo whose whole point is a percentage saving, that error is larger than the
-effect being shown.
+effect being measured.
 
 Two things the obvious implementation gets wrong:
 
@@ -55,8 +55,8 @@ NEIGHBOURS_16 = NEIGHBOURS_8 + [
 class NoRouteFound(RuntimeError):
     """No passable path exists between the endpoints.
 
-    Not an error condition to hide: SPEC §8.4 makes this a scenario to show on
-    purpose — "with a 1A this route does not exist, with a PC6 it does".
+    Not an error condition to hide: it is a result worth showing on purpose —
+    "with a 1A this route does not exist, with a PC6 it does".
     """
 
     def __init__(self, message: str, *, expanded: int = 0, reason: str = ""):
@@ -83,7 +83,7 @@ class Route:
         return len(self.cells)
 
     def as_geojson(self, properties: dict | None = None) -> dict:
-        """GeoJSON LineString in WGS84, as SPEC §8.6 requires."""
+        """GeoJSON LineString in WGS84 (RFC 7946 coordinate order: lon, lat)."""
         props = {
             "ice_class": self.ice_class,
             "transit_time_hours": round(self.time_hours, 3),
@@ -106,8 +106,8 @@ class Route:
 
     def summary(self) -> str:
         return (
-            f"{self.ice_class}: {self.time_hours:.1f} h su {self.distance_km:.0f} km "
-            f"({len(self.cells)} celle, RIO minimo "
+            f"{self.ice_class}: {self.time_hours:.1f} h over {self.distance_km:.0f} km "
+            f"({len(self.cells)} cells, minimum RIO "
             f"{'—' if self.min_rio is None else f'{self.min_rio:.1f}'})"
         )
 
@@ -150,13 +150,13 @@ def find_route(
     passable = cost.passable
     spm = cost.seconds_per_metre
 
-    for name, (r, c) in (("partenza", start), ("arrivo", goal)):
+    for name, (r, c) in (("Start", start), ("Goal", goal)):
         if not (0 <= r < nrow and 0 <= c < ncol):
-            raise NoRouteFound(f"Punto di {name} fuori dalla griglia: ({r}, {c})", reason="bounds")
+            raise NoRouteFound(f"{name} point outside the grid: ({r}, {c})", reason="bounds")
         if not passable[r, c]:
             raise NoRouteFound(
-                f"Il punto di {name} ({r}, {c}) non è praticabile per una nave "
-                f"{cost.ice_class}: è terra o ghiaccio oltre il limite POLARIS.",
+                f"{name} point ({r}, {c}) is not navigable for a {cost.ice_class} "
+                f"vessel: it is land or ice beyond the POLARIS limit.",
                 reason="endpoint_blocked",
             )
 
@@ -205,8 +205,8 @@ def find_route(
         expanded += 1
         if expanded > max_expansions:
             raise NoRouteFound(
-                f"Superato il budget di espansioni ({max_expansions}). "
-                f"Griglia troppo grande o euristica inefficace.",
+                f"Expansion budget exceeded ({max_expansions}). "
+                f"Grid too large or heuristic ineffective.",
                 expanded=expanded,
                 reason="budget",
             )
@@ -238,8 +238,8 @@ def find_route(
                 heapq.heappush(open_heap, (tentative + heuristic(nr, nc), nflat))
     else:
         raise NoRouteFound(
-            f"Nessun percorso esistente per una nave {cost.ice_class} fra "
-            f"{start} e {goal}. Il ghiaccio o la terra bloccano ogni via.",
+            f"No path exists for a {cost.ice_class} vessel between "
+            f"{start} and {goal}. Ice or land blocks every way through.",
             expanded=expanded,
             reason="disconnected",
         )
@@ -273,7 +273,7 @@ def find_route(
     mean_speed = distance_m / (time_hours * 3600.0) / KNOT_TO_MS if time_hours > 0 else None
 
     log.info(
-        "rotta %s: %.1f h, %.0f km, %d celle, %d nodi espansi",
+        "route %s: %.1f h, %.0f km, %d cells, %d nodes expanded",
         cost.ice_class,
         time_hours,
         distance_m / 1000,

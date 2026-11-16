@@ -1,7 +1,7 @@
-"""SAR geometry to a regular EPSG:3413 grid. SPEC §8.1.
+"""SAR geometry to a regular EPSG:3413 grid.
 
-This is the step the spec calls the one that makes everything else wrong, so
-the reasoning is written out.
+If this step is wrong, everything downstream of it is wrong too, so the
+reasoning is written out.
 
 An AI4Arctic scene is in SAR geometry: a pixel is not a constant ground
 distance, and the grid is not north-aligned. Running A* on the raw array gives
@@ -19,12 +19,14 @@ Three things had to be established against the real data rather than assumed:
    array corners that the grid places on Greenland are exactly the corners
    where ``distance_map`` bottoms out, and the corners it places in the Fram
    Strait are where ``distance_map`` is high. A flipped interpretation would
-   anti-correlate. See DECISIONS.md D-009.
+   anti-correlate. See docs/decisions.md D-009.
 
 3. **Planar distance in EPSG:3413 is not ground distance.** The projection is
    true-scale at 70°N only; at 78°N the scale factor is 0.9806, so a planar
    measurement understates the real distance by 1.9%, and by 2.8% at 85°N. That
-   alone would fail the spec's 1% gate and would bias every transit time. Use
+   alone would fail the 1% distance-accuracy gate (scale-corrected planar
+   distance within 1% of the WGS84 geodesic, enforced in the tests) and would
+   bias every transit time. Use
    :func:`ground_distance_m`, never a bare hypot.
 """
 
@@ -142,9 +144,9 @@ class GeoGrid:
         """
         x, y = _to_polar(self.crs).transform(lon, lat)
         if not (self.x.min() - self.resolution_m <= x <= self.x.max() + self.resolution_m):
-            raise ValueError(f"Punto ({lon:.3f}, {lat:.3f}) fuori dalla griglia in x")
+            raise ValueError(f"Point ({lon:.3f}, {lat:.3f}) outside the grid in x")
         if not (self.y.min() - self.resolution_m <= y <= self.y.max() + self.resolution_m):
-            raise ValueError(f"Punto ({lon:.3f}, {lat:.3f}) fuori dalla griglia in y")
+            raise ValueError(f"Point ({lon:.3f}, {lat:.3f}) outside the grid in y")
         col = int(np.argmin(np.abs(self.x - x)))
         row = int(np.argmin(np.abs(self.y - y)))
         return row, col
@@ -170,7 +172,7 @@ def interpolate_gcp_grid(
 
     gh, gw = lat_gcp.shape
     if gh < 2 or gw < 2:
-        raise ValueError(f"Griglia GCP troppo piccola: {lat_gcp.shape}")
+        raise ValueError(f"GCP grid too small: {lat_gcp.shape}")
 
     x_gcp, y_gcp = _to_polar(crs).transform(lon_gcp, lat_gcp)
 
@@ -275,7 +277,7 @@ def geocode_scene(
         A loaded scene.
     resolution_m
         Target cell size. Default 500 m: the native 80 m is pointless for
-        routing and makes A* crawl (SPEC §8.1).
+        routing and makes A* crawl.
     subsample
         Take every n-th source pixel before resampling. ``None`` picks a factor
         that keeps the source about twice as dense as the target, which is
@@ -285,7 +287,7 @@ def geocode_scene(
         :attr:`GeocodedScene.extra`. This exists so a caller that wants, say,
         the SAR on the routing grid gets it from *this* call rather than
         rebuilding the grid itself — two grids built separately are two grids
-        that can disagree, which is D-027.
+        that can disagree, which is docs/decisions.md D-027.
     """
     from iceroute.data.loader import FILL_VALUE
 
@@ -310,7 +312,7 @@ def geocode_scene(
     valid &= sod != FILL_VALUE
 
     log.info(
-        "geocodifica %s: %dx%d @ %.0f m (sorgente %dx%d @ %.0f m, subsample %d) — %.1f%% coperto",
+        "geocoding %s: %dx%d @ %.0f m (source %dx%d @ %.0f m, subsample %d) — %.1f%% covered",
         scene.meta.scene_id,
         *grid.shape,
         resolution_m,
