@@ -1,0 +1,60 @@
+name: Pages
+
+# Rebuilds the live demo (console + frozen single-file demo) from the latest
+# release assets and publishes it to GitHub Pages.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+      - name: Install dependencies (CPU)
+        run: |
+          uv python install 3.11 && uv venv --python 3.11 .venv
+          TORCH=$(grep -E '^torch==' requirements.txt | cut -d= -f3)
+          VISION=$(grep -E '^torchvision==' requirements.txt | cut -d= -f3)
+          uv pip install --python .venv/bin/python \
+            "torch==${TORCH}" "torchvision==${VISION}" \
+            --index-url https://download.pytorch.org/whl/cpu
+          grep -vE '^(torch|torchvision|triton|nvidia-)' requirements.txt > /tmp/req-ci.txt
+          uv pip install --python .venv/bin/python -r /tmp/req-ci.txt
+          uv pip install --python .venv/bin/python -e . --no-deps
+      - name: Fetch demo bundle and weights
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          [ -n "$TAG" ] || TAG=$(gh release view --json tagName -q .tagName)
+          bash scripts/fetch_assets.sh "$TAG"
+      - name: Build site
+        run: make site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

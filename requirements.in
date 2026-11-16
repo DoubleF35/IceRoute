@@ -1,54 +1,55 @@
-# Sorgente delle dipendenze. NON è il file che viene installato.
+# Dependency source. This is NOT the file that gets installed.
 #
-#   requirements.in   (questo file, vincoli larghi, scritto a mano)
+#   requirements.in   (this file: loose constraints, hand-written)
 #        │
 #        │  uv pip compile requirements.in -o requirements.txt
 #        ▼
-#   requirements.txt  (pin esatti di TUTTO l'albero, generato)
+#   requirements.txt  (exact pins for the WHOLE tree, generated)
 #
-# La SPEC (regola 6) chiede pin esatti: un aggiornamento automatico che rompe
-# la demo il 6 ottobre è uno scenario da evitare per costruzione. Quindi si
-# installa sempre da requirements.txt, mai da questo file.
+# Exact pins on purpose: a transitive upgrade must never change a measured
+# number or break the offline demo behind our back. Always install from
+# requirements.txt, never from this file.
 
-# --- Deep learning ----------------------------------------------------------
-# torch: ruota Linux x86_64 da PyPI, che include già il runtime CUDA 12.x.
-# Verificato contro driver 595.84 (CUDA 13.2) su RTX 4050 Laptop 6 GB.
+# --- Deep learning -----------------------------------------------------------
+# torch: Linux x86_64 wheel from PyPI, which bundles the CUDA 12.x runtime.
+# Verified against driver 595.84 (CUDA 13.2) on an RTX 4050 Laptop, 6 GB.
+# CI installs the CPU wheel of the same version instead (see .github/workflows/ci.yml).
 torch==2.8.0
 torchvision==0.23.0
 
-# --- Dati scientifici -------------------------------------------------------
-numpy<2.0                 # pyresample e alcune ruote scientifiche sono ancora su ABI numpy 1.x
+# --- Scientific data ---------------------------------------------------------
+numpy<2.0                 # pyresample and some scientific wheels still build against the numpy 1.x ABI
 scipy
 xarray
 netCDF4
-h5netcdf                  # backend alternativo: alcune scene AI4Arctic sono HDF5 travestite
+h5netcdf                  # fallback backend: some AI4Arctic scenes are HDF5 in disguise
 scikit-image
-scikit-learn              # matrice di confusione, metriche, soglia baseline su HV
+scikit-learn              # confusion matrix, metrics, HV threshold baseline
 
-# --- Geospaziale ------------------------------------------------------------
-pyproj                    # trasformazioni CRS + Geod per il test di distanza geodetica
-pyresample                # ricampionamento su griglia EPSG:3413, nearest neighbour
-shapely                   # semplificazione rotta, geometrie
-rasterio                  # scrittura GeoTIFF dei raster RIO/mask
+# --- Geospatial --------------------------------------------------------------
+pyproj                    # CRS transforms + Geod for the geodesic distance check
+pyresample                # resampling onto the EPSG:3413 grid, nearest neighbour
+shapely                   # route simplification, geometry
+rasterio                  # GeoTIFF output of the RIO / mask rasters
 
-# --- Inferenza e quantizzazione --------------------------------------------
+# --- Inference and quantization ----------------------------------------------
 onnx
-onnxruntime               # CPU: è il punto — si dimostra INT8 senza GPU
+onnxruntime               # CPU on purpose: INT8 is demonstrated without a GPU
 
-# --- Demo -------------------------------------------------------------------
+# --- Demo --------------------------------------------------------------------
 streamlit
-pydeck                    # mappa; regge la proiezione polare meglio di folium
-folium                    # fallback se pydeck dà problemi sul portatile
+pydeck                    # map; handles the polar projection better than folium
+folium                    # fallback if pydeck misbehaves
 matplotlib
 pillow
 
-# --- Config e utility -------------------------------------------------------
+# --- Config and utilities ----------------------------------------------------
 pyyaml
 tqdm
-requests                  # download del dataset da Figshare
-psutil                    # RAM di picco durante l'inferenza (metrica §7.5)
+requests                  # dataset download from Figshare
+psutil                    # peak RAM during inference
 
-# --- Test e qualità ---------------------------------------------------------
+# --- Tests and quality -------------------------------------------------------
 pytest
 pytest-cov
 ruff

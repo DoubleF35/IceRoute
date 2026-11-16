@@ -1,7 +1,7 @@
-# IceRoute — orchestrazione. Ogni target è un gate della SPEC.
+# IceRoute — task runner.
 #
-# Regola: ogni target o fa la cosa, o fallisce con un messaggio che spiega
-# esattamente cosa manca. Mai un successo silenzioso su codice non implementato.
+# Rule: every target either does the thing, or fails with a message that says
+# exactly what is missing. Never a silent success on unimplemented code.
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -9,76 +9,84 @@ SHELL := /bin/bash
 
 VENV    := .venv
 PY      := $(VENV)/bin/python
-PIP     := $(VENV)/bin/pip
 PYTEST  := $(VENV)/bin/pytest
+RUFF    := $(VENV)/bin/ruff
 UV      := $(shell command -v uv 2>/dev/null)
 
-# Scena usata da `make inspect` se non se ne passa un'altra:
+# Scene used by `make inspect`:
 #   make inspect SCENE=data/raw/train/<file>.nc
 SCENE   ?=
 
-# Guardia: quasi tutti i target richiedono l'ambiente. `setup` no, ovviamente.
+# Release that `make fetch-demo` downloads the demo bundle and weights from.
+RELEASE ?= v1.0.0
+
+# Guard: almost every target needs the environment. `setup` obviously does not.
 define REQUIRE_VENV
 	@test -x $(PY) || { \
 		echo ""; \
-		echo "  L'ambiente virtuale non esiste ancora."; \
-		echo "  Esegui prima:  make setup"; \
+		echo "  The virtual environment does not exist yet."; \
+		echo "  Run first:  make setup"; \
 		echo ""; \
 		exit 1; \
 	}
 endef
 
 # ---------------------------------------------------------------------------
-# Aiuto
+# Help
 # ---------------------------------------------------------------------------
 
 .PHONY: help
 help:
 	@echo ""
-	@echo "  IceRoute — comandi disponibili"
+	@echo "  IceRoute — available targets"
 	@echo ""
-	@echo "  Ambiente"
-	@echo "    make setup        crea .venv (Python 3.11), installa le dipendenze pinnate,"
-	@echo "                      verifica CUDA  [Gate 0.1]"
+	@echo "  Environment"
+	@echo "    make setup        create .venv (Python 3.11), install pinned deps, check CUDA"
+	@echo "    make fetch-demo   download the demo bundle + model weights from GitHub Releases"
 	@echo ""
-	@echo "  Dati"
-	@echo "    make download     scarica il sottoinsieme AI4Arctic (ripartibile, in background)"
-	@echo "    make inspect      report su una scena   SCENE=data/raw/train/<file>.nc  [Gate 0.2]"
-	@echo "    make data         estrae e cachea le patch + statistiche  [Gate 1]"
+	@echo "  Data"
+	@echo "    make download     download the AI4Arctic subset (resumable)"
+	@echo "    make inspect      report on one scene   SCENE=data/raw/train/<file>.nc"
+	@echo "    make data         extract and cache training patches + statistics"
 	@echo ""
-	@echo "  Modello"
-	@echo "    make train        training U-Net"
-	@echo "    make eval         mIoU, IoU per classe, matrice di confusione, baseline"
-	@echo "    make quantize     export ONNX + INT8 + misure size/latenza/RAM  [Gate 2]"
+	@echo "  Model"
+	@echo "    make train        train the U-Net"
+	@echo "    make eval         mIoU, per-class IoU, confusion matrix, RIO error, baselines"
+	@echo "    make quantize     ONNX export + INT8 quantization + size/latency/RAM"
+	@echo "    make calibrate    temperature scaling + reliability diagram (ECE)"
+	@echo "    make risk         safety vs. accuracy curves for risk-aware decision rules"
 	@echo ""
-	@echo "  Rotte"
-	@echo "    make route        geocodifica + POLARIS + A* sulle scene demo  [Gate 3]"
+	@echo "  Routing"
+	@echo "    make route        geocoding + POLARIS + A* on the demo scenes"
 	@echo ""
-	@echo "  Demo e pitch"
-	@echo "    make precompute   genera data/demo/"
-	@echo "    make report       artifacts/metrics.json + figure per il deck"
-	@echo "    make demo         avvia la UI  [Gate 4]"
-	@echo "    make demo-static  congela la demo in demo.html: un file, zero dipendenze"
-	@echo "    make console      console.html: la stessa demo con globo e impronte reali"
-	@echo "    make present      modalità presentazione: una schermata per passo  [Demo Night]"
-	@echo "    make video        registra il video di backup 90s"
+	@echo "  Demo and reporting"
+	@echo "    make precompute   build data/demo/ (scenes, masks, routes, overlays)"
+	@echo "    make report       artifacts/metrics.json, figures, audit tables, static demo"
+	@echo "    make demo         Streamlit UI"
+	@echo "    make demo-static  freeze the demo into demo.html (one file, no dependencies)"
+	@echo "    make console      console.html: the same demo with a globe and real footprints"
+	@echo "    make site         assemble site/ for GitHub Pages (console as index)"
 	@echo ""
-	@echo "  Qualità"
-	@echo "    make test         pytest"
-	@echo "    make dashboard    rigenera index.html: stato del progetto nel browser"
-	@echo "    make status       a che punto siamo (file presenti, gate superati)"
-	@echo "    make backup       archivia cio che non sta in git e serve il 7 ottobre"
+	@echo "  Quality"
+	@echo "    make test         full test suite"
+	@echo "    make test-fast    tests that need neither downloaded data nor a GPU (= CI)"
+	@echo "    make lint         ruff check + format check"
+	@echo "    make format       ruff format + autofix"
+	@echo "    make dashboard    regenerate index.html: project status in the browser"
+	@echo "    make status       which stages are done and what is missing"
+	@echo "    make preflight    offline readiness check of every demo artifact"
+	@echo "    make backup       archive what is not in git (demo bundle, weights)"
 	@echo "    make all          data -> train -> eval -> quantize -> route -> precompute -> report"
 	@echo ""
 
 # ---------------------------------------------------------------------------
-# Ambiente  [Gate 0.1]
+# Environment
 # ---------------------------------------------------------------------------
 
 .PHONY: setup
 setup:
 	@test -n "$(UV)" || { \
-		echo "uv non trovato. Installalo con:  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		echo "uv not found. Install it with:  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		exit 1; \
 	}
 	uv python install 3.11
@@ -92,8 +100,12 @@ check-cuda:
 	$(REQUIRE_VENV)
 	@$(PY) scripts/check_env.py
 
+.PHONY: fetch-demo
+fetch-demo:
+	bash scripts/fetch_assets.sh $(RELEASE)
+
 # ---------------------------------------------------------------------------
-# Dati
+# Data
 # ---------------------------------------------------------------------------
 
 .PHONY: download
@@ -107,18 +119,18 @@ download-bg:
 	@mkdir -p artifacts/logs
 	@nohup $(PY) scripts/download_subset.py --config configs/data.yaml \
 		>> artifacts/logs/download.log 2>&1 & \
-		echo "Download avviato in background (PID $$!). Log: artifacts/logs/download.log"
+		echo "Download started in the background (PID $$!). Log: artifacts/logs/download.log"
 
 .PHONY: inspect
 inspect:
 	$(REQUIRE_VENV)
 	@test -n "$(SCENE)" || { \
 		echo ""; \
-		echo "  Serve una scena. Uso:"; \
+		echo "  A scene is required. Usage:"; \
 		echo "    make inspect SCENE=data/raw/train/<file>.nc"; \
 		echo ""; \
-		echo "  Scene disponibili:"; \
-		ls -1 data/raw/train/*.nc 2>/dev/null | head -5 || echo "    (nessuna: lancia prima 'make download')"; \
+		echo "  Available scenes:"; \
+		ls -1 data/raw/train/*.nc 2>/dev/null | head -5 || echo "    (none: run 'make download' first)"; \
 		echo ""; \
 		exit 1; \
 	}
@@ -130,7 +142,7 @@ data:
 	$(PY) -m iceroute.data.patches --config configs/data.yaml
 
 # ---------------------------------------------------------------------------
-# Modello
+# Model
 # ---------------------------------------------------------------------------
 
 .PHONY: train
@@ -149,8 +161,18 @@ quantize:
 	$(PY) -m iceroute.model.export --config configs/train.yaml
 	$(PY) -m iceroute.model.quantize --config configs/train.yaml
 
+.PHONY: calibrate
+calibrate:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.model.calibration --config configs/train3_lovasz.yaml
+
+.PHONY: risk
+risk:
+	$(REQUIRE_VENV)
+	$(PY) -m iceroute.model.risk --config configs/train3_lovasz.yaml
+
 # ---------------------------------------------------------------------------
-# Rotte
+# Routing
 # ---------------------------------------------------------------------------
 
 .PHONY: route
@@ -159,7 +181,7 @@ route:
 	$(PY) -m iceroute.routing.run --config configs/routing.yaml
 
 # ---------------------------------------------------------------------------
-# Demo e pitch
+# Demo and reporting
 # ---------------------------------------------------------------------------
 
 .PHONY: precompute
@@ -171,7 +193,7 @@ precompute:
 dashboard:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.report.dashboard
-	@echo "  Apri index.html nel browser."
+	@echo "  Open index.html in a browser."
 
 .PHONY: report
 report:
@@ -183,32 +205,29 @@ report:
 	$(PY) -m iceroute.report.dashboard
 	@$(MAKE) --no-print-directory demo-static
 
-# La demo congelata in un solo file. Non richiede Python, server o rete: è la
-# rete di sicurezza se `make demo` non parte il 7 ottobre.
+# The demo frozen into a single file: no Python, no server, no network.
 .PHONY: demo-static
 demo-static:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.web.standalone
 
-# Modalità presentazione: una schermata per passo, guidata da tastiera o
-# telecomando. Entry point separato — non tocca `make demo`, che resta la UI
-# completa. Vedi D-037.
 .PHONY: console
 console:
 	$(REQUIRE_VENV)
 	$(PY) -m iceroute.web.console
 	@echo ""
-	@echo "  Doppio clic su console.html. Trascina il globo, rotella per lo zoom."
+	@echo "  Double-click console.html. Drag the globe, scroll to zoom."
 	@echo ""
 
-.PHONY: present
-present:
-	$(REQUIRE_VENV)
-	$(PY) -m iceroute.report.present
-	@echo ""
-	@echo "  Apri present.html nel browser e premi F per lo schermo intero."
-	@echo "  → spazio PagGiù avanti · ← PagSu indietro · C classe nave · T timer · ? aiuto"
-	@echo ""
+# Static site for GitHub Pages: the console is the landing page, the frozen
+# demo sits next to it. Built locally or by .github/workflows/pages.yml.
+.PHONY: site
+site: console demo-static
+	rm -rf site && mkdir -p site
+	cp console.html site/index.html
+	cp demo.html site/demo.html
+	touch site/.nojekyll
+	@echo "  site/ ready ($$(du -sh site | cut -f1))."
 
 .PHONY: demo
 demo:
@@ -224,7 +243,7 @@ video:
 	bash scripts/record_demo.sh
 
 # ---------------------------------------------------------------------------
-# Qualità
+# Quality
 # ---------------------------------------------------------------------------
 
 .PHONY: test
@@ -232,13 +251,30 @@ test:
 	$(REQUIRE_VENV)
 	$(PYTEST) tests/ -v
 
+.PHONY: test-fast
+test-fast:
+	$(REQUIRE_VENV)
+	$(PYTEST) tests/ -q -m "not slow and not needs_data"
+
+.PHONY: lint
+lint:
+	$(REQUIRE_VENV)
+	$(RUFF) check .
+	$(RUFF) format --check .
+
+.PHONY: format
+format:
+	$(REQUIRE_VENV)
+	$(RUFF) check --fix .
+	$(RUFF) format .
+
 .PHONY: status
 status:
 	$(REQUIRE_VENV)
 	@$(PY) scripts/status.py
 
-# Da lanciare la mattina del 7 ottobre, con la rete staccata, dopo il riavvio —
-# e ogni volta che si rigenera un artefatto da qui a lì.
+# Run with the network unplugged after a reboot, and after regenerating any
+# artifact: it checks that the demo works from what is on disk.
 .PHONY: preflight
 preflight:
 	$(REQUIRE_VENV)
@@ -247,27 +283,26 @@ preflight:
 .PHONY: all
 all: data train eval quantize route precompute report
 	@echo ""
-	@echo "  Pipeline completa. Verifica artifacts/metrics.json prima del pitch."
+	@echo "  Full pipeline done. Check artifacts/metrics.json."
 	@echo ""
 
-# Gli artefatti che non stanno in git e che il 7 ottobre servono. Vedi README.
+# What is not in git and what the demo needs. See README, "Reproducing".
 .PHONY: backup
 backup:
 	@out=$$HOME/iceroute-backup-$$(date +%Y%m%d-%H%M).tar.gz; \
 	files=""; \
-	for f in data/demo demo.html present.html console.html artifacts/models artifacts/metrics.json artifacts/video; do \
+	for f in data/demo demo.html console.html artifacts/models artifacts/metrics.json; do \
 		[ -e "$$f" ] && files="$$files $$f"; \
 	done; \
 	tar czf "$$out" $$files; \
 	echo ""; \
 	echo "  $$out  ($$(du -h "$$out" | cut -f1))"; \
-	echo "  contiene:$$files"; \
+	echo "  contains:$$files"; \
 	echo ""; \
-	echo "  Ora copialo ALTROVE: chiavetta o cloud."; \
-	echo "  Un backup sullo stesso disco non è un backup."; \
+	echo "  Now copy it somewhere ELSE. A backup on the same disk is not a backup."; \
 	echo ""
 
 .PHONY: clean-cache
 clean-cache:
 	rm -rf data/processed/*
-	@echo "Cache patch svuotata. 'make data' la rigenera."
+	@echo "Patch cache cleared. 'make data' rebuilds it."

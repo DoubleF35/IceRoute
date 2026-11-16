@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use IceRoute in your work, please cite it as below."
+title: "IceRoute: on-board sea-ice segmentation and POLARIS-constrained Arctic routing"
+type: software
+authors:
+  - family-names: Fassio
+    given-names: Federico
+repository-code: "https://github.com/DoubleF35/IceRoute"
+license: MIT
+version: 1.0.0
+date-released: "2026-11-17"
+keywords:
+  - sea ice
+  - SAR
+  - Sentinel-1
+  - semantic segmentation
+  - INT8 quantization
+  - edge AI
+  - route planning
+  - POLARIS
+references:
+  - type: dataset
+    title: "AI4Arctic Sea Ice Challenge Dataset"
+    authors:
+      - name: "DTU Space and ESA Φ-lab"
+    doi: "10.11583/DTU.c.6244065"
+  - type: standard
+    title: "MSC.1/Circ.1519 — Guidance on methodologies for assessing operational capabilities and limitations in ice (POLARIS)"
+    authors:
+      - name: "International Maritime Organization"
+    year: 2016

@@ -8,45 +8,38 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# --- Data (large, reproducible via `make download`) --------------------------
+# --- Data (large; `make download` / `make fetch-demo` rebuild it) -----------
 data/raw/
 data/processed/
-
-# Demo bundle: gitignored because it is large, but it is the single most
-# important artifact to BACK UP before 7 October. See README "Backup".
+# Demo bundle (~18 MB): shipped as a GitHub Release asset, see `make fetch-demo`.
 data/demo/
 
 # --- Exploration ------------------------------------------------------------
-# SPEC rule 4: no notebooks on the main branch.
-notebooks/scratch/
+# No notebooks on main: everything that produces a number is a module + test.
+notebooks/
 
 # --- Generated artifacts ----------------------------------------------------
+# Weights are Release assets, not git blobs.
 artifacts/models/
 artifacts/figures/
 artifacts/video/
 artifacts/logs/
-artifacts/metrics.json
 artifacts/data_stats.json
+artifacts/inspect_*.json
+# artifacts/metrics.json IS versioned: it is the source of every number in the README.
 
 # Downloaded reference PDFs (dataset manual, IMO circulars). Not redistributable.
 docs/reference/*.pdf
 
+# Built pages: derived entirely from data/demo/ and artifacts/metrics.json.
+# `make site` rebuilds them; the Pages workflow publishes them.
+demo.html
+console.html
+index.html
+site/
 
 # --- OS / editor ------------------------------------------------------------
 .DS_Store
 *.swp
 .vscode/
 .idea/
-
-# Report di ispezione generati (il PNG di Gate 0.2 si rigenera con `make inspect`)
-artifacts/inspect_*.json
-
-# Copia statica della demo: 2,8 MB rigenerati da `make demo-static` a ogni
-# ricostruzione. Derivata al 100% da data/demo/ e artifacts/metrics.json, quindi
-# versionarla significherebbe un blob nuovo da 2,8 MB per ogni build.
-#
-# ATTENZIONE: è la rete di sicurezza del 7 ottobre. Non essendo in git va copiata
-# altrove a mano (chiavetta, mail a sé stessi) insieme a data/demo/.
-demo.html
-present.html
-console.html

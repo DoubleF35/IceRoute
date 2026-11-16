@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: ruff check
+        run: uvx ruff@0.16.5 check .
+      - name: ruff format --check
+        run: uvx ruff@0.16.5 format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+      - name: Set up Python 3.11
+        run: uv python install 3.11 && uv venv --python 3.11 .venv
+      - name: Install dependencies (CPU torch, same pinned versions)
+        run: |
+          # The pinned tree targets a CUDA workstation. CI runs on CPU: install the
+          # CPU wheels of the same torch/torchvision versions, then everything else
+          # exactly as pinned, minus the CUDA runtime packages.
+          TORCH=$(grep -E '^torch==' requirements.txt | cut -d= -f3)
+          VISION=$(grep -E '^torchvision==' requirements.txt | cut -d= -f3)
+          uv pip install --python .venv/bin/python \
+            "torch==${TORCH}" "torchvision==${VISION}" \
+            --index-url https://download.pytorch.org/whl/cpu
+          grep -vE '^(torch|torchvision|triton|nvidia-)' requirements.txt > /tmp/req-ci.txt
+          uv pip install --python .venv/bin/python -r /tmp/req-ci.txt
+          uv pip install --python .venv/bin/python -e . --no-deps
+      - name: Tests (no dataset, no GPU)
+        run: .venv/bin/python -m pytest -q -m "not slow and not needs_data" --durations=10
