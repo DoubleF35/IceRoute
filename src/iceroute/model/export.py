@@ -1,4 +1,4 @@
-"""Export the trained U-Net to ONNX. SPEC §7.5, first half.
+"""Export the trained U-Net to ONNX: the first half of quantization and export.
 
 ONNX is the handover format to the FPGA toolchain, so this step is not a
 formality: if the exported graph differs from the trained model, every number
@@ -87,7 +87,7 @@ def export_onnx(
         do_constant_folding=True,
         dynamo=False,
     )
-    log.info("ONNX fp32 scritto in %s (%.2f MB)", path, path.stat().st_size / 1024**2)
+    log.info("fp32 ONNX written to %s (%.2f MB)", path, path.stat().st_size / 1024**2)
     return path
 
 
@@ -162,21 +162,19 @@ def check_parity(
 
     passed = max_diff <= atol and disagree <= max_disagreement
     note = (
-        "Export fedele al modello addestrato."
+        "Export faithful to the trained model."
         if passed
         else (
-            f"Export NON fedele: differenza massima sui logit {max_diff:.2e} "
-            f"(tolleranza {atol:.0e}), {disagree:.4%} di pixel cambiano classe "
-            f"(tolleranza {max_disagreement:.4%}). Non usare questo file."
+            f"Export NOT faithful: maximum logit difference {max_diff:.2e} "
+            f"(tolerance {atol:.0e}), {disagree:.4%} of pixels change class "
+            f"(tolerance {max_disagreement:.4%}). Do not use this file."
         )
     )
     return ParityReport(max_diff, disagree, n_px, passed, note)
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(
-        description="Esporta il modello in ONNX fp32 e verifica la parità."
-    )
+    ap = argparse.ArgumentParser(description="Export the model to fp32 ONNX and verify parity.")
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=None)
@@ -194,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     tile = args.tile_size or int(cfg.get("eval", {}).get("tile_size", 256))
 
     if not ckpt_path.exists():
-        log.error("Checkpoint assente: %s. Lancia prima 'make train'.", ckpt_path)
+        log.error("Checkpoint missing: %s. Run 'make train' first.", ckpt_path)
         return 1
 
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
@@ -206,10 +204,10 @@ def main(argv: list[str] | None = None) -> int:
     parity = check_parity(model, out_path, in_channels=in_ch, tile_size=tile)
 
     log.info(
-        "parità: max |Δlogit| %.2e, pixel discordanti %.4f%% → %s",
+        "parity: max |Δlogit| %.2e, disagreeing pixels %.4f%% → %s",
         parity.max_abs_logit_diff,
         100 * parity.argmax_disagreement,
-        "OK" if parity.passed else "FALLITA",
+        "OK" if parity.passed else "FAILED",
     )
     if not parity.passed:
         log.error(parity.note)

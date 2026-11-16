@@ -90,7 +90,7 @@ def test_threshold_refuses_single_class_data():
     """No threshold separates ice from water when there is only ice."""
     hv = np.random.default_rng(0).normal(size=1000).astype("float32")
     sod = np.full(1000, 3, dtype="int64")
-    with pytest.raises(ValueError, match="tutti ghiaccio|tutta acqua"):
+    with pytest.raises(ValueError, match="all ice or all water"):
         fit_hv_threshold(hv, sod)
 
 
@@ -105,7 +105,7 @@ def test_threshold_refuses_empty_data():
 
 
 def test_scored_baseline_is_strong_on_binary_and_weak_on_six_classes():
-    """The central claim of §7.3, as an executable assertion.
+    """The central claim of the baseline comparison, as an executable assertion.
 
     A threshold can only ever emit two labels, so with four ice classes present
     its 6-class mIoU is structurally capped well below its binary accuracy.
@@ -136,7 +136,7 @@ def test_oracle_threshold_is_never_worse_than_a_fitted_one():
 
 
 def test_verdict_is_honest_when_the_threshold_wins_on_binary():
-    """SPEC rule 2 applied to a comparison: if the cheap baseline wins, say so."""
+    """Never-invent-numbers applied to a comparison: if the cheap baseline wins, say so."""
     cm = ConfusionMatrix(N_CLASSES)
     truth = np.array([0, 0, 1, 1, 4, 4, 5, 5])
     cm.update(truth, np.array([0, 1, 1, 1, 4, 4, 5, 5]))
@@ -151,7 +151,7 @@ def test_verdict_is_honest_when_the_threshold_wins_on_binary():
     out = threshold_verdict(cm, strong)
     assert set(out) >= {"delta_binary_accuracy", "delta_miou", "verdict"}
     if not out["unet_beats_threshold_on_binary"]:
-        assert "soglia ottimale è competitiva" in out["verdict"]
+        assert "optimal threshold is competitive" in out["verdict"]
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ def test_verdict_is_honest_when_the_threshold_wins_on_binary():
 def test_frozen_split_has_no_test_key():
     """Pins the contract that made evaluate.py crash on its own default.
 
-    SPEC §5.3 freezes train/val/demo only. Code that reaches for ``split["test"]``
+    configs/split.yaml freezes train/val/demo only. Code that reaches for ``split["test"]``
     raises KeyError the first time it runs against the real config — which is
     after training, i.e. hours in.
     """
@@ -172,7 +172,7 @@ def test_frozen_split_has_no_test_key():
 
     cfg = Path("configs/split.yaml")
     if not cfg.exists():
-        pytest.skip("split non ancora congelato")
+        pytest.skip("split not frozen yet")
     split = yaml.safe_load(cfg.read_text())["split"]
     assert set(split) - {"frozen", "seed", "note"} == {"train", "val", "demo"}
 
@@ -181,9 +181,9 @@ def test_reported_bias_is_never_silent():
     """Every split is biased or not, and the report must say which and how."""
     from iceroute.model.evaluate import report_bias
 
-    assert "OTTIMISTICA" in report_bias("val")
-    assert "scelte a mano" in report_bias("demo")
-    assert "NON DISTORTA" in report_bias("test_ufficiale")
+    assert "OPTIMISTIC" in report_bias("val")
+    assert "hand-picked" in report_bias("demo")
+    assert "UNBIASED" in report_bias("official_test")
 
 
 def test_reference_path_maps_a_scene_to_its_labels():
@@ -223,28 +223,28 @@ def test_missing_reference_file_raises_a_useful_error(tmp_path):
 @pytest.mark.skipif(
     not Path("data/raw/test").exists()
     or not any(Path("data/raw/test").glob("*_prep_reference.nc")),
-    reason="set di test ufficiale non scaricato",
+    reason="official test set not downloaded",
 )
 def test_official_test_scene_loads_with_external_labels():
     """End-to-end on the real files: scene from one, labels from another.
 
-    SPEC §5.4 — the variable names in the reference file were read off disk,
-    not taken from documentation. This is what keeps that true.
+    The variable names in the reference file were read off disk, not taken
+    from documentation (docs/decisions.md D-006). This is what keeps that true.
     """
     from iceroute.data.loader import load_config, load_scene
 
     ref = sorted(Path("data/raw/test").glob("*_prep_reference.nc"))[0]
     scene_path = ref.with_name(ref.name.replace("_prep_reference.nc", "_prep.nc"))
     if not scene_path.exists():
-        pytest.skip("scena corrispondente non scaricata")
+        pytest.skip("matching scene not downloaded")
 
     scene = load_scene(scene_path, load_config("configs/data.yaml"), labels_from=ref)
     assert scene.sod.shape == scene.hh.shape
-    assert scene.mask_valid.any(), "nessun pixel annotato nel file di riferimento"
+    assert scene.mask_valid.any(), "no annotated pixel in the reference file"
     assert set(np.unique(scene.sod[scene.mask_valid]).tolist()) <= set(range(6))
 
 
-def test_gate_warns_below_the_spec_thresholds():
+def test_gate_warns_below_the_acceptance_thresholds():
     cm = ConfusionMatrix(3)
     cm.update(np.array([0, 1, 2, 0, 1, 2]), np.array([0, 0, 0, 0, 0, 0]))
     warns = check_thresholds(cm, {"min_miou": 0.60, "min_binary_accuracy": 0.90})
@@ -263,11 +263,11 @@ def test_confusion_csv_round_trips_the_counts(tmp_path):
     cm = ConfusionMatrix(3)
     cm.update(np.array([0, 0, 1, 2]), np.array([0, 1, 1, 2]))
     path = tmp_path / "cm.csv"
-    write_confusion_csv(cm, path, {0: "Acqua", 1: "Nuovo", 2: "Vecchio"})
+    write_confusion_csv(cm, path, {0: "Water", 1: "New", 2: "Old"})
 
     lines = path.read_text().strip().splitlines()
-    assert lines[0].startswith("verita\\predizione")
-    assert lines[1].split(",")[:4] == ["Acqua", "1", "1", "0"]
+    assert lines[0].startswith("truth\\prediction")
+    assert lines[1].split(",")[:4] == ["Water", "1", "1", "0"]
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ def test_parity_check_is_not_fooled_by_a_different_model(tmp_path):
     other = _tiny_model(seed=1)  # same shape, different weights
     report = check_parity(other, path, in_channels=2, tile_size=64, n_samples=2)
     assert not report.passed
-    assert "NON fedele" in report.note
+    assert "NOT faithful" in report.note
 
 
 def test_parity_is_reproducible_under_load(tmp_path):
@@ -380,7 +380,7 @@ def test_calibration_reader_caps_at_the_dataset_size():
 
 
 def test_calibration_reader_refuses_an_empty_dataset():
-    with pytest.raises(ValueError, match="calibrazione"):
+    with pytest.raises(ValueError, match="calibration"):
         PatchCalibrationReader(_FakeDataset(0), 10, "input")
 
 

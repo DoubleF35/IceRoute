@@ -120,7 +120,7 @@ def test_tile_starts_cover_the_full_extent():
     for extent in (256, 300, 512, 1000, 1024):
         starts = tile_starts(extent, 256, 224)
         assert starts[0] == 0
-        assert starts[-1] + 256 == extent, f"ultima tile non a filo per extent={extent}"
+        assert starts[-1] + 256 == extent, f"last tile not flush with the edge for extent={extent}"
 
 
 def test_tile_starts_handles_an_extent_below_one_tile():

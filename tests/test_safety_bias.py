@@ -144,8 +144,8 @@ def test_choose_tau_refuses_to_relax_the_budget_silently():
         TradeOff(0.3, 0.465, 0.968, 0.250, 0.0007, 5.11, 1.8),
     ]
     tau, why = choose_tau(curve, max_unsafe=0.05)
-    assert "NESSUN punto" in why
-    assert "non allargato in silenzio" in why
+    assert "NO point" in why
+    assert "not widened in silence" in why
     assert tau == 0.3
 
 
@@ -157,7 +157,7 @@ def test_choose_tau_takes_the_least_conservative_feasible_point():
     ]
     tau, why = choose_tau(curve, max_unsafe=0.05)
     assert tau == 0.8
-    assert "entro il budget" in why
+    assert "within the budget" in why
 
 
 def test_choose_tau_will_not_pick_a_useless_map():
@@ -170,9 +170,9 @@ def test_choose_tau_will_not_pick_a_useless_map():
         TradeOff(0.1, 0.05, 0.30, 0.00, 0.90, 9.0, -8.0),
     ]
     tau, why = choose_tau(curve, max_unsafe=0.05, min_miou_ratio=0.80)
-    assert tau != 0.1, "ha scelto una mappa senza informazione pur di azzerare il rischio"
+    assert tau != 0.1, "picked a map with no information just to drive the risk to zero"
     assert tau == 1.0
-    assert "non allargato in silenzio" in why
+    assert "not widened in silence" in why
 
 
 def test_choose_tau_says_so_when_no_point_is_usable_at_all():
@@ -184,7 +184,7 @@ def test_choose_tau_says_so_when_no_point_is_usable_at_all():
     ]
     tau, why = choose_tau(curve, max_unsafe=0.05, min_miou_ratio=2.0)
     assert tau == 1.0
-    assert "problema è del modello" in why
+    assert "lies with the model" in why
 
 
 def test_choose_tau_on_an_empty_curve_falls_back_to_argmax():
@@ -196,5 +196,5 @@ def test_choose_tau_on_an_empty_curve_falls_back_to_argmax():
 def test_format_curve_is_readable():
     out = format_curve([TradeOff(1.0, 0.45, 0.97, 0.264, 0.0001, 5.70, 2.0)])
     assert "tau" in out
-    assert "PERMISSIVA" in out
+    assert "PERMISSIVE" in out
     assert "26.40%" in out

@@ -1,7 +1,7 @@
 """U-Net for sea ice stage-of-development segmentation.
 
-Constrained by SPEC §7.1. The constraints are not stylistic — each one exists
-because the target is an FPGA payload on a 2U CubeSat:
+The constraints are not stylistic — each one exists because the target is an
+FPGA payload on a CubeSat:
 
 * **< 2M parameters.** A project budget, not a suggestion. ``param_count()``
   is asserted in ``tests/test_unet.py``.
@@ -84,11 +84,11 @@ class UNetConfig:
     """Shape of the network. Mirrors the ``model:`` block of ``configs/train.yaml``.
 
     ``encoder_channels`` defaults to ``[16, 32, 64, 128]`` rather than the
-    ``[32, 64, 128, 256]`` that SPEC §7.1 suggests as a starting point. At base
-    32 the model comes out around 4.7M parameters, well over the 2M budget.
-    SPEC §7.1 prescribes the remedy explicitly — reduce base channels before
-    reducing depth — so the depth of 4 is preserved and the width is halved.
-    See DECISIONS.md D-005.
+    ``[32, 64, 128, 256]`` of the original design, which was only a starting
+    point. At base 32 the model comes out around 4.7M parameters, well over the
+    2M budget. The design rule fixed the remedy in advance — reduce base
+    channels before reducing depth — so the depth of 4 is preserved and the
+    width is halved. See docs/decisions.md D-005.
     """
 
     in_channels: int = 3  # hv, hh, incidence_angle
@@ -112,12 +112,12 @@ class UNet(nn.Module):
         if cfg is None:
             cfg = UNetConfig(**overrides)
         elif overrides:
-            raise TypeError("Passa un UNetConfig oppure i singoli parametri, non entrambi.")
+            raise TypeError("Pass either a UNetConfig or individual parameters, not both.")
         self.cfg = cfg
 
         enc_ch = list(cfg.encoder_channels)
         if len(enc_ch) < 2:
-            raise ValueError("Servono almeno due livelli di encoder.")
+            raise ValueError("At least two encoder levels are required.")
 
         # --- Encoder --------------------------------------------------------
         self.encoders = nn.ModuleList()
@@ -181,20 +181,20 @@ class UNet(nn.Module):
         """Approximate on-disk size. ``bytes_per_param=1`` for the INT8 estimate.
 
         This is an estimate for sanity-checking during design. The number that
-        goes in the pitch is the **measured** file size from
-        ``model/quantize.py`` — see SPEC §7.5.
+        gets quoted is the **measured** file size from ``model/quantize.py``
+        (docs/decisions.md D-014).
         """
         return self.param_count(trainable_only=False) * bytes_per_param / 1024**2
 
     def summary(self) -> str:
         n = self.param_count()
         budget = 2_000_000
-        status = "entro budget" if n < budget else "FUORI BUDGET"
+        status = "within budget" if n < budget else "OVER BUDGET"
         return (
-            f"UNet  in={self.cfg.in_channels}  classi={self.cfg.n_classes}  "
+            f"UNet  in={self.cfg.in_channels}  classes={self.cfg.n_classes}  "
             f"encoder={self.cfg.encoder_channels}  bottleneck={self.cfg.bottleneck_channels}\n"
-            f"  parametri: {n:,} / {budget:,} ({status})\n"
-            f"  fp32 ~{self.size_mb():.2f} MB · INT8 stimato ~{self.size_mb(1):.2f} MB"
+            f"  parameters: {n:,} / {budget:,} ({status})\n"
+            f"  fp32 ~{self.size_mb():.2f} MB · INT8 estimated ~{self.size_mb(1):.2f} MB"
         )
 
 
@@ -205,8 +205,7 @@ def build_model(cfg_dict: dict | None = None) -> UNet:
     unknown = set(cfg_dict) - known
     if unknown:
         raise ValueError(
-            f"Chiavi non riconosciute nella config del modello: {sorted(unknown)}. "
-            f"Ammesse: {sorted(known)}"
+            f"Unrecognised keys in the model config: {sorted(unknown)}. Allowed: {sorted(known)}"
         )
     return UNet(UNetConfig(**cfg_dict))
 

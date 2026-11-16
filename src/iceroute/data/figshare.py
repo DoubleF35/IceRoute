@@ -3,7 +3,8 @@
 The AI4Arctic dataset lives on ``data.dtu.dk``, a Figshare instance. This module
 knows how to list the files in an article and fetch them in a way that survives
 a dropped connection, because the download is the longest pole on the critical
-path (SPEC §12) and restarting a 40 GB transfer from zero is not an option.
+path (a slow or interrupted download blocks everything downstream) and restarting
+a 40 GB transfer from zero is not an option.
 
 Design notes
 ------------
@@ -89,7 +90,7 @@ def _get_json(url: str, *, params: dict | None = None) -> object:
             last_exc = exc
             wait = BACKOFF_BASE * (2**attempt)
             log.warning(
-                "GET %s fallita (tentativo %d/%d): %s — riprovo fra %.0fs",
+                "GET %s failed (attempt %d/%d): %s — retrying in %.0fs",
                 url,
                 attempt + 1,
                 MAX_RETRIES,
@@ -97,7 +98,7 @@ def _get_json(url: str, *, params: dict | None = None) -> object:
                 wait,
             )
             time.sleep(wait)
-    raise DownloadError(f"Impossibile leggere {url}: {last_exc}")
+    raise DownloadError(f"Cannot read {url}: {last_exc}")
 
 
 def list_collection_articles(collection_id: int) -> list[dict]:
@@ -107,7 +108,7 @@ def list_collection_articles(collection_id: int) -> list[dict]:
         params={"page_size": 100},
     )
     if not isinstance(out, list):
-        raise DownloadError(f"Risposta inattesa per la collection {collection_id}: {out!r}")
+        raise DownloadError(f"Unexpected response for collection {collection_id}: {out!r}")
     return out
 
 
@@ -121,7 +122,7 @@ def list_article_files(article_id: int) -> list[FigshareFile]:
             params={"page": page, "page_size": 1000},
         )
         if not isinstance(payload, list):
-            raise DownloadError(f"Risposta inattesa per l'articolo {article_id}: {payload!r}")
+            raise DownloadError(f"Unexpected response for article {article_id}: {payload!r}")
         if not payload:
             break
         files.extend(FigshareFile.from_api(item) for item in payload)
@@ -150,14 +151,14 @@ def _md5_of(path: Path) -> str:
 def verify(path: Path, expected_size: int, expected_md5: str | None) -> tuple[bool, str]:
     """Check a downloaded file. Returns ``(ok, reason)``."""
     if not path.exists():
-        return False, "assente"
+        return False, "missing"
     actual = path.stat().st_size
     if actual != expected_size:
-        return False, f"dimensione {actual} != attesa {expected_size}"
+        return False, f"size {actual} != expected {expected_size}"
     if expected_md5:
         digest = _md5_of(path)
         if digest != expected_md5:
-            return False, f"md5 {digest} != atteso {expected_md5}"
+            return False, f"md5 {digest} != expected {expected_md5}"
     return True, "ok"
 
 
@@ -187,9 +188,9 @@ def download_file(
     if final.exists():
         ok, reason = verify(final, spec.size, spec.md5)
         if ok:
-            log.info("già presente, salto: %s", spec.name)
+            log.info("already present, skipping: %s", spec.name)
             return final
-        log.warning("%s presente ma non valido (%s) — riscarico", spec.name, reason)
+        log.warning("%s present but invalid (%s) — downloading again", spec.name, reason)
         final.unlink()
 
     already = part.stat().st_size if part.exists() else 0
@@ -198,8 +199,8 @@ def download_file(
     avail = free_bytes(dest_dir)
     if avail - remaining < min_free_bytes:
         raise DiskSpaceError(
-            f"Spazio insufficiente per {spec.name}: servono {remaining / 1e9:.1f} GB, "
-            f"liberi {avail / 1e9:.1f} GB, soglia minima da mantenere "
+            f"Not enough space for {spec.name}: {remaining / 1e9:.1f} GB needed, "
+            f"{avail / 1e9:.1f} GB free, minimum to keep free "
             f"{min_free_bytes / 1e9:.1f} GB."
         )
 
@@ -207,7 +208,7 @@ def download_file(
         already = part.stat().st_size if part.exists() else 0
 
         if already > spec.size:
-            log.warning("%s: parziale più grande dell'atteso, riparto da zero", spec.name)
+            log.warning("%s: partial file larger than expected, restarting from zero", spec.name)
             part.unlink()
             already = 0
         if already == spec.size:
@@ -228,7 +229,7 @@ def download_file(
                 # anyway, appending would corrupt the result. Start over.
                 if already and resp.status_code == 200:
                     log.warning(
-                        "%s: il server ignora Range (200 invece di 206) — riparto da zero",
+                        "%s: server ignores Range (200 instead of 206) — restarting from zero",
                         spec.name,
                     )
                     resp.close()
@@ -263,7 +264,7 @@ def download_file(
         except Exception as exc:  # noqa: BLE001 — retry on anything transient
             wait = BACKOFF_BASE * (2**attempt)
             log.warning(
-                "%s: transfer interrotto (tentativo %d/%d): %s — riprovo fra %.0fs",
+                "%s: transfer interrupted (attempt %d/%d): %s — retrying in %.0fs",
                 spec.name,
                 attempt + 1,
                 MAX_RETRIES,
@@ -276,11 +277,11 @@ def download_file(
         if part.exists() and part.stat().st_size == spec.size:
             break
     else:
-        raise DownloadError(f"{spec.name}: esauriti i tentativi di download")
+        raise DownloadError(f"{spec.name}: download attempts exhausted")
 
     ok, reason = verify(part, spec.size, spec.md5)
     if not ok:
-        raise DownloadError(f"{spec.name}: verifica fallita dopo il download ({reason})")
+        raise DownloadError(f"{spec.name}: verification failed after download ({reason})")
 
     part.rename(final)
     return final

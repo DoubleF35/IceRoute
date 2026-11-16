@@ -77,11 +77,11 @@ def safety_biased_labels(
     one, and the whole point is to act on *relative* uncertainty.
     """
     if not 0.0 < tau <= 1.0:
-        raise ValueError(f"tau deve stare in (0, 1], non {tau}")
+        raise ValueError(f"tau must lie in (0, 1], not {tau}")
     if proba.ndim != 3:
-        raise ValueError(f"Attese (n_classes, H, W), ricevuto {proba.shape}")
+        raise ValueError(f"Expected (n_classes, H, W), got {proba.shape}")
     if len(riv) != proba.shape[0]:
-        raise ValueError(f"{len(riv)} risk value per {proba.shape[0]} classi: non corrispondono.")
+        raise ValueError(f"{len(riv)} risk values for {proba.shape[0]} classes: they do not match.")
 
     if tau == 1.0:
         return proba.argmax(axis=0).astype("uint8")
@@ -160,7 +160,7 @@ def sweep_tau(
                 n_classes=n_classes,
             )
         except ValueError as exc:
-            log.warning("tau=%.2f: errore RIO non calcolabile — %s", tau, exc)
+            log.warning("tau=%.2f: RIO error cannot be computed — %s", tau, exc)
             continue
         out.append(
             TradeOff(
@@ -194,7 +194,7 @@ def choose_tau(
     answer is plain argmax plus an explicit statement that it cannot be met.
     """
     if not curve:
-        return 1.0, "Nessuna curva misurata: resta argmax."
+        return 1.0, "No curve measured: staying with argmax."
 
     baseline = next((t for t in curve if t.tau == 1.0), curve[0])
     floor = baseline.miou * min_miou_ratio
@@ -204,30 +204,30 @@ def choose_tau(
     if feasible:
         best = max(feasible, key=lambda t: t.tau)
         return best.tau, (
-            f"tau={best.tau:g}: permissiva {best.unsafe_fraction:.2%} entro il budget "
+            f"tau={best.tau:g}: permissive {best.unsafe_fraction:.2%} within the budget "
             f"{max_unsafe:.0%}, mIoU {best.miou:.3f} ({best.miou / baseline.miou:.0%} "
-            f"di argmax). Cauta {best.overcautious_fraction:.2%}."
+            f"of argmax). Cautious {best.overcautious_fraction:.2%}."
         )
 
     if usable:
         safest = min(usable, key=lambda t: t.unsafe_fraction)
         return safest.tau, (
-            f"NESSUN punto rispetta la permissiva ≤ {max_unsafe:.0%} restando sopra "
-            f"mIoU {floor:.3f}. Il più cauto utilizzabile è tau={safest.tau:g}, "
-            f"permissiva {safest.unsafe_fraction:.2%}. Il budget va rinegoziato "
-            f"esplicitamente, non allargato in silenzio."
+            f"NO point keeps permissive ≤ {max_unsafe:.0%} while staying above "
+            f"mIoU {floor:.3f}. The most cautious usable one is tau={safest.tau:g}, "
+            f"permissive {safest.unsafe_fraction:.2%}. The budget must be renegotiated "
+            f"explicitly, not widened in silence."
         )
 
     return 1.0, (
-        f"Nessun punto della curva resta sopra mIoU {floor:.3f}: la regola di "
-        f"decisione non può recuperare la sicurezza senza distruggere la mappa. "
-        f"Resta argmax, e il problema è del modello, non della soglia."
+        f"No point on the curve stays above mIoU {floor:.3f}: the decision rule "
+        f"cannot recover safety without destroying the map. "
+        f"Staying with argmax; the problem lies with the model, not the threshold."
     )
 
 
 def format_curve(curve: list[TradeOff]) -> str:
     lines = [
-        f"  {'tau':>5}{'mIoU':>9}{'gh/acqua':>11}{'PERMISSIVA':>13}{'cauta':>9}{'RIO MAE':>10}"
+        f"  {'tau':>5}{'mIoU':>9}{'ice/water':>11}{'PERMISSIVE':>13}{'cautious':>9}{'RIO MAE':>10}"
     ]
     lines.append("  " + "-" * 57)
     for t in curve:

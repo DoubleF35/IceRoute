@@ -1,7 +1,7 @@
 """Extract and cache 256x256 training patches.
 
-SPEC §6.2. The sampling rule is the part of this file that decides how good the
-model gets, so it is worth stating plainly:
+The sampling rule is the part of this file that decides how good the model
+gets, so it is worth stating plainly:
 
 An Arctic scene is mostly open water or uniform ice. Sample it uniformly and
 the model learns to predict one class everywhere, which scores well on pixel
@@ -181,7 +181,7 @@ def allocate_uniform_quota(
 
     With ``balance="sampler"`` the answer is "all of them": the target margin
     fraction is achieved at training time by weighting the sampler instead of by
-    throwing data away. See DECISIONS.md D-017 — the discard route kept 14.7% of
+    throwing data away. See docs/decisions.md D-017 — the discard route kept 14.7% of
     the available patches and the model overfitted for lack of data while the
     ratio it was starved for was perfectly correct.
 
@@ -193,7 +193,7 @@ def allocate_uniform_quota(
     if balance == "sampler":
         return {s.scene_id: len(s.uniform) for s in scans}
     if balance != "discard":
-        raise ValueError(f"balance deve essere 'sampler' o 'discard', non {balance!r}")
+        raise ValueError(f"balance must be 'sampler' or 'discard', not {balance!r}")
 
     total_margin = sum(len(s.margin) for s in scans)
     total_uniform = sum(len(s.uniform) for s in scans)
@@ -299,7 +299,7 @@ def cache_scene(
 
     if stats.n_kept == 0:
         log.warning(
-            "%s: nessuna patch utilizzabile (annotato %.1f%%, candidate %d)",
+            "%s: no usable patch (annotated %.1f%%, candidates %d)",
             stem,
             100 * stats.valid_fraction,
             stats.n_candidates,
@@ -385,13 +385,13 @@ class PatchDataset:
             margin.append(np.load(fp) if fp.exists() else np.zeros(n, dtype="bool"))
 
         if missing:
-            log.warning("%d scene senza cache: %s", len(missing), ", ".join(missing[:5]))
+            log.warning("%d scenes without cache: %s", len(missing), ", ".join(missing[:5]))
 
         self.is_margin = np.concatenate(margin) if margin else np.zeros(0, dtype="bool")
         if not self._index:
             raise RuntimeError(
-                f"Nessuna patch in {self.cache_dir} per le {len(scene_ids)} scene richieste. "
-                f"Hai lanciato 'make data'?"
+                f"No patches in {self.cache_dir} for the {len(scene_ids)} requested scenes. "
+                f"Did you run 'make data'?"
             )
 
     def __len__(self) -> int:
@@ -438,7 +438,7 @@ class PatchDataset:
         if self.augment:
             # Flips and 90-degree rotations only. An arbitrary rotation would
             # interpolate a categorical target; colour jitter would alter a
-            # physical backscatter value. SPEC §6.2 forbids both.
+            # physical backscatter value. Both are excluded by design.
             if self._rng.random() < 0.5:
                 x, y, m = x[:, :, ::-1], y[:, ::-1], m[:, ::-1]
             if self._rng.random() < 0.5:
@@ -462,13 +462,13 @@ class PatchDataset:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Estrae e cachea le patch di training.")
+    ap = argparse.ArgumentParser(description="Extract and cache the training patches.")
     ap.add_argument("--config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--split", type=Path, default=None, help="default: da configs/data.yaml")
+    ap.add_argument("--split", type=Path, default=None, help="default: from configs/data.yaml")
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
     ap.add_argument("--out", type=Path, default=Path("data/processed"))
     ap.add_argument("--stats", type=Path, default=Path("artifacts/data_stats.json"))
-    ap.add_argument("--limit", type=int, default=None, help="processa solo le prime N scene")
+    ap.add_argument("--limit", type=int, default=None, help="process only the first N scenes")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -489,10 +489,10 @@ def main(argv: list[str] | None = None) -> int:
     absent = len(wanted) - len(present)
     if absent:
         log.warning(
-            "%d scene non ancora scaricate: le salto (rilancia dopo 'make download')", absent
+            "%d scenes not downloaded yet: skipping them (re-run after 'make download')", absent
         )
     if not present:
-        log.error("Nessuna scena disponibile in %s. Lancia prima 'make download'.", args.raw_dir)
+        log.error("No scene available in %s. Run 'make download' first.", args.raw_dir)
         return 1
 
     rng = np.random.default_rng(int(split.get("seed", 0)))
@@ -501,13 +501,13 @@ def main(argv: list[str] | None = None) -> int:
     # --- pass 1: classify -------------------------------------------------
     # Reads only the ice chart, so it is cheap enough to do over every scene
     # before committing to a selection.
-    log.info("Passata 1/2 — classificazione (%d scene)", len(present))
+    log.info("Pass 1/2 — classification (%d scenes)", len(present))
     scans: list[SceneScan] = []
     for i, sid in enumerate(present, 1):
         sc = scan_scene(args.raw_dir / sid, cfg)
         scans.append(sc)
         log.info(
-            "  [%d/%d] %-32s annotato %5.1f%%  margine %4d  uniformi %4d",
+            "  [%d/%d] %-32s annotated %5.1f%%  margin %4d  uniform %4d",
             i,
             len(present),
             sid,
@@ -521,14 +521,14 @@ def main(argv: list[str] | None = None) -> int:
     tm, tu = sum(len(s.margin) for s in scans), sum(quota.values())
     if balance == "sampler":
         log.info(
-            "Bilanciamento 'sampler': tengo tutte le %d patch valide. Il %.0f%% di "
-            "margine si ottiene pesando il campionamento in training, non buttando "
-            "dati (D-017).",
+            "Balance 'sampler': keeping all %d valid patches. The %.0f%% margin "
+            "fraction is reached by weighting the sampler during training, not by "
+            "throwing data away (D-017).",
             tm + tu,
             100 * target_margin,
         )
     log.info(
-        "Budget globale: %d con margine + %d uniformi = %d patch (%.0f%% margine, obiettivo %.0f%%)",
+        "Global budget: %d with margin + %d uniform = %d patches (%.0f%% margin, target %.0f%%)",
         tm,
         tu,
         tm + tu,
@@ -537,22 +537,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     if tm == 0:
         log.warning(
-            "NESSUNA patch con margine di ghiaccio in tutto il sottoinsieme. "
-            "Il criterio (>=%d classi, ciascuna >=%.0f%%) è troppo stretto per queste scene, "
-            "oppure le scene scaricate sono tutte a ghiaccio uniforme.",
+            "NO patch with an ice margin in the whole subset. "
+            "The criterion (>=%d classes, each >=%.0f%%) is too strict for these scenes, "
+            "or the downloaded scenes are all uniform ice.",
             cfg["patches"]["margin_criterion"]["min_classes"],
             100 * cfg["patches"]["margin_criterion"]["min_class_fraction"],
         )
 
     # --- pass 2: extract --------------------------------------------------
-    log.info("Passata 2/2 — estrazione")
+    log.info("Pass 2/2 — extraction")
     all_stats: list[PatchStats] = []
     for i, (sid, sc) in enumerate(zip(present, scans, strict=True), 1):
         scene = load_scene(args.raw_dir / sid, cfg)
         st = cache_scene(scene, cfg, args.out, rng, sc, quota.get(sc.scene_id, 0))
         all_stats.append(st)
         log.info(
-            "  [%d/%d] %-32s tenute %4d  (margine %d, uniformi %d)",
+            "  [%d/%d] %-32s kept %4d  (margin %d, uniform %d)",
             i,
             len(present),
             sid,
@@ -591,19 +591,19 @@ def main(argv: list[str] | None = None) -> int:
     args.stats.write_text(json.dumps(summary, indent=2))
 
     log.info("=" * 66)
-    log.info("Patch totali: %d da %d scene", n_kept, len(all_stats))
+    log.info("Total patches: %d from %d scenes", n_kept, len(all_stats))
     if n_kept:
         log.info(
-            "Con margine: %d (%.0f%%, obiettivo %.0f%%)",
+            "With margin: %d (%.0f%%, target %.0f%%)",
             n_margin,
             100 * n_margin / n_kept,
             100 * cfg["patches"]["margin_fraction_target"],
         )
-        log.info("Distribuzione classi sui pixel validi:")
+        log.info("Class distribution over valid pixels:")
         for k, v in sorted(total_counts.items()):
             bar = "█" * int(round(40 * v / grand))
             log.info("  %d %-12s %5.1f%%  %s", k, names.get(k, "?"), 100 * v / grand, bar)
-    log.info("Statistiche in %s", args.stats)
+    log.info("Statistics in %s", args.stats)
     return 0
 
 

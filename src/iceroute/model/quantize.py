@@ -1,11 +1,12 @@
-"""Post-training INT8 quantization and the measurements around it. SPEC §7.5.
+"""Post-training INT8 quantization and the measurements around it.
 
 This file exists to replace estimates with measurements. Every number it emits
 is read off a file on disk or a clock, never computed from a parameter count.
-That matters here more than anywhere else in the project: the pitch deck claims
-``58 KB INT8 weights``, which implies about 59,000 parameters, and the model has
-1,964,182. See DECISIONS.md A-02 — the number this script prints is the one that
-goes on the slide.
+That matters here more than anywhere else in the project: an early public
+estimate claimed ``58 KB INT8 weights``, which implies about 59,000 parameters,
+and the model has 1,964,182. See docs/decisions.md, *Early estimates vs.
+measurements*, A-02, and D-014 — the number this script prints is the one that
+gets quoted.
 
 What is measured, and how
 -------------------------
@@ -74,7 +75,7 @@ class PatchCalibrationReader:
         total = len(dataset)
         n = min(n_samples, total)
         if n == 0:
-            raise ValueError("Nessuna patch disponibile per la calibrazione.")
+            raise ValueError("No patch available for calibration.")
         idx = np.linspace(0, total - 1, n).astype(int)
         self._batches = [
             {input_name: np.asarray(dataset[int(i)][0], dtype="float32")[None]} for i in idx
@@ -111,7 +112,7 @@ def quantize_model(
         "percentile": CalibrationMethod.Percentile,
     }
     if method not in methods:
-        raise ValueError(f"Metodo di calibrazione sconosciuto: {method}. Usa {sorted(methods)}.")
+        raise ValueError(f"Unknown calibration method: {method}. Use one of {sorted(methods)}.")
 
     int8_path.parent.mkdir(parents=True, exist_ok=True)
     quantize_static(
@@ -125,7 +126,7 @@ def quantize_model(
         calibrate_method=methods[method],
     )
     log.info(
-        "INT8 scritto in %s (%.3f MB, calibrato su %d patch)",
+        "INT8 written to %s (%.3f MB, calibrated on %d patches)",
         int8_path,
         int8_path.stat().st_size / 1024**2,
         reader.n_samples,
@@ -386,13 +387,13 @@ def size_report(fp32_path: Path, int8_path: Path, n_parameters: int) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Quantizza in INT8 e misura size, latenza, mIoU.")
+    ap = argparse.ArgumentParser(description="Quantize to INT8 and measure size, latency, mIoU.")
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--fp32", type=Path, default=None)
     ap.add_argument("--int8", type=Path, default=None)
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
-    ap.add_argument("--scenes", type=int, default=2, help="scene intere per il confronto mIoU")
+    ap.add_argument("--scenes", type=int, default=2, help="whole scenes for the mIoU comparison")
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--skip-accuracy", action="store_true")
     args = ap.parse_args(argv)
@@ -410,8 +411,8 @@ def main(argv: list[str] | None = None) -> int:
     int8_path = args.int8 or Path(cfg["output"]["onnx_int8"])
     if not fp32_path.exists():
         log.error(
-            "ONNX fp32 assente: %s. Lancialo con 'make quantize', che esporta e poi "
-            "quantizza: se la parità dell'export fallisce, make si ferma lì.",
+            "fp32 ONNX missing: %s. Run 'make quantize', which exports and then "
+            "quantizes: if the export parity check fails, make stops there.",
             fp32_path,
         )
         return 1
@@ -425,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
     split = yaml.safe_load(split_file.read_text())["split"]
 
     # -- calibrate and quantize --------------------------------------------
-    log.info("Calibrazione su patch di training…")
+    log.info("Calibrating on training patches…")
     ds = PatchDataset(cfg["data"]["cache_dir"], split["train"], channels=channels, augment=False)
     sess = onnx_session(fp32_path)
     reader = PatchCalibrationReader(
@@ -452,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     s = report["size"]
     log.info(
-        "dimensioni: fp32 %.3f MB → int8 %.3f MB (%.1f KB), rapporto %.2f×, %.3f byte/parametro",
+        "size: fp32 %.3f MB → int8 %.3f MB (%.1f KB), ratio %.2f×, %.3f bytes/parameter",
         s["fp32_mb"],
         s["int8_mb"],
         s["int8_kb"],
@@ -475,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
         f = report["latency"][label]["fp32"]["median_ms_per_tile"]
         q = report["latency"][label]["int8"]["median_ms_per_tile"]
         log.info(
-            "latenza/tile (%s): fp32 %.1f ms → int8 %.1f ms (%.2f×)",
+            "latency/tile (%s): fp32 %.1f ms → int8 %.1f ms (%.2f×)",
             label,
             f,
             q,
@@ -483,17 +484,17 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # -- accuracy -----------------------------------------------------------
-    # No test split exists (SPEC §5.3); val is the non-training data we have.
+    # The frozen split has no test set; val is the non-training data we have.
     # For this particular comparison the selection bias does not matter: both
     # graphs are scored on identical pixels, so the *difference* is unaffected
     # even though each absolute mIoU is optimistic.
     scene_ids = [s for s in split["val"] if (args.raw_dir / s).exists()][: args.scenes]
     if args.skip_accuracy or not scene_ids:
         if not scene_ids and not args.skip_accuracy:
-            log.warning("Nessuna scena di test scaricata: salto il confronto di accuratezza.")
+            log.warning("No evaluation scene downloaded: skipping the accuracy comparison.")
         report["accuracy"] = {"skipped": True}
     else:
-        log.info("Confronto fp32 vs INT8 su %d scene intere…", len(scene_ids))
+        log.info("Comparing fp32 vs INT8 on %d whole scenes…", len(scene_ids))
         acc = compare_accuracy(
             fp32_path,
             int8_path,
@@ -508,25 +509,25 @@ def main(argv: list[str] | None = None) -> int:
         )
         report["accuracy"] = acc.as_dict()
         log.info(
-            "mIoU: fp32 %.4f → int8 %.4f, degrado %+.4f (soglia %.3f) → %s",
+            "mIoU: fp32 %.4f → int8 %.4f, degradation %+.4f (threshold %.3f) → %s",
             acc.fp32_miou,
             acc.int8_miou,
             -acc.miou_drop,
             acc.max_acceptable_drop,
-            "accettabile" if acc.acceptable else "OLTRE SOGLIA",
+            "acceptable" if acc.acceptable else "OVER THRESHOLD",
         )
         if not acc.acceptable:
             log.warning(
-                "Degrado oltre la soglia SPEC §7.5. L'opzione prevista è QAT con "
-                "Brevitas, fuori percorso critico: prima di prenderla, verificare "
-                "se il degrado si concentra su una classe sola."
+                "Degradation over the configured threshold. The planned option is "
+                "QAT with Brevitas, off the critical path: before taking it, check "
+                "whether the degradation is concentrated on a single class."
             )
 
     args.metrics.parent.mkdir(parents=True, exist_ok=True)
     existing = json.loads(args.metrics.read_text()) if args.metrics.exists() else {}
     existing["quantization"] = report
     args.metrics.write_text(json.dumps(existing, indent=2))
-    log.info("Misure in %s", args.metrics)
+    log.info("Measurements in %s", args.metrics)
 
     return 0
 

@@ -1,4 +1,4 @@
-"""Train the U-Net. SPEC §7.2.
+"""Train the U-Net.
 
 Constraints that shaped this file, all from the 6 GB of VRAM on the RTX 4050:
 
@@ -8,8 +8,8 @@ Constraints that shaped this file, all from the 6 GB of VRAM on the RTX 4050:
   says so in the log. Losing a night's training to an OOM at epoch 40 is a
   worse outcome than a slower epoch.
 * Logging goes to a CSV file. No cloud dependency: the demo laptop has to work
-  with the network card switched off, and a training run that phones home is
-  one more thing that can fail.
+  with the network switched off, and a training run that phones home is one
+  more thing that can fail.
 """
 
 from __future__ import annotations
@@ -44,7 +44,8 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     # Deterministic cuDNN would cost ~20% throughput for a reproducibility
-    # guarantee we do not need; the seed is logged, which is what SPEC §7.2 asks.
+    # guarantee we do not need; the seed is fixed and logged, which is what the
+    # training setup requires.
     torch.backends.cudnn.benchmark = True
 
 
@@ -118,7 +119,7 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
     train_scenes = list(split["train"])
     if train_cfg["data"].get("use_split_extra", False):
         # Extra scenes extend TRAIN only. Val and demo stay bit-for-bit the
-        # frozen split (SPEC §5.3), which is the whole reason the before/after
+        # frozen split (configs/split.yaml), which is the whole reason the before/after
         # comparison means anything: if the yardstick moved too, it would not.
         extra_path = Path("configs/split_extra.yaml")
         if extra_path.exists():
@@ -126,15 +127,15 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
             new = [s for s in extra if s not in set(train_scenes)]
             train_scenes += new
             log.info(
-                "Split esteso: %d scene di training (%d dal congelato + %d aggiuntive). "
-                "Val e demo invariate.",
+                "Extended split: %d training scenes (%d from the frozen split + %d extra). "
+                "Val and demo unchanged.",
                 len(train_scenes),
                 len(split["train"]),
                 len(new),
             )
         else:
             log.warning(
-                "use_split_extra attivo ma %s non esiste: uso il solo split congelato.",
+                "use_split_extra is on but %s does not exist: using the frozen split only.",
                 extra_path,
             )
 
@@ -150,7 +151,7 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
         cache, split["val"], channels=channels, augment=False, collapse_classes=collapse
     )
 
-    log.info("Patch: %d train, %d val — canali %s", len(train_ds), len(val_ds), channels)
+    log.info("Patches: %d train, %d val — channels %s", len(train_ds), len(val_ds), channels)
 
     common = {
         "num_workers": nw,
@@ -167,8 +168,8 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
     weights = train_ds.sampler_weights(target)
     if weights is None:
         log.warning(
-            "Nessun peso di campionamento (cache senza flag di margine, o un gruppo "
-            "vuoto): uso lo shuffle semplice. Il %.0f%% di margine NON è garantito.",
+            "No sampling weights (cache without margin flags, or an empty group): "
+            "using plain shuffling. The %.0f%% margin fraction is NOT guaranteed.",
             100 * target,
         )
         train_loader = DataLoader(train_ds, batch_size=bs, shuffle=True, drop_last=True, **common)
@@ -176,7 +177,7 @@ def build_loaders(data_cfg: dict, train_cfg: dict, split: dict) -> tuple[DataLoa
         from torch.utils.data import WeightedRandomSampler
 
         log.info(
-            "Campionamento pesato: %d patch in cache, %.1f%% con margine → target %.0f%% per batch",
+            "Weighted sampling: %d cached patches, %.1f%% with margin → target %.0f%% per batch",
             len(train_ds),
             100 * train_ds.margin_fraction(),
             100 * target,
@@ -252,10 +253,10 @@ def train_one_epoch(
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Training U-Net per segmentazione SOD.")
+    ap = argparse.ArgumentParser(description="Train the U-Net for SOD segmentation.")
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
-    ap.add_argument("--epochs", type=int, default=None, help="override, utile per smoke test")
+    ap.add_argument("--epochs", type=int, default=None, help="override, useful for a smoke test")
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--limit-batches", type=int, default=None, help="smoke test")
     args = ap.parse_args(argv)
@@ -278,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     set_seed(int(cfg["seed"]))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cpu":
-        log.warning("CUDA non disponibile: training su CPU, sarà lentissimo.")
+        log.warning("CUDA not available: training on CPU, it will be very slow.")
 
     n_classes = int(cfg["model"]["n_classes"])
     model = build_model(cfg["model"]).to(device)
@@ -288,12 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     criterion = build_loss(cfg, n_classes, stats_path).to(device)
     if criterion.class_weights.numel():
         log.info(
-            "Pesi di classe (da %s): %s",
+            "Class weights (from %s): %s",
             stats_path.name,
             np.round(criterion.class_weights.cpu().numpy(), 2).tolist(),
         )
     else:
-        log.warning("Nessun peso di classe: %s assente. Lancia 'make data'.", stats_path)
+        log.warning("No class weights: %s missing. Run 'make data'.", stats_path)
 
     train_loader, val_loader = build_loaders(data_cfg, cfg, split)
 
@@ -329,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         }
 
     log.info(
-        "Inizio: %d epoche, %d step/epoca, batch %d, AMP %s",
+        "Start: %d epochs, %d steps/epoch, batch %d, AMP %s",
         epochs,
         steps_per_epoch,
         tc["batch_size"],
@@ -358,8 +359,8 @@ def main(argv: list[str] | None = None) -> int:
         except torch.cuda.OutOfMemoryError:
             new_bs = max(1, int(tc["batch_size"]) // 2)
             log.error(
-                "OOM con batch %d → riduco a %d e riprovo. "
-                "ANNOTARE in DECISIONS.md: il batch effettivo non è quello in config.",
+                "OOM with batch %d → reducing to %d and retrying. "
+                "RECORD THIS in docs/decisions.md: the effective batch is not the one in the config.",
                 tc["batch_size"],
                 new_bs,
             )
@@ -405,7 +406,7 @@ def main(argv: list[str] | None = None) -> int:
             since_best += 1
 
         log.info(
-            "epoca %3d/%d  loss %.4f  val %.4f  mIoU %.4f  acc %.4f  gh/acqua %.4f  "
+            "epoch %3d/%d  loss %.4f  val %.4f  mIoU %.4f  acc %.4f  ice/water %.4f  "
             "lr %.2e  %.0fs  VRAM %.1f GB%s",
             epoch,
             epochs,
@@ -421,12 +422,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         if args.limit_batches:
-            log.info("--limit-batches: smoke test concluso.")
+            log.info("--limit-batches: smoke test finished.")
             break
 
         if since_best >= patience:
             log.info(
-                "Early stopping: %d epoche senza miglioramento (best %.4f all'epoca %d).",
+                "Early stopping: %d epochs without improvement (best %.4f at epoch %d).",
                 patience,
                 best_miou,
                 best_epoch,
@@ -435,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # --- final report -----------------------------------------------------
     log.info("=" * 66)
-    log.info("Miglior mIoU: %.4f (epoca %d) → %s", best_miou, best_epoch, ckpt_path)
+    log.info("Best mIoU: %.4f (epoch %d) → %s", best_miou, best_epoch, ckpt_path)
 
     _, cm = validate(model, val_loader, criterion, device, n_classes)
     print("\n" + cm.format_table(class_names) + "\n")
@@ -445,29 +446,30 @@ def main(argv: list[str] | None = None) -> int:
     min_bin = float(thresholds.get("min_binary_accuracy", 0.90))
     collapsed = bool(cfg["data"].get("collapse_classes", False))
     if collapsed:
-        # The 0.60 in SPEC §7.4 is a threshold on the SIX-class problem. Quoting
+        # The 0.60 acceptance threshold is a threshold on the SIX-class problem. Quoting
         # it against a three-class score would compare two different tasks, and
         # in the flattering direction. Whatever this run scores, it does not
         # clear that gate — it replaces it.
         log.warning(
-            "mIoU %.3f sullo schema RIDOTTO a 3 classi. Non è confrontabile con la "
-            "soglia SPEC §7.4 di %.2f, che vale per le 6 classi SOD: questo è un "
-            "problema diverso e più facile. Il ripiego §7.4 è già stato attivato, "
-            "quindi il numero da ridimensionare è quello nel pitch, non questo.",
+            "mIoU %.3f on the REDUCED 3-class scheme. It is not comparable with the "
+            "acceptance threshold of %.2f, which applies to the 6 SOD classes: this is a "
+            "different and easier problem. The 3-class fallback (docs/decisions.md D-020) "
+            "is already active, so what has to be scaled down is the public claim, not "
+            "this number.",
             best_miou,
             min_miou,
         )
     elif best_miou < min_miou:
         log.warning(
-            "mIoU %.3f sotto la soglia SPEC di %.2f. SPEC §7.4: se dopo 3 giorni non si "
-            "arriva, ridurre a binario ghiaccio/acqua + una classe di ghiaccio spesso, e "
-            "ridimensionare le affermazioni nel pitch. Non aggiustare il numero.",
+            "mIoU %.3f below the acceptance threshold of %.2f. Project rule: if it is not "
+            "reached after 3 days of attempts, reduce to binary ice/water + one thick-ice "
+            "class, and scale the public claims down accordingly. Do not adjust the number.",
             best_miou,
             min_miou,
         )
     if cm.binary_accuracy() < min_bin:
         log.warning(
-            "Accuratezza ghiaccio/acqua %.3f sotto la soglia di %.2f.",
+            "Ice/water accuracy %.3f below the threshold of %.2f.",
             cm.binary_accuracy(),
             min_bin,
         )
@@ -486,7 +488,7 @@ def main(argv: list[str] | None = None) -> int:
             indent=2,
         )
     )
-    log.info("Riepilogo in %s", summary_path)
+    log.info("Summary in %s", summary_path)
     return 0
 
 

@@ -105,7 +105,7 @@ class ConfusionMatrix:
             return np.where(denom > 0, 2 * tp / denom, np.nan)
 
     def binary_accuracy(self, water_class: int = 0) -> float:
-        """Ice vs water accuracy — SPEC §7.4 requires it separately from mIoU.
+        """Ice vs water accuracy — the acceptance criteria require it separately from mIoU.
 
         Collapses every ice class into one. It is the number a sceptical
         engineer will ask for, because a single threshold on HV already gets
@@ -172,7 +172,7 @@ class ConfusionMatrix:
             self.support(),
         )
         total = max(int(sup.sum()), 1)
-        lines = [f"  {'classe':<14}{'IoU':>8}{'F1':>8}{'recall':>8}{'supporto':>12}{'%':>7}"]
+        lines = [f"  {'class':<14}{'IoU':>8}{'F1':>8}{'recall':>8}{'support':>12}{'%':>7}"]
         lines.append("  " + "-" * 57)
         for i in range(self.n_classes):
             fmt = lambda v: "     —" if np.isnan(v) else f"{v:6.3f}"  # noqa: E731
@@ -182,11 +182,11 @@ class ConfusionMatrix:
             )
         lines.append("  " + "-" * 57)
         absent = self.n_classes_predicted_absent()
-        note = f", {absent} predette ma assenti" if absent else ""
+        note = f", {absent} predicted but absent" if absent else ""
         lines.append(
             f"  {'mIoU':<14}{self.miou():>8.3f}   "
-            f"(media su {self.n_classes_scored()}/{self.n_classes} classi con ground truth{note})"
+            f"(mean over {self.n_classes_scored()}/{self.n_classes} classes with ground truth{note})"
         )
-        lines.append(f"  {'accuratezza':<14}{self.accuracy():>8.3f}")
-        lines.append(f"  {'ghiaccio/acqua':<14}{self.binary_accuracy():>8.3f}")
+        lines.append(f"  {'accuracy':<14}{self.accuracy():>8.3f}")
+        lines.append(f"  {'ice/water':<14}{self.binary_accuracy():>8.3f}")
         return "\n".join(lines)

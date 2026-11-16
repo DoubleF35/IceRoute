@@ -85,7 +85,7 @@ def test_perfect_prediction_has_zero_error():
     assert err.unsafe_fraction == 0.0
     assert err.overcautious_fraction == 0.0
     assert err.exact_level_agreement == 1.0
-    assert "Nessun pixel" in err.notes[0]
+    assert "No pixel" in err.notes[0]
 
 
 def test_ignored_pixels_are_excluded():
@@ -99,7 +99,7 @@ def test_ignored_pixels_are_excluded():
 def test_all_ignored_raises_rather_than_returning_zero():
     """A metric of nothing must not read as a perfect score."""
     truth = _field(IGNORE_INDEX)
-    with pytest.raises(ValueError, match="Nessun pixel annotato"):
+    with pytest.raises(ValueError, match="No annotated pixel"):
         rio_error(truth, _field(OPEN_WATER), "PC6", MAPPING, table=TABLE, sic=_sic(10))
 
 
@@ -150,7 +150,7 @@ def test_predicting_safety_where_there_is_danger_is_unsafe():
     assert err.unsafe_fraction > 0.0
     assert err.overcautious_fraction == 0.0
     assert err.worst_unsafe_delta > 0
-    assert "sovrastima" in err.notes[0]
+    assert "overestimates" in err.notes[0]
 
 
 def test_level_confusion_rows_sum_to_the_pixel_count():
@@ -198,5 +198,5 @@ def test_the_weakest_vessel_is_never_the_most_forgiving():
 def test_summary_names_both_directions():
     err = rio_error(_field(OLD_ICE), _field(THICK_FYI), "PC6", MAPPING, table=TABLE, sic=_sic(10))
     text = err.summary()
-    assert "PERMISSIVA" in text
-    assert "cauta" in text
+    assert "PERMISSIVE" in text
+    assert "cautious" in text

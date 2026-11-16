@@ -1,7 +1,7 @@
 """Loss functions for masked multi-class segmentation.
 
-SPEC §7.2: cross-entropy with ``ignore_index`` for invalid pixels, plus Dice on
-the valid ones, with configurable weights.
+Cross-entropy with ``ignore_index`` for invalid pixels, plus Dice on the valid
+ones, with configurable weights.
 
 Why both. Cross-entropy optimises per-pixel likelihood and is dominated by
 whichever class covers the most area, which in an Arctic scene is usually a

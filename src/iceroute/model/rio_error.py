@@ -21,8 +21,8 @@ right metric for this project:
   safer than it is routes a ship into ice it cannot handle. Averaging the two
   into one number would hide precisely the failure that matters.
 
-This does **not** replace mIoU, and the SPEC §7.4 threshold on mIoU still
-stands. A model that scored perfectly here and badly on mIoU would be one whose
+This does **not** replace mIoU, and the 0.60 acceptance threshold on mIoU
+still stands. A model that scored perfectly here and badly on mIoU would be one whose
 errors happen to fall in operationally cheap places — worth knowing, not worth
 hiding. Both numbers get reported.
 """
@@ -45,7 +45,7 @@ from iceroute.routing.polaris import (
 log = logging.getLogger(__name__)
 
 # Operation level codes from classify_rio: 0 normal, 1 elevated, 2 special.
-LEVEL_NAMES = {0: "normale", 1: "rischio elevato", 2: "considerazione speciale", 3: "ignoto"}
+LEVEL_NAMES = {0: "normal", 1: "elevated risk", 2: "special consideration", 3: "unknown"}
 
 
 @dataclass
@@ -82,8 +82,8 @@ class RioError:
     def summary(self) -> str:
         return (
             f"{self.ice_class}: RIO MAE {self.rio_mae:.2f} (bias {self.rio_bias:+.2f}), "
-            f"decisione operativa corretta {self.exact_level_agreement:.1%}, "
-            f"PERMISSIVA {self.unsafe_fraction:.2%}, cauta {self.overcautious_fraction:.2%}"
+            f"correct operational decision {self.exact_level_agreement:.1%}, "
+            f"PERMISSIVE {self.unsafe_fraction:.2%}, cautious {self.overcautious_fraction:.2%}"
         )
 
 
@@ -114,7 +114,7 @@ def rio_error(
     if mask_valid is not None:
         valid &= np.asarray(mask_valid, dtype=bool)
     if not valid.any():
-        raise ValueError("Nessun pixel annotato: l'errore su RIO non è definito.")
+        raise ValueError("No annotated pixel: the RIO error is undefined.")
 
     rio_true = compute_rio(
         truth_sod,
@@ -137,7 +137,7 @@ def rio_error(
 
     both = valid & np.isfinite(rio_true) & np.isfinite(rio_pred)
     if not both.any():
-        raise ValueError("Nessun pixel con RIO definito su entrambe le mappe.")
+        raise ValueError("No pixel with a defined RIO on both maps.")
 
     t, p = rio_true[both], rio_pred[both]
     delta = p - t
@@ -157,12 +157,12 @@ def rio_error(
     if unsafe.any():
         worst = float(delta[unsafe].max())
         notes.append(
-            f"Nel caso peggiore il modello sovrastima il RIO di {worst:.1f} punti: "
-            f"è la distanza fra una cella dichiarata percorribile e la realtà."
+            f"In the worst case the model overestimates the RIO by {worst:.1f} points: "
+            f"that is the distance between a cell declared navigable and reality."
         )
     else:
         worst = 0.0
-        notes.append("Nessun pixel è stato classificato come meno pericoloso del vero.")
+        notes.append("No pixel was classified as less dangerous than the truth.")
 
     return RioError(
         ice_class=ice_class,
@@ -250,9 +250,9 @@ def evaluate_all_classes(
             list(pair) for pair in free_confusions(sod_to_polaris, ice_classes, table=table)
         ],
         "note": (
-            "unsafe_fraction = frazione di pixel che il modello colloca in un livello "
-            "operativo MENO restrittivo del vero. È l'errore che porta una nave dentro "
-            "ghiaccio che POLARIS le vieta, ed è l'unico asimmetrico: essere troppo "
-            "cauti costa tempo, essere troppo permissivi costa la nave."
+            "unsafe_fraction = fraction of pixels the model places in an operational "
+            "level LESS restrictive than the truth. It is the error that takes a ship "
+            "into ice POLARIS forbids for it, and the only asymmetric one: being too "
+            "cautious costs time, being too permissive costs the ship."
         ),
     }

@@ -1,6 +1,7 @@
 """Inspect one AI4Arctic netCDF scene and report what is actually inside it.
 
-SPEC §5.4 is explicit: *do not trust the variable names in the spec*. This module
+The project rule is explicit: *do not trust variable names copied from
+documentation*, verify them on the file (docs/decisions.md D-006). This module
 exists to find the real ones. It assumes nothing about naming — it enumerates
 every variable, classifies each by heuristic, and prints statistics that ignore
 fill values.
@@ -10,8 +11,8 @@ Usage
     make inspect SCENE=data/raw/train/<file>.nc
     python -m iceroute.data.inspect <file.nc> --figure out.png --json out.json
 
-The output feeds ``configs/data.yaml``. SPEC rule: if a name differs from what
-the spec assumed, update the config, never the code.
+The output feeds ``configs/data.yaml``. Rule: if a name differs from what was
+assumed, update the config, never the code.
 """
 
 from __future__ import annotations
@@ -195,11 +196,11 @@ def print_report(rep: dict) -> None:
     print("=" * 100)
 
     if rep["global_attrs"]:
-        print(f"\n{BOLD}Attributi globali{RESET}")
+        print(f"\n{BOLD}Global attributes{RESET}")
         for k, v in rep["global_attrs"].items():
             print(f"  {k:<28} {DIM}{v}{RESET}")
 
-    print(f"\n{BOLD}Dimensioni{RESET}")
+    print(f"\n{BOLD}Dimensions{RESET}")
     print("  " + "  ".join(f"{k}={v}" for k, v in rep["dimensions"].items()))
 
     by_role: dict[str, list[dict]] = {}
@@ -223,13 +224,13 @@ def print_report(rep: dict) -> None:
             continue
         print(f"\n{BOLD}{role.upper()}{RESET}  {DIM}({len(items)}){RESET}")
         print(
-            f"  {'variabile':<30} {'shape':<18} {'dtype':<9} {'mask%':>7} "
+            f"  {'variable':<30} {'shape':<18} {'dtype':<9} {'mask%':>7} "
             f"{'min':>10} {'max':>10} {'mean':>10}"
         )
         print("  " + "-" * 96)
         for v in items:
             if "error" in v:
-                print(f"  {v['name']:<30} {YELLOW}errore: {v['error']}{RESET}")
+                print(f"  {v['name']:<30} {YELLOW}error: {v['error']}{RESET}")
                 continue
             shape = "×".join(str(s) for s in v["shape"])
             fmt = lambda x: f"{x:>10.3f}" if isinstance(x, float) else f"{'—':>10}"  # noqa: E731
@@ -243,12 +244,12 @@ def print_report(rep: dict) -> None:
             )
             if v.get("unique_values") is not None:
                 vals = ", ".join(f"{u:g}" for u in v["unique_values"])
-                print(f"    {DIM}livelli ({v['n_unique']}): {vals}{RESET}")
+                print(f"    {DIM}levels ({v['n_unique']}): {vals}{RESET}")
             elif v.get("n_unique") is not None:
-                print(f"    {DIM}valori distinti: {v['n_unique']}{RESET}")
+                print(f"    {DIM}distinct values: {v['n_unique']}{RESET}")
 
     if not by_role.get("target"):
-        print(f"\n  {YELLOW}Nessuna variabile classificata come target.{RESET}")
+        print(f"\n  {YELLOW}No variable classified as target.{RESET}")
 
 
 def check_coherence(rep: dict) -> list[str]:
@@ -271,9 +272,9 @@ def check_coherence(rep: dict) -> list[str]:
     for v in sar:
         if v["pct_exact_zero"] > 5.0:
             warnings.append(
-                f"{v['name']}: {v['pct_exact_zero']:.1f}% dei pixel è esattamente 0.0 e NON è "
-                f"marcato come mancante. È padding dello swath, non backscatter. "
-                f"Va escluso con la maschera del target, mai usato per statistiche."
+                f"{v['name']}: {v['pct_exact_zero']:.1f}% of the pixels are exactly 0.0 and are "
+                f"NOT marked as missing. This is swath padding, not backscatter. "
+                f"It must be excluded with the target mask, never used for statistics."
             )
 
     # If the SAR padding and the target's invalid region coincide, then masking
@@ -285,21 +286,21 @@ def check_coherence(rep: dict) -> list[str]:
             delta = abs(sar_zero - tgt_masked)
             if delta < 1.0:
                 warnings.append(
-                    f"Padding SAR ({sar_zero:.1f}%) e invalidi del target ({tgt_masked:.1f}%) "
-                    f"coincidono: mascherare sul target è sufficiente."
+                    f"SAR padding ({sar_zero:.1f}%) and invalid target pixels ({tgt_masked:.1f}%) "
+                    f"coincide: masking on the target is sufficient."
                 )
             else:
                 warnings.append(
-                    f"ATTENZIONE: padding SAR {sar_zero:.1f}% ma invalidi del target "
-                    f"{tgt_masked:.1f}% — NON coincidono (scarto {delta:.1f} punti). "
-                    f"Mascherare sul solo target lascerebbe passare padding come dato."
+                    f"WARNING: SAR padding {sar_zero:.1f}% but invalid target pixels "
+                    f"{tgt_masked:.1f}% — they do NOT coincide (gap {delta:.1f} points). "
+                    f"Masking on the target alone would let padding through as data."
                 )
 
     for v in targets:
         if v["pct_masked"] > 90.0:
             warnings.append(
-                f"{v['name']}: solo il {100 - v['pct_masked']:.1f}% della scena è annotato. "
-                f"Poche patch utilizzabili."
+                f"{v['name']}: only {100 - v['pct_masked']:.1f}% of the scene is annotated. "
+                f"Few usable patches."
             )
 
     return warnings
@@ -337,7 +338,7 @@ def print_histograms(hists: dict[str, dict[int, int]]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Figure — Gate 0.2 requires HH, HV and the SOD chart side by side
+# Figure — HH, HV and the SOD chart side by side, for a visual coherence check
 # ---------------------------------------------------------------------------
 
 
@@ -403,14 +404,14 @@ def make_figure(path: Path, rep: dict, out_png: Path, downsample: int = 4) -> bo
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("scene", type=Path, help="percorso del file netCDF")
-    ap.add_argument("--figure", type=Path, default=None, help="salva un PNG di confronto")
-    ap.add_argument("--json", type=Path, default=None, help="salva il report in JSON")
+    ap.add_argument("scene", type=Path, help="path to the netCDF file")
+    ap.add_argument("--figure", type=Path, default=None, help="save a side-by-side comparison PNG")
+    ap.add_argument("--json", type=Path, default=None, help="save the report as JSON")
     ap.add_argument("--max-unique", type=int, default=32)
     args = ap.parse_args(argv)
 
     if not args.scene.exists():
-        print(f"File non trovato: {args.scene}", file=sys.stderr)
+        print(f"File not found: {args.scene}", file=sys.stderr)
         return 1
 
     rep = inspect_scene(args.scene, max_unique=args.max_unique)
@@ -419,9 +420,9 @@ def main(argv: list[str] | None = None) -> int:
     issues = check_coherence(rep)
     rep["coherence_warnings"] = issues
     if issues:
-        print(f"\n{BOLD}Coerenza{RESET}")
+        print(f"\n{BOLD}Coherence{RESET}")
         for w in issues:
-            colour = YELLOW if w.startswith("ATTENZIONE") else DIM
+            colour = YELLOW if w.startswith("WARNING") else DIM
             print(f"  {colour}·{RESET} {w}")
 
     targets = [v["name"] for v in rep["variables"] if v.get("role") == "target"]
@@ -437,13 +438,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.figure:
         if make_figure(args.scene, rep, args.figure):
-            print(f"{GREEN}Figura:{RESET} {args.figure}")
+            print(f"{GREEN}Figure:{RESET} {args.figure}")
         else:
-            print(f"{YELLOW}Nessuna variabile 2D adatta alla figura.{RESET}")
+            print(f"{YELLOW}No 2D variable suitable for the figure.{RESET}")
 
     print(
-        f"\n{DIM}Prossimo passo: riportare questi nomi in configs/data.yaml. "
-        f"Se un nome differisce dalla SPEC, si aggiorna la config, non il codice.{RESET}\n"
+        f"\n{DIM}Next step: copy these names into configs/data.yaml. "
+        f"If a name differs from what was assumed, update the config, not the code.{RESET}\n"
     )
     return 0
 

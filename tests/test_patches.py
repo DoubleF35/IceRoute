@@ -1,4 +1,4 @@
-"""Tests for the patch pipeline — SPEC Gate 1.
+"""Tests for the patch pipeline and the data-stage acceptance gate.
 
 Three of these guard invariants that, if broken, produce a model that trains
 without error and is quietly wrong:
@@ -6,7 +6,7 @@ without error and is quietly wrong:
 * a target pixel carrying the fill value while its mask says "valid" would feed
   class id 255 to CrossEntropy;
 * a scene appearing in both train and val inflates mIoU and the inflation is
-  invisible until demo day;
+  invisible until the model meets a scene it has never seen;
 * augmentation that interpolates a categorical target invents classes that were
   never in the chart.
 """
@@ -160,27 +160,27 @@ def test_unknown_balance_mode_is_rejected():
 
 
 def test_split_has_no_scene_overlap():
-    """SPEC §5.3: split per scene, never per patch.
+    """Split per scene, never per patch.
 
     Patches of one scene in both train and val leak, and produce metrics that
-    look excellent right up until the demo.
+    look excellent right up until the model is used on new scenes.
     """
     split_path = REPO / "configs" / "split.yaml"
     if not split_path.exists():
-        pytest.skip("split non ancora congelato")
+        pytest.skip("split not frozen yet")
     split = yaml.safe_load(split_path.read_text())["split"]
 
     train, val, demo = set(split["train"]), set(split["val"]), set(split["demo"])
-    assert not train & val, f"scene in train e val: {sorted(train & val)}"
-    assert not train & demo, f"scene in train e demo: {sorted(train & demo)}"
-    assert not val & demo, f"scene in val e demo: {sorted(val & demo)}"
+    assert not train & val, f"scenes in both train and val: {sorted(train & val)}"
+    assert not train & demo, f"scenes in both train and demo: {sorted(train & demo)}"
+    assert not val & demo, f"scenes in both val and demo: {sorted(val & demo)}"
     assert len(train) + len(val) + len(demo) == len(train | val | demo)
 
 
 def test_split_is_frozen():
     split_path = REPO / "configs" / "split.yaml"
     if not split_path.exists():
-        pytest.skip("split non ancora congelato")
+        pytest.skip("split not frozen yet")
     assert yaml.safe_load(split_path.read_text())["split"]["frozen"] is True
 
 
@@ -188,12 +188,12 @@ def test_polaris_mapping_covers_every_class():
     """Every SOD class the model can emit must map to a POLARIS column.
 
     An unmapped class means polaris.py has no risk value for a pixel the model
-    predicts — the joint between model and routing, SPEC §6.3.
+    predicts — and this mapping is the joint between model and routing (D-008).
     """
     cfg = load_config(REPO / "configs" / "data.yaml")
     classes = {int(k) for k in cfg["sod_classes"] if int(k) != FILL_VALUE}
     mapped = {int(k) for k in cfg["sod_to_polaris"]}
-    assert classes == mapped, f"classi senza mappatura POLARIS: {sorted(classes - mapped)}"
+    assert classes == mapped, f"classes without a POLARIS mapping: {sorted(classes - mapped)}"
 
     import csv
 
@@ -201,7 +201,7 @@ def test_polaris_mapping_covers_every_class():
         rows = [r for r in csv.reader(fh) if r and not r[0].startswith("#")]
     columns = set(rows[0])
     unknown = set(cfg["sod_to_polaris"].values()) - columns
-    assert not unknown, f"colonne inesistenti in polaris_rv.csv: {sorted(unknown)}"
+    assert not unknown, f"columns that do not exist in polaris_rv.csv: {sorted(unknown)}"
 
 
 # ---------------------------------------------------------------------------
@@ -209,18 +209,18 @@ def test_polaris_mapping_covers_every_class():
 # ---------------------------------------------------------------------------
 
 _cached = sorted(CACHE.glob("*_x.npy"))
-needs_cache = pytest.mark.skipif(not _cached, reason="cache patch assente: lancia 'make data'")
+needs_cache = pytest.mark.skipif(not _cached, reason="patch cache missing: run 'make data'")
 
 
 @needs_cache
 def test_fill_value_always_matches_the_mask():
-    """SPEC Gate 1: no target pixel may be FILL_VALUE while marked valid."""
+    """No target pixel may be FILL_VALUE while marked valid."""
     for xp in _cached[:5]:
         stem = xp.name[:-6]
         y = np.load(CACHE / f"{stem}_y.npy", mmap_mode="r")
         m = np.load(CACHE / f"{stem}_m.npy", mmap_mode="r")
         y_valid = np.asarray(y)[np.asarray(m)]
-        assert not (y_valid == FILL_VALUE).any(), f"{stem}: FILL_VALUE su pixel valido"
+        assert not (y_valid == FILL_VALUE).any(), f"{stem}: FILL_VALUE on a valid pixel"
 
 
 @needs_cache
@@ -229,7 +229,7 @@ def test_labels_are_in_range():
         stem = xp.name[:-6]
         y = np.asarray(np.load(CACHE / f"{stem}_y.npy", mmap_mode="r"))
         m = np.asarray(np.load(CACHE / f"{stem}_m.npy", mmap_mode="r"))
-        assert y[m].max() <= 5, f"{stem}: classe fuori range"
+        assert y[m].max() <= 5, f"{stem}: class out of range"
 
 
 @needs_cache
@@ -237,7 +237,7 @@ def test_no_nan_in_cached_inputs():
     """NaN in the input propagates to the loss and destroys a training run."""
     for xp in _cached[:5]:
         x = np.asarray(np.load(xp, mmap_mode="r"))
-        assert np.isfinite(x).all(), f"{xp.name}: NaN o inf nella cache"
+        assert np.isfinite(x).all(), f"{xp.name}: NaN or inf in the cache"
 
 
 @needs_cache
@@ -256,11 +256,11 @@ def test_cached_shapes_are_consistent():
 
 @needs_cache
 def test_stats_file_records_class_distribution():
-    """SPEC Gate 1 requires the distribution to be logged, not just computed."""
-    assert STATS.exists(), "artifacts/data_stats.json mancante"
+    """The class distribution must be logged to a file, not just computed."""
+    assert STATS.exists(), "artifacts/data_stats.json missing"
     stats = json.loads(STATS.read_text())
     for key in ("n_patches", "class_pixel_counts", "class_frequency", "margin_fraction"):
-        assert key in stats, f"chiave mancante in data_stats.json: {key}"
+        assert key in stats, f"key missing in data_stats.json: {key}"
     assert stats["n_patches"] > 0
     assert sum(stats["class_frequency"].values()) == pytest.approx(1.0, abs=1e-6)
 
@@ -326,7 +326,7 @@ def test_scarce_margins_are_upweighted_not_duplicated(tmp_path):
     ds = PatchDataset(tmp_path, [sid], augment=False)
     w = ds.sampler_weights(0.40)
 
-    assert len(ds) == 200, "nessuna patch deve essere stata scartata"
+    assert len(ds) == 200, "no patch must have been discarded"
     assert w[0] / w[-1] == pytest.approx((0.40 / 10) / (0.60 / 190))
 
 

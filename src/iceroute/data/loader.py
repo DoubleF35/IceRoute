@@ -1,7 +1,7 @@
 """Read one AI4Arctic scene into memory as a typed structure.
 
-SPEC §6.1. The loader does exactly two non-obvious things, and both exist
-because of what ``inspect.py`` found on the real data (DECISIONS.md D-006):
+The loader does exactly two non-obvious things, and both exist because of what
+``inspect.py`` found on the real data (docs/decisions.md D-006):
 
 1. **Validity comes from the target, not from the SAR.** The SAR channels pad
    the swath with a literal ``0.0`` — not NaN, no ``_FillValue`` attribute — on
@@ -98,7 +98,7 @@ class Scene:
         }
         missing = [n for n in names if n not in available]
         if missing:
-            raise KeyError(f"Canali non disponibili: {missing}. Ammessi: {sorted(available)}")
+            raise KeyError(f"Channels not available: {missing}. Allowed: {sorted(available)}")
         return np.stack([available[n] for n in names], axis=0)
 
     def summary(self) -> str:
@@ -109,7 +109,7 @@ class Scene:
         return (
             f"{self.meta.scene_id}  {self.shape[0]}x{self.shape[1]}  "
             f"{self.meta.region}  {self.meta.acquired:%Y-%m-%d}\n"
-            f"  annotato: {100 * self.valid_fraction:.1f}%  ·  SOD  {dist}"
+            f"  annotated: {100 * self.valid_fraction:.1f}%  ·  SOD  {dist}"
         )
 
 
@@ -161,7 +161,7 @@ def reference_path(path: str | Path) -> Path:
 
     The official test scenes ship without targets — that is what makes them a
     test set — and the charts live alongside in ``*_prep_reference.nc``.
-    Verified on disk rather than taken from documentation, per SPEC §5.4.
+    Verified on disk rather than taken from documentation (docs/decisions.md D-006).
     """
     path = Path(path)
     return path.with_name(path.name.replace("_prep.nc", "_prep_reference.nc"))
@@ -205,16 +205,16 @@ def load_scene(
             ref = Path(labels_from)
             if not ref.exists():
                 raise FileNotFoundError(
-                    f"Etichette assenti: {ref}. Le scene di test ufficiali non le "
-                    f"contengono, stanno nel file _prep_reference.nc affiancato."
+                    f"Labels missing: {ref}. The official test scenes do not contain "
+                    f"them; they live in the _prep_reference.nc file alongside."
                 )
             with netCDF4.Dataset(ref, "r") as rds:
                 sod_raw = _read(rds, tgt["sod"], "float64")
                 sic_raw = _read(rds, tgt["sic"], "float64")
             if sod_raw.shape != _read(ds, var["sar_hh"], "float32").shape:
                 raise ValueError(
-                    f"La griglia delle etichette {sod_raw.shape} non coincide con "
-                    f"quella del SAR in {path.name}: sono due scene diverse."
+                    f"The label grid {sod_raw.shape} does not match the SAR grid "
+                    f"in {path.name}: these are two different scenes."
                 )
         else:
             sod_raw = _read(ds, tgt["sod"], "float64")
@@ -309,7 +309,7 @@ def _sanity_check(scene: Scene) -> None:
         "mask_valid": scene.mask_valid.shape,
     }
     if len(set(shapes.values())) != 1:
-        raise ValueError(f"Shape non allineate in {scene.meta.scene_id}: {shapes}")
+        raise ValueError(f"Misaligned shapes in {scene.meta.scene_id}: {shapes}")
 
     # A label outside 0-5 that is not the fill value means the SOD lookup was
     # applied wrongly, and CrossEntropy would index out of bounds.
@@ -318,18 +318,18 @@ def _sanity_check(scene: Scene) -> None:
         bad = np.unique(labels[(labels > 5) & (labels != FILL_VALUE)])
         if bad.size:
             raise ValueError(
-                f"{scene.meta.scene_id}: classi SOD fuori range su pixel validi: {bad.tolist()}. "
-                f"Attese 0-5, oppure {FILL_VALUE} con mask_valid=False."
+                f"{scene.meta.scene_id}: SOD classes out of range on valid pixels: {bad.tolist()}. "
+                f"Expected 0-5, or {FILL_VALUE} with mask_valid=False."
             )
 
     # The invariant that lets us mask on the target alone (D-006).
     if scene.mask_valid.any():
         if (scene.sod[scene.mask_valid] == FILL_VALUE).any():
             raise ValueError(
-                f"{scene.meta.scene_id}: pixel con SOD={FILL_VALUE} ma mask_valid=True."
+                f"{scene.meta.scene_id}: pixels with SOD={FILL_VALUE} but mask_valid=True."
             )
         if not np.isfinite(scene.hh[scene.mask_valid]).all():
-            raise ValueError(f"{scene.meta.scene_id}: NaN nel SAR su pixel marcati validi.")
+            raise ValueError(f"{scene.meta.scene_id}: NaN in the SAR on pixels marked valid.")
 
 
 def load_config(path: str | Path = "configs/data.yaml") -> dict:
@@ -341,7 +341,7 @@ def load_config(path: str | Path = "configs/data.yaml") -> dict:
 if __name__ == "__main__":
     import argparse
 
-    ap = argparse.ArgumentParser(description="Carica una scena e stampa un riassunto.")
+    ap = argparse.ArgumentParser(description="Load a scene and print a summary.")
     ap.add_argument("scene", type=Path)
     ap.add_argument("--config", type=Path, default=Path("configs/data.yaml"))
     args = ap.parse_args()
@@ -349,9 +349,9 @@ if __name__ == "__main__":
     sc = load_scene(args.scene, load_config(args.config))
     print(sc.summary())
     print(
-        f"  piattaforma: {sc.meta.platform}  ·  spacing: {sc.meta.pixel_spacing_m:.0f} m  ·  flip: {sc.meta.flip}"
+        f"  platform: {sc.meta.platform}  ·  spacing: {sc.meta.pixel_spacing_m:.0f} m  ·  flip: {sc.meta.flip}"
     )
     print(
-        f"  griglia geo: {sc.lat_grid.shape}  lat {sc.lat_grid.min():.2f}..{sc.lat_grid.max():.2f}  "
+        f"  geo grid: {sc.lat_grid.shape}  lat {sc.lat_grid.min():.2f}..{sc.lat_grid.max():.2f}  "
         f"lon {sc.lon_grid.min():.2f}..{sc.lon_grid.max():.2f}"
     )

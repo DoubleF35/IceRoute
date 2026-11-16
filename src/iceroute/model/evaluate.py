@@ -1,7 +1,8 @@
-"""Evaluate the trained model. SPEC §7.3 and §7.4.
+"""Evaluate the trained model: per-class IoU, confusion matrix, whole-scene
+inference, and the baselines it has to beat.
 
-Produces the numbers the pitch is allowed to quote, and the one comparison that
-decides whether the U-Net deserves to exist at all.
+Produces the numbers the project is allowed to quote publicly, and the one
+comparison that decides whether the U-Net deserves to exist at all.
 
 The honest baseline
 -------------------
@@ -15,7 +16,7 @@ threshold two ways:
 * **oracle** — the best threshold *in hindsight on the evaluation split
   itself*. It is not deployable and it is not fair; that is the point. It is
   the strongest possible version of the cheap baseline, and beating it is the
-  only result worth putting on a slide.
+  only result worth quoting.
 
 The threshold baseline is binary by construction: it cannot distinguish young
 ice from old ice, and old ice is precisely what POLARIS penalises hardest. So
@@ -37,6 +38,7 @@ import numpy as np
 import torch
 import yaml
 
+from iceroute.data.collapse import NAMES as COLLAPSED_NAMES
 from iceroute.data.collapse import collapse, polaris_mapping
 from iceroute.data.loader import load_config, load_scene, reference_path
 from iceroute.data.patches import CHANNELS, PatchDataset
@@ -65,13 +67,13 @@ def load_checkpoint(path: Path, device: str = "cpu") -> tuple[torch.nn.Module, d
     ckpt = torch.load(path, map_location=device, weights_only=False)
     if "model" not in ckpt or "config" not in ckpt:
         raise ValueError(
-            f"{path} non sembra un checkpoint di train.py: mancano 'model' o 'config'."
+            f"{path} does not look like a train.py checkpoint: 'model' or 'config' is missing."
         )
     model = build_model(ckpt["config"]["model"])
     model.load_state_dict(ckpt["model"])
     model.eval().to(device)
     log.info(
-        "checkpoint %s: epoca %s, val_miou %.4f, %s parametri",
+        "checkpoint %s: epoch %s, val_miou %.4f, %s parameters",
         path.name,
         ckpt.get("epoch", "?"),
         ckpt.get("val_miou", float("nan")),
@@ -170,13 +172,11 @@ def fit_hv_threshold(
     keep = sod != IGNORE_INDEX
     hv, sod = hv[keep].astype("float64"), sod[keep]
     if hv.size == 0:
-        raise ValueError("Nessun pixel valido per calibrare la soglia HV.")
+        raise ValueError("No valid pixel to calibrate the HV threshold.")
 
     is_ice = sod != WATER_CLASS
     if is_ice.all() or not is_ice.any():
-        raise ValueError(
-            "I pixel validi sono tutti ghiaccio o tutta acqua: la soglia non è definita."
-        )
+        raise ValueError("The valid pixels are all ice or all water: the threshold is undefined.")
 
     qs = np.linspace(0.001, 0.999, n_candidates)
     cands = np.unique(np.quantile(hv, qs))
@@ -199,7 +199,7 @@ def score_hv_threshold(
     keep = sod != IGNORE_INDEX
     hv, sod = hv[keep], sod[keep]
     if hv.size == 0:
-        raise ValueError("Nessun pixel valido per valutare la soglia HV.")
+        raise ValueError("No valid pixel to score the HV threshold.")
 
     ice_labels = sod[sod != WATER_CLASS]
     majority_ice = (
@@ -228,8 +228,8 @@ def collect_patch_pixels(
     """Flatten a patch dataset into (hv, sod) arrays, subsampled if huge."""
     if hv_channel not in dataset.channels:
         raise ValueError(
-            f"Il canale '{hv_channel}' non è nel dataset ({dataset.channels}): "
-            f"la baseline a soglia non è calcolabile."
+            f"Channel '{hv_channel}' is not in the dataset ({dataset.channels}): "
+            f"the threshold baseline cannot be computed."
         )
     ch = dataset.channels.index(hv_channel)
 
@@ -242,7 +242,7 @@ def collect_patch_pixels(
         sod_parts.append(lab)
         total += lab.size
         if total >= max_pixels:
-            log.info("baseline HV: campionamento fermato a %d px", total)
+            log.info("HV baseline: sampling stopped at %d px", total)
             break
 
     hv = np.concatenate(hv_parts)
@@ -276,7 +276,7 @@ def evaluate_scene(
 ) -> tuple[ConfusionMatrix, dict]:
     """Tiled inference over a whole scene, scored against its ice chart.
 
-    Scores it twice: as a classification (mIoU, the SPEC §7.4 gate) and as a
+    Scores it twice: as a classification (mIoU, the acceptance gate) and as a
     POLARIS input (RIO error, what the route actually depends on). Neither
     replaces the other — see ``rio_error``.
     """
@@ -331,7 +331,7 @@ def evaluate_scene(
                 n_classes=n_classes,
             )
         except (ValueError, KeyError) as exc:
-            log.warning("  errore RIO non calcolabile: %s", exc)
+            log.warning("  RIO error cannot be computed: %s", exc)
             info["rio"] = {"error": str(exc)}
 
     return cm, info
@@ -348,7 +348,7 @@ def write_confusion_csv(cm: ConfusionMatrix, path: Path, class_names: dict[int, 
     names = [class_names.get(i, str(i)) for i in range(cm.n_classes)]
     with path.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["verita\\predizione", *names, "supporto"])
+        w.writerow(["truth\\prediction", *names, "support"])
         for i, row in enumerate(cm.matrix):
             w.writerow([names[i], *row.tolist(), int(row.sum())])
 
@@ -361,7 +361,7 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
-        log.warning("matplotlib non disponibile: salto la figura.")
+        log.warning("matplotlib not available: skipping the figure.")
         return False
 
     norm = cm.normalized()
@@ -372,11 +372,11 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
     im = ax.imshow(norm, cmap="Blues", vmin=0, vmax=1)
     ax.set_xticks(range(cm.n_classes), names, rotation=40, ha="right")
     ax.set_yticks(range(cm.n_classes), names)
-    ax.set_xlabel("Predizione")
-    ax.set_ylabel("Verità (ice chart)")
+    ax.set_xlabel("Prediction")
+    ax.set_ylabel("Truth (ice chart)")
     ax.set_title(
-        f"Matrice di confusione — mIoU {cm.miou():.3f} "
-        f"({cm.n_classes_scored()}/{cm.n_classes} classi con ground truth)"
+        f"Confusion matrix — mIoU {cm.miou():.3f} "
+        f"({cm.n_classes_scored()}/{cm.n_classes} classes with ground truth)"
     )
 
     for i in range(cm.n_classes):
@@ -400,7 +400,7 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
             ax.text(
                 cm.n_classes / 2 - 0.5,
                 i,
-                "nessun pixel di verità in questo split",
+                "no ground-truth pixels in this split",
                 ha="center",
                 va="center",
                 fontsize=7,
@@ -408,7 +408,7 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
                 color="0.35",
             )
 
-    fig.colorbar(im, ax=ax, label="frazione della classe vera")
+    fig.colorbar(im, ax=ax, label="fraction of the true class")
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path)
@@ -417,24 +417,25 @@ def plot_confusion(cm: ConfusionMatrix, path: Path, class_names: dict[int, str])
 
 
 def threshold_verdict(model_cm: ConfusionMatrix, oracle: ThresholdBaseline) -> dict:
-    """Does the U-Net actually beat a threshold? SPEC §7.4 wants this stated."""
+    """Does the U-Net actually beat a threshold? The project requires this to be stated."""
     d_bin = model_cm.binary_accuracy(WATER_CLASS) - oracle.binary_accuracy
     d_miou = model_cm.miou() - oracle.miou_6class
     beats_binary = d_bin > 0
 
     if beats_binary:
         verdict = (
-            f"La U-Net batte la soglia ottimale anche su ghiaccio/acqua "
-            f"({d_bin:+.3f}) oltre che sulle 6 classi ({d_miou:+.3f})."
+            f"The U-Net beats the optimal threshold on ice/water too "
+            f"({d_bin:+.3f}), as well as on the 6 classes ({d_miou:+.3f})."
         )
     else:
         # The defensible position when the threshold wins on binary. It usually
-        # does, and pretending otherwise is the fastest way to lose the room.
+        # does, and pretending otherwise is the fastest way to lose credibility
+        # with anyone who knows the field.
         verdict = (
-            f"Su ghiaccio/acqua la soglia ottimale è competitiva ({d_bin:+.3f}): "
-            f"è un problema facile. Il valore della U-Net è nelle 6 classi "
-            f"({d_miou:+.3f}), che è ciò che POLARIS richiede — una soglia non "
-            f"distingue young ice da old ice, e il RIO fra le due cambia di segno."
+            f"On ice/water the optimal threshold is competitive ({d_bin:+.3f}): "
+            f"it is an easy problem. The value of the U-Net is in the 6 classes "
+            f"({d_miou:+.3f}), which is what POLARIS needs — a threshold cannot "
+            f"tell young ice from old ice, and the RIO between the two changes sign."
         )
 
     return {
@@ -447,11 +448,13 @@ def threshold_verdict(model_cm: ConfusionMatrix, oracle: ThresholdBaseline) -> d
 
 
 def report_bias(split: str) -> str:
-    """State plainly how the reported number is biased. SPEC rule 2.
+    """State plainly how the reported number is biased.
 
-    The frozen split (SPEC §5.3) has no held-out test set, so there is no
-    unbiased estimate available and pretending otherwise would be the exact
-    failure mode rule 2 exists to prevent. Both options have a named defect:
+    The project rule is that no number is quoted without its source or its
+    caveat. The frozen train/val/demo split has no held-out test set, so within
+    it there is no unbiased estimate available, and pretending otherwise would
+    be the exact failure mode that rule exists to prevent. Both options have a
+    named defect:
 
     * ``val`` — early stopping picked the checkpoint that maximises val mIoU, so
       this number is the *best epoch as judged by this very split*. Optimistic
@@ -460,34 +463,34 @@ def report_bias(split: str) -> str:
       bias. But the scenes were hand-picked to be visually convincing, which is
       its own bias and pushes in the same direction.
 
-    * ``test_ufficiale`` — the AI4Arctic challenge's own held-out set, 20 scenes
+    * ``official_test`` — the AI4Arctic challenge's own held-out set, 20 scenes
       whose labels ship in separate ``_prep_reference.nc`` files. Never touched
       by training, model selection or scene curation. **This is the unbiased
-      estimate and the one the pitch should quote.**
+      estimate and the one to quote publicly.**
 
     Prefer the official test set; fall back to val with the caveat attached.
     """
-    if split == "test_ufficiale":
+    if split == "official_test":
         return (
-            "Stima NON DISTORTA: set di test ufficiale AI4Arctic, mai usato per "
-            "training, selezione del modello o scelta delle scene. È il numero "
-            "da citare nel pitch."
+            "UNBIASED estimate: official AI4Arctic test set, never used for "
+            "training, model selection or scene choice. This is the number "
+            "to quote."
         )
     if split == "val":
         return (
-            "Stima OTTIMISTICA: l'early stopping ha scelto il checkpoint che massimizza "
-            "il mIoU su questo stesso split (SPEC §5.3 non prevede un test set). "
-            "Non è una stima out-of-sample."
+            "OPTIMISTIC estimate: early stopping picked the checkpoint that maximises "
+            "mIoU on this very split (the frozen split has no test set). "
+            "It is not an out-of-sample estimate."
         )
     return (
-        "Split demo: mai usato per training né per selezione del modello, quindi nessun "
-        "bias di selezione — ma le scene sono state scelte a mano perché visivamente "
-        "convincenti, che è un bias nella stessa direzione."
+        "Demo split: never used for training or model selection, so no selection "
+        "bias — but the scenes were hand-picked for being visually convincing, "
+        "which is a bias in the same direction."
     )
 
 
 def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = False) -> list[str]:
-    """Compare against the SPEC §7.4 acceptance thresholds."""
+    """Compare against the acceptance thresholds (mIoU 0.60, ice/water accuracy 0.90)."""
     warns = []
     miou, binacc = cm.miou(), cm.binary_accuracy(WATER_CLASS)
     if collapsed:
@@ -496,18 +499,18 @@ def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = F
         # and recommending a fallback we are already inside is worse than
         # useless: it reads as if the option were still open.
         warns.append(
-            f"mIoU {miou:.3f} sullo schema RIDOTTO a 3 classi. Non confrontabile con "
-            f"la soglia §7.4 di {eval_cfg.get('min_miou', 0.60)}, che vale per le 6 "
-            f"classi SOD. Il ripiego §7.4 è già attivo."
+            f"mIoU {miou:.3f} on the REDUCED 3-class scheme. Not comparable with "
+            f"the acceptance threshold of {eval_cfg.get('min_miou', 0.60)}, which applies "
+            f"to the 6 SOD classes. The 3-class fallback (D-020) is already active."
         )
     elif np.isfinite(miou) and miou < float(eval_cfg.get("min_miou", 0.60)):
         warns.append(
-            f"mIoU {miou:.3f} sotto la soglia SPEC §7.4 di "
-            f"{eval_cfg['min_miou']}: valutare il ripiego al problema binario."
+            f"mIoU {miou:.3f} below the acceptance threshold of "
+            f"{eval_cfg['min_miou']}: consider falling back to the reduced problem."
         )
     if np.isfinite(binacc) and binacc < float(eval_cfg.get("min_binary_accuracy", 0.90)):
         warns.append(
-            f"Accuratezza ghiaccio/acqua {binacc:.3f} sotto la soglia SPEC §7.4 di "
+            f"Ice/water accuracy {binacc:.3f} below the acceptance threshold of "
             f"{eval_cfg['min_binary_accuracy']}."
         )
     return warns
@@ -519,25 +522,29 @@ def check_thresholds(cm: ConfusionMatrix, eval_cfg: dict, *, collapsed: bool = F
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Valuta il modello: patch, scene intere, baseline.")
+    ap = argparse.ArgumentParser(
+        description="Evaluate the model: patches, whole scenes, baselines."
+    )
     ap.add_argument("--config", type=Path, default=Path("configs/train.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--checkpoint", type=Path, default=None)
-    # SPEC §5.3 freezes train/val/demo. `test_ufficiale` is not one of them: it
-    # is the AI4Arctic challenge's own held-out set, downloaded separately into
-    # data/raw/test/, and it is the only unbiased option. See report_bias().
-    ap.add_argument("--split", default="test_ufficiale", choices=["test_ufficiale", "val", "demo"])
+    # configs/split.yaml freezes train/val/demo. `official_test` ("official
+    # test") is not one of them: it is the AI4Arctic challenge's own held-out
+    # set, downloaded separately into data/raw/test/, and it is the only
+    # unbiased option. See report_bias(). It keeps its historical name because
+    # scripts and stored metrics key on it.
+    ap.add_argument("--split", default="official_test", choices=["official_test", "val", "demo"])
     ap.add_argument("--test-dir", type=Path, default=Path("data/raw/test"))
     ap.add_argument("--out", type=Path, default=Path("artifacts"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/train"))
-    ap.add_argument("--scenes", type=int, default=3, help="quante scene intere valutare")
+    ap.add_argument("--scenes", type=int, default=3, help="how many whole scenes to evaluate")
     ap.add_argument("--device", default=None)
     ap.add_argument("--skip-baseline", action="store_true")
     ap.add_argument(
         "--ice-classes",
         nargs="*",
         default=["PC6", "PC7", "IA"],
-        help="classi di nave per cui misurare l'errore su RIO",
+        help="vessel classes for which to measure the RIO error",
     )
     args = ap.parse_args(argv)
 
@@ -554,13 +561,18 @@ def main(argv: list[str] | None = None) -> int:
 
     ckpt_path = args.checkpoint or Path(cfg["output"]["best_checkpoint"])
     if not ckpt_path.exists():
-        log.error("Checkpoint assente: %s. Lancia prima 'make train'.", ckpt_path)
+        log.error("Checkpoint missing: %s. Run 'make train' first.", ckpt_path)
         return 1
     model, ckpt = load_checkpoint(ckpt_path, device)
 
-    class_names = ckpt.get("class_names") or {
-        i: v["name"] for i, v in data_cfg["sod_classes"].items() if i != IGNORE_INDEX
-    }
+    # The collapsed scheme's names come from collapse.NAMES, the single source
+    # of truth: names stored in an older checkpoint must not leak into reports.
+    class_names = (
+        dict(COLLAPSED_NAMES)
+        if collapsed
+        else ckpt.get("class_names")
+        or {i: v["name"] for i, v in data_cfg["sod_classes"].items() if i != IGNORE_INDEX}
+    )
     class_names = {int(k): v for k, v in class_names.items()}
 
     split_file = Path(data_cfg.get("split_file", "configs/split.yaml"))
@@ -582,13 +594,13 @@ def main(argv: list[str] | None = None) -> int:
     # The official test set has no patch cache — patches are only extracted for
     # the frozen splits — so it is evaluated whole-scene only. That is the
     # better test anyway: whole scenes are what the payload actually processes.
-    official = args.split == "test_ufficiale"
+    official = args.split == "official_test"
     cm = ConfusionMatrix(n_classes)
     ds = None
 
     # -- patches ------------------------------------------------------------
     if not official:
-        log.info("Valutazione su patch (%s)…", args.split)
+        log.info("Evaluating on patches (%s)…", args.split)
         ds = PatchDataset(
             cache_dir,
             split[args.split],
@@ -611,14 +623,14 @@ def main(argv: list[str] | None = None) -> int:
         plot_confusion(cm, args.out / "figures" / f"confusion_{args.split}.png", class_names)
     else:
         log.info(
-            "Set di test ufficiale: nessuna cache di patch, valutazione solo a "
-            "scena intera. È anche il test più pertinente — le scene intere sono "
-            "ciò che il payload elabora davvero."
+            "Official test set: no patch cache, whole-scene evaluation only. "
+            "It is also the more relevant test — whole scenes are what the "
+            "payload actually processes."
         )
 
     # -- HV threshold baseline ---------------------------------------------
     if not args.skip_baseline and ds is not None:
-        log.info("Baseline a soglia su HV…")
+        log.info("HV threshold baseline…")
         try:
             hv_tr, sod_tr = collect_patch_pixels(
                 PatchDataset(
@@ -647,7 +659,7 @@ def main(argv: list[str] | None = None) -> int:
                 "comparison": threshold_verdict(cm, oracle),
             }
             log.info(
-                "  soglia fitted %.3f → gh/acqua %.4f · oracle %.3f → %.4f | U-Net %.4f",
+                "  fitted threshold %.3f → ice/water %.4f · oracle %.3f → %.4f | U-Net %.4f",
                 fitted.threshold,
                 fitted.binary_accuracy,
                 oracle.threshold,
@@ -656,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             log.info("  %s", report["baseline_hv_threshold"]["comparison"]["verdict"])
         except ValueError as exc:
-            log.warning("Baseline a soglia non calcolabile: %s", exc)
+            log.warning("Threshold baseline cannot be computed: %s", exc)
             report["baseline_hv_threshold"] = {"error": str(exc)}
 
     # -- whole scenes -------------------------------------------------------
@@ -667,14 +679,14 @@ def main(argv: list[str] | None = None) -> int:
         scene_paths = [p for p in sorted(scene_dir.glob("*_prep.nc")) if reference_path(p).exists()]
         missing = len(list(scene_dir.glob("*_prep.nc"))) - len(scene_paths)
         if missing:
-            log.warning("%d scene di test senza file di etichette: saltate.", missing)
+            log.warning("%d test scenes without a label file: skipped.", missing)
     else:
         scene_dir = args.raw_dir
         scene_paths = [scene_dir / s for s in split[args.split] if (scene_dir / s).exists()]
     scene_paths = scene_paths[: args.scenes]
 
     if scene_paths:
-        log.info("Inferenza a scena intera su %d scene…", len(scene_paths))
+        log.info("Whole-scene inference on %d scenes…", len(scene_paths))
         scene_cm = ConfusionMatrix(n_classes)
         per_scene = []
         ice_classes = list(args.ice_classes)
@@ -704,7 +716,7 @@ def main(argv: list[str] | None = None) -> int:
             for ic, r in (rio.get("per_ice_class") or {}).items():
                 if "error" not in r:
                     log.info(
-                        "    %s  RIO MAE %.2f · decisione corretta %.1f%% · PERMISSIVA %.2f%%",
+                        "    %s  RIO MAE %.2f · correct decision %.1f%% · PERMISSIVE %.2f%%",
                         ic,
                         r["rio_mae"],
                         100 * r["operational_agreement"],
@@ -729,16 +741,16 @@ def main(argv: list[str] | None = None) -> int:
         }
         if unsafe:
             log.warning(
-                "Frazione PERMISSIVA peggiore su tutte le scene e classi di nave: "
-                "%.2f%%. Sono i pixel dove una rotta passerebbe in ghiaccio che "
-                "POLARIS vieta.",
+                "Worst PERMISSIVE fraction across all scenes and vessel classes: "
+                "%.2f%%. These are the pixels where a route would cross ice that "
+                "POLARIS forbids.",
                 100 * max(unsafe),
             )
         write_confusion_csv(scene_cm, args.out / "figures" / "confusion_scenes.csv", class_names)
         plot_confusion(scene_cm, args.out / "figures" / "confusion_scenes.png", class_names)
-        log.info("Scene intere:\n%s", scene_cm.format_table(class_names))
+        log.info("Whole scenes:\n%s", scene_cm.format_table(class_names))
     else:
-        log.warning("Nessuna scena dello split '%s' presente in %s.", args.split, scene_dir)
+        log.warning("No scene of split '%s' present in %s.", args.split, scene_dir)
 
     # -- gate ---------------------------------------------------------------
     # Gate against whole-scene numbers when that is all we have: on the official
@@ -756,7 +768,7 @@ def main(argv: list[str] | None = None) -> int:
     existing = json.loads(out_path.read_text()) if out_path.exists() else {}
     existing["evaluation"] = report
     out_path.write_text(json.dumps(existing, indent=2))
-    log.info("Metriche in %s", out_path)
+    log.info("Metrics in %s", out_path)
 
     return 0
 

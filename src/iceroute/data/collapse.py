@@ -1,12 +1,13 @@
-"""Reduce the six SOD classes to three. The SPEC §7.4 fallback.
+"""Reduce the six SOD classes to three: the reduced-problem fallback
+(docs/decisions.md D-020).
 
 Why this exists
 ---------------
 Six-class SOD did not reach the mIoU threshold: 0.272 on the official test set,
 against a required 0.60, with the model confidently wrong rather than uncertain
-(D-018). SPEC §7.4 prescribes the response — *"ridurre a binario ghiaccio/acqua
-+ una classe di ghiaccio spesso, e ridimensionare le affermazioni nel pitch.
-Non aggiustare il numero."*
+(D-018). The project rule for that case was fixed before training started:
+*reduce the problem to binary ice/water plus one thick-ice class, and scale the
+public claims down accordingly. Do not adjust the number.*
 
 **This is a reduction of the problem, not an improvement of the model.** Any
 number produced under this scheme describes an easier task and must be labelled
@@ -54,9 +55,9 @@ GROUPS: dict[int, list[int]] = {
 }
 
 NAMES: dict[int, str] = {
-    0: "Acqua libera",
-    1: "Ghiaccio sottile",
-    2: "Ghiaccio spesso",
+    0: "Open water",
+    1: "Thin ice",
+    2: "Thick ice",
 }
 
 N_CLASSES = len(GROUPS)
@@ -96,7 +97,7 @@ def collapse_proba(proba: np.ndarray) -> np.ndarray:
     here.
     """
     if proba.ndim != 3:
-        raise ValueError(f"Attese (n_classes, H, W), ricevuto {proba.shape}")
+        raise ValueError(f"Expected (n_classes, H, W), got {proba.shape}")
     out = np.zeros((N_CLASSES, *proba.shape[1:]), dtype=proba.dtype)
     for new, olds in GROUPS.items():
         for old in olds:
@@ -143,9 +144,9 @@ def polaris_mapping(
         pick, agree = conservative_member(olds, sod_to_polaris, ice_classes, table=table)
         if not agree:
             raise ValueError(
-                f"Il membro più cauto del gruppo {new} ({olds}) cambia a seconda della "
-                f"classe di nave: un solo tipo di ghiaccio POLARIS non lo rappresenta. "
-                f"Il raggruppamento va rifatto per classe di nave."
+                f"The most cautious member of group {new} ({olds}) depends on the "
+                f"vessel class: a single POLARIS ice type cannot represent it. "
+                f"The grouping has to be redone per vessel class."
             )
         out[new] = sod_to_polaris[pick]
     return out
@@ -154,18 +155,18 @@ def polaris_mapping(
 def describe(source_miou: float | None = None) -> str:
     """The disclaimer that must travel with every number from this scheme."""
     text = (
-        "SCHEMA RIDOTTO A 3 CLASSI (ripiego SPEC §7.4): acqua libera / ghiaccio "
-        "sottile / ghiaccio spesso. È un problema PIÙ FACILE di quello a 6 classi: "
-        "questi numeri non sono confrontabili con la soglia mIoU 0,60, che si "
-        "riferisce alle 6 classi SOD."
+        "REDUCED 3-CLASS SCHEME (fallback, docs/decisions.md D-020): open water / "
+        "thin ice / thick ice. This is an EASIER problem than the 6-class one: "
+        "these numbers are not comparable with the 0.60 mIoU threshold, which "
+        "refers to the 6 SOD classes."
     )
     if source_miou is not None:
-        text += f" Il modello a 6 classi si era fermato a mIoU {source_miou:.3f}."
+        text += f" The 6-class model had stopped at mIoU {source_miou:.3f}."
     return text
 
 
 def summary() -> str:
-    lines = ["Raggruppamento SOD → 3 classi (SPEC §7.4):"]
+    lines = ["SOD grouping → 3 classes (docs/decisions.md D-020):"]
     for new, olds in GROUPS.items():
         lines.append(f"  {new} {NAMES[new]:<18} ← SOD {olds}")
     return "\n".join(lines)

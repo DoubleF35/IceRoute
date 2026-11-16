@@ -1,9 +1,9 @@
 """Tests for the segmentation network.
 
-The parameter-budget test is the important one: SPEC §7.1 makes < 2M parameters
-a project constraint because the model has to be credible as an FPGA payload.
-A refactor that quietly pushes it to 3M would invalidate the pitch, not just
-slow things down, so it fails the build.
+The parameter-budget test is the important one: < 2M parameters is a project
+constraint because the model has to be credible as an FPGA payload. A refactor
+that quietly pushes it to 3M would invalidate the project's central claim, not
+just slow things down, so it fails the build.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ def test_parameter_budget():
     model = UNet()
     n = model.param_count()
     assert n < PARAM_BUDGET, (
-        f"Il modello ha {n:,} parametri, oltre il budget di {PARAM_BUDGET:,} "
-        f"(SPEC §7.1). Riduci encoder_channels prima della profondità."
+        f"The model has {n:,} parameters, over the budget of {PARAM_BUDGET:,} "
+        f"(docs/decisions.md D-005). Reduce encoder_channels before the depth."
     )
 
 
@@ -56,7 +56,7 @@ def test_odd_size_does_not_crash():
 
 
 def test_no_batchnorm_anywhere():
-    """SPEC §7.1: GroupNorm only.
+    """GroupNorm only.
 
     BatchNorm with a batch of 8 gives noisy statistics, and its train/eval
     behaviour differs, which is a silent source of train/deploy mismatch.
@@ -66,11 +66,11 @@ def test_no_batchnorm_anywhere():
         for name, module in UNet().named_modules()
         if isinstance(module, torch.nn.modules.batchnorm._BatchNorm)
     ]
-    assert not offenders, f"Trovati layer BatchNorm: {offenders}"
+    assert not offenders, f"BatchNorm layers found: {offenders}"
 
 
 def test_no_exotic_layers():
-    """SPEC §7.1: the FPGA target allows conv/relu/pool/upsample only."""
+    """The FPGA target allows conv/relu/pool/upsample only."""
     allowed = (
         torch.nn.Conv2d,
         torch.nn.GroupNorm,
@@ -85,7 +85,7 @@ def test_no_exotic_layers():
         for name, m in UNet().named_modules()
         if name and not isinstance(m, allowed) and type(m).__module__.startswith("torch.nn")
     ]
-    assert not offenders, f"Layer non ammessi per il target FPGA: {offenders}"
+    assert not offenders, f"Layers not allowed for the FPGA target: {offenders}"
 
 
 def test_extra_input_channel_stays_in_budget():
@@ -96,7 +96,7 @@ def test_extra_input_channel_stays_in_budget():
 
 def test_build_model_rejects_unknown_keys():
     """A typo in configs/train.yaml should fail loudly, not be ignored."""
-    with pytest.raises(ValueError, match="non riconosciute"):
+    with pytest.raises(ValueError, match="Unrecognised keys"):
         build_model({"in_channels": 3, "base_channels": 32})
 
 
@@ -106,4 +106,4 @@ def test_gradients_flow():
     out = model(torch.randn(1, 3, 64, 64))
     out.mean().backward()
     missing = [n for n, p in model.named_parameters() if p.grad is None]
-    assert not missing, f"Parametri senza gradiente: {missing}"
+    assert not missing, f"Parameters without a gradient: {missing}"

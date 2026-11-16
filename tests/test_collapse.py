@@ -1,4 +1,4 @@
-"""Tests for the three-class fallback scheme (SPEC §7.4).
+"""Tests for the three-class fallback scheme (docs/decisions.md D-020).
 
 Two properties carry the argument for this reduction, and both are asserted
 against the POLARIS circular rather than taken on trust:
@@ -86,7 +86,7 @@ def test_conservative_member_agrees_across_vessel_classes():
     MSC.1/Circ.1519, not a guarantee, so it is checked."""
     for olds in GROUPS.values():
         _, agrees = conservative_member(olds, MAPPING, VESSELS, table=TABLE)
-        assert agrees, f"il membro più cauto di {olds} cambia con la classe di nave"
+        assert agrees, f"the most cautious member of {olds} changes with the vessel class"
 
 
 def test_merging_rounds_towards_danger():
@@ -102,8 +102,8 @@ def test_merging_rounds_towards_danger():
             merged = TABLE.riv(vessel, m3[new])
             members = [TABLE.riv(vessel, MAPPING[o]) for o in olds]
             assert merged == min(members), (
-                f"classe {new} per {vessel}: RIV {merged}, il peggiore fra i "
-                f"membri è {min(members)}"
+                f"class {new} for {vessel}: RIV {merged}, the worst of the "
+                f"members is {min(members)}"
             )
 
 
@@ -173,17 +173,23 @@ def test_collapse_proba_rejects_a_bad_shape():
 
 
 def test_describe_says_the_problem_was_reduced():
-    """SPEC §7.4 forbids adjusting the number; the label is what keeps a
+    """The fallback rule forbids adjusting the number; the label is what keeps a
     three-class score from being read as a six-class one."""
     text = describe(0.272)
-    assert "RIDOTTO" in text
-    assert "PIÙ FACILE" in text
-    assert "0,60" in text
+    assert "REDUCED" in text
+    assert "EASIER" in text
+    assert "0.60" in text
     assert "0.272" in text
 
 
 def test_names_cover_every_class():
     assert set(NAMES) == set(GROUPS)
+
+
+def test_class_names_are_the_canonical_english_ones():
+    """These strings are keys in metrics JSON, the report and the demo
+    legend; changing one silently orphans every consumer keyed on it."""
+    assert NAMES == {0: "Open water", 1: "Thin ice", 2: "Thick ice"}
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +223,7 @@ def test_class_weights_use_the_collapsed_frequencies(tmp_path):
     w = load_class_weights(stats, N_CLASSES, collapse=True, normalize=False, clip_max=100.0)
     assert w is not None
     # Thin group is 0.01+0.02+0.03 = 0.06 of pixels, thick 0.15+0.09 = 0.24.
-    assert w[1] > w[2] > w[0], f"pesi non ordinati per rarità: {w.tolist()}"
+    assert w[1] > w[2] > w[0], f"weights not ordered by rarity: {w.tolist()}"
     assert w[0] == pytest.approx(1 / 0.70, rel=1e-3)
     assert w[1] == pytest.approx(1 / 0.06, rel=1e-3)
     assert w[2] == pytest.approx(1 / 0.24, rel=1e-3)
@@ -236,7 +242,7 @@ def test_confusion_matrix_silently_drops_out_of_range_truth():
     cm = ConfusionMatrix(N_CLASSES)
     truth = np.array([0, 1, 2, 3, 4, 5])
     cm.update(truth, np.zeros(6, dtype="int64"))
-    assert cm.matrix.sum() == 3, "i pixel 3, 4 e 5 vengono scartati senza errore"
+    assert cm.matrix.sum() == 3, "pixels 3, 4 and 5 are dropped without an error"
 
 
 def test_collapsed_mapping_separates_thin_from_thick():
@@ -253,8 +259,8 @@ def test_collapsed_mapping_separates_thin_from_thick():
     for vessel in VESSELS:
         wrong = TABLE.riv(vessel, six[1]) - TABLE.riv(vessel, six[2])
         right = TABLE.riv(vessel, three[1]) - TABLE.riv(vessel, three[2])
-        assert wrong == 0, "presupposto del bug: New ice e Young ice hanno lo stesso RIV"
-        assert right != 0, f"{vessel}: ghiaccio sottile e spesso devono differire"
+        assert wrong == 0, "premise of the bug: New ice and Young ice have the same RIV"
+        assert right != 0, f"{vessel}: thin and thick ice must differ"
 
 
 def test_collapsed_weights_still_respect_the_clip(tmp_path):

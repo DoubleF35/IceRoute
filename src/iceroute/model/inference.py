@@ -1,4 +1,4 @@
-"""Whole-scene inference by overlapping tiles. SPEC §7.3.
+"""Whole-scene inference by overlapping tiles.
 
 A scene is ~5000x5000 pixels and the model was trained on 256x256 patches, so
 inference is tiled. Two things make a naive tiling wrong, and both are visible
@@ -21,9 +21,9 @@ rows**, and a strip is finalised as soon as no later tile can touch it. Peak
 accumulator memory becomes ``(n_classes, tile, W)`` — about 30 MB for the same
 scene, a 20x reduction.
 
-That is not incidental tidiness. The pitch claims this pipeline belongs on a
-CubeSat; an implementation whose memory grows with scene area would contradict
-the claim on the first slide.
+That is not incidental tidiness. The premise of the project is that this
+pipeline belongs on a CubeSat; an implementation whose memory grows with scene
+area would contradict the premise before anything else is measured.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def tile_starts(extent: int, tile: int, stride: int) -> list[int]:
 
 @dataclass
 class InferenceStats:
-    """What the run cost, for the numbers the pitch is allowed to quote."""
+    """What the run cost, for the numbers the project is allowed to quote."""
 
     scene_shape: tuple[int, int]
     n_tiles: int
@@ -158,9 +158,9 @@ def predict_scene(
     import time
 
     if channels.ndim != 3:
-        raise ValueError(f"Attese (C, H, W), ricevuto {channels.shape}")
+        raise ValueError(f"Expected (C, H, W), got {channels.shape}")
     if overlap >= tile_size:
-        raise ValueError(f"overlap ({overlap}) deve essere < tile_size ({tile_size})")
+        raise ValueError(f"overlap ({overlap}) must be < tile_size ({tile_size})")
 
     t0 = time.monotonic()
     dev = torch.device(device)
@@ -250,11 +250,11 @@ def predict_scene(
     )
     if pad_h or pad_w:
         stats.warnings.append(
-            f"Scena più piccola di un tile: padding di {pad_h}x{pad_w} px replicando il bordo."
+            f"Scene smaller than one tile: padding by {pad_h}x{pad_w} px, replicating the edge."
         )
 
     log.info(
-        "inferenza %dx%d: %d tile, %.1fs, accumulatore %.0f MB (naive %.0f MB)",
+        "inference %dx%d: %d tiles, %.1fs, accumulator %.0f MB (naive %.0f MB)",
         orig_h,
         orig_w,
         n_tiles,
