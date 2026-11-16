@@ -58,6 +58,7 @@ Three rules run through the whole log:
 - [D-039 — `console.html`: the real geography the scenes had always carried](#d-039)
 - [D-040 — The route snaked through open water: string pulling after A*](#d-040)
 - [D-041 — The console takes Blueprint's palette, read from the source](#d-041)
+- [D-042 — Probabilities are calibrated by temperature scaling, fitted on validation](#d-042)
 - [Early estimates vs. measurements](#early-estimates-vs-measurements)
 - [Provisional values](#provisional-values)
 
@@ -1976,6 +1977,44 @@ outside the tokens.
 
 **Data colours are not touched**: the route stays `#ff2d95` from `overlay.py`, the RIO stays
 green/yellow/red from `precompute.py`. They are measurements, not style.
+
+---
+
+<a id="d-042"></a>
+## D-042 — Probabilities are calibrated by temperature scaling, fitted on validation
+
+**Date:** 2026-11-17 · **Status:** accepted
+
+D-018 showed that the model's errors are confident. That is harmless while the router reads only
+labels, and it stops being harmless the moment anything reads a probability: a rule such as "avoid
+a cell if P(thick ice) ≥ 5 %" is only as safe as that 5 % is honest.
+
+**Measured** (`iceroute.model.calibration`, 200,000 pixels sampled per scene):
+
+| | Uncalibrated | T = 2.52 |
+|---|---|---|
+| Top-class ECE (15 bins), 20 official test scenes | **16.4 %** | **3.9 %** |
+| NLL | 0.963 | 0.554 |
+| Brier score | 0.361 | 0.308 |
+| Class-wise ECE: Open water / Thin ice / Thick ice | 6.8 / 11.0 / 15.5 % | 4.8 / 6.2 / 7.0 % |
+| Pixel accuracy | 0.797 | 0.797 |
+| Mean confidence on wrong pixels | 0.909 | 0.754 |
+
+**Decision.** One temperature, fitted by minimising NLL on the 10 scenes of the frozen validation
+split, frozen, then applied to the test scenes. It is the simplest method that works (Guo et al.,
+2017): one scalar, no retraining, no change to any label, mIoU or route, and it costs one division
+per pixel on board.
+
+**Why on log-probabilities.** Tiles are blended in probability space (D-013), so logits do not exist
+for the whole scene. Temperature is applied to `log p` of the blended probabilities, which is exact
+inside a tile and a close approximation in the 32-pixel overlap bands.
+
+**What it does not fix.** Accuracy is unchanged by construction, and on its wrong pixels the model
+still places 0.75 on the wrong class. Calibration makes the *average* confidence honest; it does
+not make an individual confident error less wrong. That part is the model's, not the decision rule's.
+
+**Consequence.** Calibrated probabilities are what make the chance-constrained rule of D-043
+meaningful: its threshold α can be read as a frequency.
 
 ---
 

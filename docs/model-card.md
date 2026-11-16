@@ -75,10 +75,20 @@ flight accelerator.
 
 ## Calibration
 
-See [`artifacts/calibration.json`](../artifacts/calibration.json) and
-[D-042](decisions.md#d-042). The model's errors are confident ([D-018](decisions.md#d-018)):
-temperature scaling corrects the average over-confidence, but it cannot move probability onto
-the true class of a pixel that is wrong with 99 % confidence.
+Temperature scaling, fitted on the 10 validation scenes and measured on the 20 test scenes
+([D-042](decisions.md#d-042), [`artifacts/calibration.json`](../artifacts/calibration.json)):
+
+| | Uncalibrated | T = 2.52 |
+|---|---|---|
+| Top-class ECE | 16.4 % | **3.9 %** |
+| NLL / Brier | 0.963 / 0.361 | **0.554 / 0.308** |
+| Class-wise ECE, *Thick ice* | 15.5 % | **7.0 %** |
+
+![Reliability diagram](img/reliability.png)
+
+Calibration leaves every label, and therefore mIoU and every route, unchanged. The model's errors
+stay confident ([D-018](decisions.md#d-018)): on wrong pixels it still puts 0.75 on the wrong
+class after scaling. Temperature fixes the average over-confidence, not individual errors.
 
 ## Known limitations
 
