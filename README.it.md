@@ -20,6 +20,8 @@ più veloce che una data nave può percorrere secondo le regole IMO POLARIS e tr
 | Modello | 7,53 MB FP32 → **2,05 MB INT8**, nessuna perdita misurabile |
 | Latenza per tile 256², 1 thread CPU | 93 ms FP32 → **40 ms INT8** |
 | Compressione del downlink | **439:1** (mediana) |
+| Calibrazione (ECE, test) | **16,4 % → 3,9 %** con una sola temperatura |
+| Regola a rischio controllato (α = 0,1) | pixel non sicuri **5,6 % → 2,3 %**, senza riaddestrare ([D-043](docs/decisions.md#d-043)) |
 
 ## Avvio rapido
 

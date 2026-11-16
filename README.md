@@ -18,7 +18,7 @@ of the image: 148 KB instead of 55 MB, of which the route is 431 bytes.
 [**Live demo**](https://doublef35.github.io/IceRoute/) ·
 [Architecture](docs/architecture.md) ·
 [Model card](docs/model-card.md) ·
-[Decision log (41 entries)](docs/decisions.md) ·
+[Decision log (43 entries)](docs/decisions.md) ·
 [Italiano](README.it.md)
 
 <img src="docs/img/console.png" alt="IceRoute console: Sentinel-1 footprint on the globe, ice map, POLARIS route and the downlinked packet" width="100%">
@@ -70,9 +70,16 @@ official AI4Arctic test set**, never used for training, model selection or demo-
 | **Downlink packet** | **148 KB** median (mask + route) · route alone **431 bytes** |
 | **Unsafe pixels** (model more permissive than the chart, PC6) | **5.6 %** overall · 0.8 % median scene · **41 %** worst scene |
 | **Calibration** (top-class ECE, test) | **16.4 % → 3.9 %** with one temperature fitted on validation |
+| **Risk-aware rule** (α = 0.1, no retraining) | unsafe pixels **5.6 % → 2.3 %** for +1.5 pt over-caution, at the cost of 0.10 mIoU |
 
 The worst case is published on purpose: the demo ships a dedicated worst-case scene, and the
 [model card](docs/model-card.md) lists what the model gets wrong and why.
+
+<img src="docs/img/risk_curve.png" alt="Decision rules on the official test set: mIoU and over-caution against unsafe pixels" width="100%">
+
+<sub>Same model, different decision rules. Lowering α trades map accuracy (left) for fewer unsafe
+pixels; the cost in POLARIS terms (right) is far smaller than the cost to the map. The deployed
+system keeps argmax ([D-043](docs/decisions.md#d-043)).</sub>
 
 <table>
 <tr>
@@ -97,6 +104,8 @@ The worst case is published on purpose: the demo ships a dedicated worst-case sc
   measured on test ([`calibration.py`](src/iceroute/model/calibration.py)). Calibrated
   probabilities make a *chance-constrained* routing rule meaningful: "plan as if the ice were
   thick wherever there is at least an α chance it is" ([`risk.py`](src/iceroute/model/risk.py)).
+  The whole safety/accuracy curve is published rather than one tuned point
+  ([D-043](docs/decisions.md#d-043)).
 * **Streaming inference.** Whole-scene tiled inference with a 20 MB accumulator instead of
   400 MB ([D-013](docs/decisions.md#d-013)) — the difference between fitting on board or not.
 * **Faithful deployment.** ONNX export checked for parity (max |Δlogit| 4 × 10⁻⁵, zero argmax

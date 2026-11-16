@@ -90,6 +90,25 @@ Calibration leaves every label, and therefore mIoU and every route, unchanged. T
 stay confident ([D-018](decisions.md#d-018)): on wrong pixels it still puts 0.75 on the wrong
 class after scaling. Temperature fixes the average over-confidence, not individual errors.
 
+## Decision rule and safety
+
+The deployed system labels each pixel by argmax. A *chance-constrained* rule (most dangerous class
+with calibrated probability ≥ α) was measured on the same 20 test scenes
+([D-043](decisions.md#d-043), [`artifacts/risk_curve.json`](../artifacts/risk_curve.json)), PC6:
+
+| Rule | mIoU | Unsafe | Over-cautious |
+|---|---|---|---|
+| argmax (deployed) | 0.532 | 5.61 % | 5.43 % |
+| α = 0.2 | 0.500 | 4.31 % | 6.22 % |
+| α = 0.1 | 0.433 | **2.28 %** | 6.97 % |
+| α = 0.05 | 0.122 | 0.07 % | 7.19 % |
+
+![Decision rules](img/risk_curve.png)
+
+Below α = 0.1 the map collapses to "thick ice almost everywhere". The over-cautious cost is measured
+with the chart's concentration on both sides, so it understates what a chart-free deployment would
+pay. Effects on routes (transit time, detours) are not yet measured.
+
 ## Known limitations
 
 * **Thin ice is weak** (IoU 0.136): it is the rarest class (8 % of test pixels) and is mostly

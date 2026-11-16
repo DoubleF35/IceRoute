@@ -1,0 +1,524 @@
+{
+  "config": "configs/train3_lovasz.yaml",
+  "temperature": 2.51988945759665,
+  "split": "official AI4Arctic test set",
+  "n_scenes": 20,
+  "weighting": "pixel-weighted over all scenes",
+  "rules": {
+    "argmax": "plain argmax (deployed)",
+    "relative": "most dangerous class with p >= tau * p_max (safety_bias.py)",
+    "chance": "most dangerous class with calibrated p >= alpha (risk.py)"
+  },
+  "curves": {
+    "PC6": [
+      {
+        "rule": "argmax",
+        "threshold": 1.0,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.05608,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8896,
+            "rio_mae": 5.24
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.9,
+        "miou": 0.5309,
+        "binary_accuracy": 0.9056,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.05466,
+            "overcautious_fraction": 0.05507,
+            "operational_agreement": 0.8903,
+            "rio_mae": 5.173
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.7,
+        "miou": 0.5267,
+        "binary_accuracy": 0.9035,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.05175,
+            "overcautious_fraction": 0.05668,
+            "operational_agreement": 0.8916,
+            "rio_mae": 5.048
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.5,
+        "miou": 0.5197,
+        "binary_accuracy": 0.8991,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.04847,
+            "overcautious_fraction": 0.05863,
+            "operational_agreement": 0.8929,
+            "rio_mae": 4.911
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.3,
+        "miou": 0.5051,
+        "binary_accuracy": 0.8886,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.04443,
+            "overcautious_fraction": 0.06138,
+            "operational_agreement": 0.8942,
+            "rio_mae": 4.745
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.1,
+        "miou": 0.4126,
+        "binary_accuracy": 0.8098,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.01738,
+            "overcautious_fraction": 0.07089,
+            "operational_agreement": 0.9117,
+            "rio_mae": 3.599
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.5,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.05608,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8896,
+            "rio_mae": 5.24
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.3,
+        "miou": 0.518,
+        "binary_accuracy": 0.8979,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.04808,
+            "overcautious_fraction": 0.05894,
+            "operational_agreement": 0.893,
+            "rio_mae": 4.896
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.2,
+        "miou": 0.5003,
+        "binary_accuracy": 0.8853,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.04312,
+            "overcautious_fraction": 0.06217,
+            "operational_agreement": 0.8947,
+            "rio_mae": 4.693
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.1,
+        "miou": 0.4333,
+        "binary_accuracy": 0.8294,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.02276,
+            "overcautious_fraction": 0.06969,
+            "operational_agreement": 0.9075,
+            "rio_mae": 3.845
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.05,
+        "miou": 0.1223,
+        "binary_accuracy": 0.4452,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.00068,
+            "overcautious_fraction": 0.07194,
+            "operational_agreement": 0.9274,
+            "rio_mae": 2.635
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.02,
+        "miou": 0.1204,
+        "binary_accuracy": 0.4432,
+        "per_ship_class": {
+          "PC6": {
+            "unsafe_fraction": 0.0,
+            "overcautious_fraction": 0.07206,
+            "operational_agreement": 0.9279,
+            "rio_mae": 2.606
+          }
+        }
+      }
+    ],
+    "PC7": [
+      {
+        "rule": "argmax",
+        "threshold": 1.0,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.05608,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8896,
+            "rio_mae": 5.24
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.9,
+        "miou": 0.5309,
+        "binary_accuracy": 0.9056,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.05466,
+            "overcautious_fraction": 0.05507,
+            "operational_agreement": 0.8903,
+            "rio_mae": 5.173
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.7,
+        "miou": 0.5267,
+        "binary_accuracy": 0.9035,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.05175,
+            "overcautious_fraction": 0.05668,
+            "operational_agreement": 0.8916,
+            "rio_mae": 5.048
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.5,
+        "miou": 0.5197,
+        "binary_accuracy": 0.8991,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.04847,
+            "overcautious_fraction": 0.05863,
+            "operational_agreement": 0.8929,
+            "rio_mae": 4.911
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.3,
+        "miou": 0.5051,
+        "binary_accuracy": 0.8886,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.04443,
+            "overcautious_fraction": 0.06138,
+            "operational_agreement": 0.8942,
+            "rio_mae": 4.745
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.1,
+        "miou": 0.4126,
+        "binary_accuracy": 0.8098,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.01738,
+            "overcautious_fraction": 0.07089,
+            "operational_agreement": 0.9117,
+            "rio_mae": 3.599
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.5,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.05608,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8896,
+            "rio_mae": 5.24
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.3,
+        "miou": 0.518,
+        "binary_accuracy": 0.8979,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.04808,
+            "overcautious_fraction": 0.05894,
+            "operational_agreement": 0.893,
+            "rio_mae": 4.896
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.2,
+        "miou": 0.5003,
+        "binary_accuracy": 0.8853,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.04312,
+            "overcautious_fraction": 0.06217,
+            "operational_agreement": 0.8947,
+            "rio_mae": 4.693
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.1,
+        "miou": 0.4333,
+        "binary_accuracy": 0.8294,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.02276,
+            "overcautious_fraction": 0.06969,
+            "operational_agreement": 0.9075,
+            "rio_mae": 3.845
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.05,
+        "miou": 0.1223,
+        "binary_accuracy": 0.4452,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.00068,
+            "overcautious_fraction": 0.07194,
+            "operational_agreement": 0.9274,
+            "rio_mae": 2.635
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.02,
+        "miou": 0.1204,
+        "binary_accuracy": 0.4432,
+        "per_ship_class": {
+          "PC7": {
+            "unsafe_fraction": 0.0,
+            "overcautious_fraction": 0.07206,
+            "operational_agreement": 0.9279,
+            "rio_mae": 2.606
+          }
+        }
+      }
+    ],
+    "IA": [
+      {
+        "rule": "argmax",
+        "threshold": 1.0,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.06362,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8821,
+            "rio_mae": 6.754
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.9,
+        "miou": 0.5309,
+        "binary_accuracy": 0.9056,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.06184,
+            "overcautious_fraction": 0.05507,
+            "operational_agreement": 0.8831,
+            "rio_mae": 6.664
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.7,
+        "miou": 0.5267,
+        "binary_accuracy": 0.9035,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.05816,
+            "overcautious_fraction": 0.05668,
+            "operational_agreement": 0.8852,
+            "rio_mae": 6.496
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.5,
+        "miou": 0.5197,
+        "binary_accuracy": 0.8991,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.05401,
+            "overcautious_fraction": 0.05863,
+            "operational_agreement": 0.8874,
+            "rio_mae": 6.312
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.3,
+        "miou": 0.5051,
+        "binary_accuracy": 0.8886,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.04865,
+            "overcautious_fraction": 0.06138,
+            "operational_agreement": 0.89,
+            "rio_mae": 6.088
+          }
+        }
+      },
+      {
+        "rule": "relative",
+        "threshold": 0.1,
+        "miou": 0.4126,
+        "binary_accuracy": 0.8098,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.0182,
+            "overcautious_fraction": 0.07089,
+            "operational_agreement": 0.9109,
+            "rio_mae": 4.579
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.5,
+        "miou": 0.5324,
+        "binary_accuracy": 0.9059,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.06362,
+            "overcautious_fraction": 0.05432,
+            "operational_agreement": 0.8821,
+            "rio_mae": 6.754
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.3,
+        "miou": 0.518,
+        "binary_accuracy": 0.8979,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.05357,
+            "overcautious_fraction": 0.05894,
+            "operational_agreement": 0.8875,
+            "rio_mae": 6.29
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.2,
+        "miou": 0.5003,
+        "binary_accuracy": 0.8853,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.04716,
+            "overcautious_fraction": 0.06217,
+            "operational_agreement": 0.8907,
+            "rio_mae": 6.017
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.1,
+        "miou": 0.4333,
+        "binary_accuracy": 0.8294,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.02403,
+            "overcautious_fraction": 0.06969,
+            "operational_agreement": 0.9063,
+            "rio_mae": 4.901
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.05,
+        "miou": 0.1223,
+        "binary_accuracy": 0.4452,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.0009,
+            "overcautious_fraction": 0.07194,
+            "operational_agreement": 0.9272,
+            "rio_mae": 3.294
+          }
+        }
+      },
+      {
+        "rule": "chance",
+        "threshold": 0.02,
+        "miou": 0.1204,
+        "binary_accuracy": 0.4432,
+        "per_ship_class": {
+          "IA": {
+            "unsafe_fraction": 0.0,
+            "overcautious_fraction": 0.07206,
+            "operational_agreement": 0.9279,
+            "rio_mae": 3.258
+          }
+        }
+      }
+    ]
+  }
+}

@@ -38,6 +38,7 @@ flowchart TD
 | Safety-biased decision rule (τ sweep) | `iceroute.model.safety_bias` | D-025 |
 | ONNX export with parity check, INT8 quantization | `iceroute.model.export`, `.quantize` | D-014, D-019 |
 | Temperature scaling, ECE, reliability diagram | `iceroute.model.calibration` | D-042 |
+| Chance-constrained decision rule, safety/accuracy curves | `iceroute.model.risk` | D-043 |
 | Geocoding with scale-factor correction | `iceroute.routing.geocode` | D-010 |
 | POLARIS RIO, most-cautious SOD mapping | `iceroute.routing.polaris`, `data/polaris_rv.csv` | D-007, D-008 |
 | Cost grid, land mask, speed model | `iceroute.routing.cost` | D-026 |

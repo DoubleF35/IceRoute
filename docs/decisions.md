@@ -59,6 +59,7 @@ Three rules run through the whole log:
 - [D-040 — The route snaked through open water: string pulling after A*](#d-040)
 - [D-041 — The console takes Blueprint's palette, read from the source](#d-041)
 - [D-042 — Probabilities are calibrated by temperature scaling, fitted on validation](#d-042)
+- [D-043 — A risk-aware decision rule is measured, published as a curve, and not deployed](#d-043)
 - [Early estimates vs. measurements](#early-estimates-vs-measurements)
 - [Provisional values](#provisional-values)
 
@@ -2015,6 +2016,65 @@ not make an individual confident error less wrong. That part is the model's, not
 
 **Consequence.** Calibrated probabilities are what make the chance-constrained rule of D-043
 meaningful: its threshold α can be read as a frequency.
+
+---
+
+<a id="d-043"></a>
+## D-043 — A risk-aware decision rule is measured, published as a curve, and not deployed
+
+**Date:** 2026-11-17 · **Status:** accepted
+
+`argmax` minimises classification error, and classification error is symmetric. POLARIS is not:
+calling thick ice thin can send a ship into ice it is not certified for, while the opposite error
+costs a detour. With calibrated probabilities (D-042) a different rule becomes expressible:
+**chance-constrained** labelling, "treat a cell as the most dangerous class whose calibrated
+probability is at least α". It is one comparison per pixel, so it is as cheap on board as argmax.
+
+**Measured** (`iceroute.model.risk`, 20 official test scenes, pixel-weighted, PC6 vessel;
+[`artifacts/risk_curve.json`](../artifacts/risk_curve.json)):
+
+| Rule | mIoU | Ice/water accuracy | **Unsafe** | Over-cautious | Same decision as the chart |
+|---|---|---|---|---|---|
+| argmax (deployed) | **0.532** | **0.906** | 5.61 % | **5.43 %** | 89.0 % |
+| α = 0.3 | 0.518 | 0.898 | 4.81 % | 5.89 % | 89.3 % |
+| α = 0.2 | 0.500 | 0.885 | 4.31 % | 6.22 % | 89.5 % |
+| **α = 0.1** | 0.433 | 0.829 | **2.28 %** | 6.97 % | 90.8 % |
+| α = 0.05 | 0.122 | 0.445 | 0.07 % | 7.19 % | 92.7 % |
+
+PC7 is identical; IA follows the same shape (argmax 6.36 % unsafe, α = 0.1 2.40 %).
+
+![Decision rules: map accuracy and POLARIS cost against unsafe pixels](img/risk_curve.png)
+
+**What the curve says.**
+
+1. **Safety can be bought without retraining.** At α = 0.1 the unsafe fraction falls by 59 %
+   (5.61 → 2.28 %) for 1.5 points more over-caution.
+2. **The map pays much more than the ship does.** The same step costs 0.10 mIoU, and below
+   α = 0.1 the map collapses: at α = 0.05 almost every ice pixel is called thick and ice/water
+   accuracy drops to 0.445. The map is no longer a usable product at that point.
+3. **The POLARIS cost looks small partly because of the chart.** In this measurement both the
+   predicted and the reference RIO use the analyst's ice concentration (`rio_error`, by design,
+   to isolate the stage-of-development error), so calling open water "thick ice" changes no RIO
+   where the chart says the concentration is zero. In a deployment without a chart, the
+   over-cautious column would grow. The table measures the label decision, not a chart-free
+   system.
+4. **Calibration does not move the frontier.** The relative rule of `safety_bias.py`
+   (τ sweep) lies on the same curve (τ = 0.3: mIoU 0.505, unsafe 4.44 %; τ = 0.1: 0.413,
+   1.74 %). What calibration buys is meaning: α is a probability you can state to a navigator,
+   τ is a ratio you can only tune.
+
+**Decision.**
+
+* The deployed map and route keep **argmax**. The map is the product that gets downlinked and
+  read by people; at every α that changes the unsafe fraction materially, the map degrades
+  visibly.
+* The curve is published, not a single point. Choosing an operating point is a trade-off between
+  map quality and safety, and it belongs to whoever operates the ship, not to whoever trained the
+  model.
+* If a *route-only* safety mode is added later, it should start at **α = 0.1**: the knee of the
+  curve, before the collapse.
+* Not measured yet: the effect on the routes themselves (extra transit time and detours) and on
+  the worst scene. Both are needed before α = 0.1 can be recommended for anything but study.
 
 ---
 
