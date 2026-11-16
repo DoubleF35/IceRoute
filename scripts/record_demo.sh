@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Registra il video di riserva della demo. SPEC §9.5.
+# Records the backup video of the demo.
 #
-# Se il portatile muore all'OGR, il pitch continua dal telefono. Per questo la
-# SPEC lo vuole pronto entro il 1 ottobre, non il 6: un video registrato la sera
-# prima e' un video che nessuno ha guardato.
+# If the laptop dies during a live demo, the walkthrough continues from a phone.
+# That is why the video should be ready well in advance, not the night before:
+# a video recorded the night before is a video nobody has watched.
 #
-# Registra lo SCHERMO mentre la demo gira davvero, invece di montare le PNG in
-# una sequenza. Il motivo e' che il video deve poter sostituire la demo: se
-# mostra qualcosa che la demo non fa, la sostituzione si vede.
+# It records the SCREEN while the demo is really running, instead of stitching
+# the PNGs into a sequence. The reason is that the video must be able to stand in
+# for the demo: if it shows something the demo does not do, the substitution shows.
 
 set -euo pipefail
 
@@ -16,32 +16,32 @@ cd "$REPO"
 
 OUT_DIR="artifacts/video"
 OUT="${OUT_DIR}/iceroute_demo.mp4"
-DURATION="${DURATION:-95}"        # 90 s piu' qualche secondo di margine
+DURATION="${DURATION:-95}"        # 90 s plus a few seconds of margin
 PORT="${PORT:-8501}"
 SIZE="${SIZE:-1920x1080}"
 VENV=".venv"
 
-fail() { echo "ERRORE: $*" >&2; exit 1; }
+fail() { echo "ERROR: $*" >&2; exit 1; }
 
-# --- prerequisiti -----------------------------------------------------------
+# --- prerequisites ----------------------------------------------------------
 command -v ffmpeg >/dev/null 2>&1 || fail \
-  "ffmpeg non installato. Serve: sudo apt install ffmpeg
-   La SPEC §11.1 elenca il video di riserva fra le cose NON tagliabili."
+  "ffmpeg not installed. Install it with: sudo apt install ffmpeg
+   The backup video is not optional: it is what a live demo falls back on."
 
-[ -d "$VENV" ] || fail "$VENV assente. Lancia prima: make setup"
+[ -d "$VENV" ] || fail "$VENV missing. Run first: make setup"
 
 [ -f "data/demo/index.json" ] || fail \
-  "data/demo/index.json assente. Lancia prima: make precompute
-   La demo legge solo file precomputati: senza, non c'e' niente da registrare."
+  "data/demo/index.json missing. Run first: make precompute
+   The demo reads only precomputed files: without them there is nothing to record."
 
 if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
-  fail "Nessun display: la registrazione dello schermo richiede una sessione grafica."
+  fail "No display: screen recording needs a graphical session."
 fi
 
 mkdir -p "$OUT_DIR"
 
-# --- avvio della demo -------------------------------------------------------
-echo "Avvio della demo su :${PORT}..."
+# --- start the demo ---------------------------------------------------------
+echo "Starting the demo on :${PORT}..."
 "$VENV/bin/streamlit" run src/iceroute/demo/app.py \
   --server.port "$PORT" \
   --server.headless true \
@@ -50,47 +50,47 @@ echo "Avvio della demo su :${PORT}..."
   > "$OUT_DIR/streamlit.log" 2>&1 &
 STREAMLIT_PID=$!
 
-# Ferma sempre il server, anche se ffmpeg fallisce a meta'.
+# Always stop the server, even if ffmpeg fails halfway.
 cleanup() {
   kill "$STREAMLIT_PID" 2>/dev/null || true
   wait "$STREAMLIT_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-# Attende che risponda davvero invece di dormire un numero fisso di secondi:
-# su un portatile scarico parte in un secondo, sotto carico in dieci.
-echo -n "Attendo che la demo risponda"
+# Wait until it really answers instead of sleeping a fixed number of seconds:
+# on an idle laptop it starts in one second, under load in ten.
+echo -n "Waiting for the demo to answer"
 for _ in $(seq 1 40); do
   if curl -sf "http://localhost:${PORT}/_stcore/health" >/dev/null 2>&1; then
-    echo " — pronta."
+    echo " — ready."
     break
   fi
   echo -n "."
   sleep 0.5
 done
 curl -sf "http://localhost:${PORT}/_stcore/health" >/dev/null 2>&1 || fail \
-  "La demo non ha risposto entro 20 s. Log in $OUT_DIR/streamlit.log"
+  "The demo did not answer within 20 s. Log in $OUT_DIR/streamlit.log"
 
 cat <<EOF
 
-  La demo gira su http://localhost:${PORT}
-  Aprila a schermo intero, poi percorri il copione:
+  The demo is running at http://localhost:${PORT}
+  Open it full screen, then follow the walkthrough:
 
-    0:00  scena con il ghiaccio che blocca la diretta (20210118T075356)
-    0:15  livello SAR      — "questo e' cio' che vede il satellite"
-    0:30  livello maschera — "questo lo calcola a bordo, in 3,6 s"
-    0:50  livello RIO      — "questo dice POLARIS: qui non si passa"
-    1:10  rotta            — "la diretta e' vietata, IceRoute ne trova una"
-    1:25  card downlink    — "scende solo questo, non la scena"
+    0:00  first scene of the carousel (configs/demo.yaml)
+    0:15  SAR layer       — "this is what the satellite sees"
+    0:30  mask layer      — "this is computed on board, in 3.6 s"
+    0:50  RIO layer       — "this is what POLARIS says: no passage here"
+    1:10  route           — "the direct route is forbidden; IceRoute finds one"
+    1:25  downlink card   — "only this comes down, not the scene"
 
-  La registrazione parte fra 5 secondi e dura ${DURATION}s.
+  Recording starts in 5 seconds and lasts ${DURATION}s.
 EOF
 sleep 5
 
-# --- registrazione ----------------------------------------------------------
-# -draw_mouse 1: il puntatore va visto, e' cio' che rende evidente che qualcuno
-# sta usando l'applicazione invece di guardare un rendering.
-echo "Registrazione..."
+# --- recording --------------------------------------------------------------
+# -draw_mouse 1: the pointer must be visible; it is what makes it obvious that
+# someone is using the application rather than watching a rendering.
+echo "Recording..."
 ffmpeg -y -hide_banner -loglevel warning \
   -f x11grab -framerate 25 -video_size "$SIZE" -draw_mouse 1 \
   -i "${DISPLAY:-:0}" \
@@ -99,15 +99,15 @@ ffmpeg -y -hide_banner -loglevel warning \
   -movflags +faststart \
   "$OUT"
 
-[ -s "$OUT" ] || fail "ffmpeg non ha prodotto un file utilizzabile."
+[ -s "$OUT" ] || fail "ffmpeg did not produce a usable file."
 
 SIZE_MB=$(du -m "$OUT" | cut -f1)
 echo
 echo "Video in $OUT (${SIZE_MB} MB, ${DURATION}s)"
 echo
-echo "Da fare adesso, non il 6 ottobre:"
-echo "  1. guardalo tutto, con l'audio spento, come lo vedrebbe la sala"
-echo "  2. copialo sul telefono"
-echo "  3. copialo su una chiavetta"
+echo "To do now, not the night before:"
+echo "  1. watch all of it, with the sound off, as a viewer would see it"
+echo "  2. copy it to a phone"
+echo "  3. copy it to a USB stick"
 echo
-echo "SPEC §9.5: se il portatile muore all'OGR, il pitch continua dal telefono."
+echo "If the laptop dies during a live demo, the walkthrough continues from the phone."

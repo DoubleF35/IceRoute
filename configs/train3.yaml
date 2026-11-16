@@ -1,50 +1,51 @@
-# Iperparametri di training — SCHEMA RIDOTTO A 3 CLASSI (ripiego SPEC §7.4).
+# Training hyperparameters — REDUCED 3-CLASS SCHEME (fallback, docs/decisions.md D-020).
 #
-# Il modello a 6 classi si è fermato a mIoU 0,272 sul test ufficiale, contro
-# una soglia di 0,60, sbagliando con sicurezza (D-018). Questo file addestra
-# lo schema ridotto: acqua libera / ghiaccio sottile / ghiaccio spesso.
+# The 6-class model stalled at mIoU 0.272 on the official test set, against
+# a threshold of 0.60, and it was confidently wrong (D-018). This file trains
+# the reduced scheme: open water / thin ice / thick ice.
 #
-# I numeri prodotti qui NON sono confrontabili con quelli a 6 classi.
+# The numbers produced here are NOT comparable with the 6-class ones.
 #
-# Nessun valore qui è "a occhio": ognuno o viene dalla SPEC, o è imposto dai
-# 6 GB di VRAM della 4050. Dove ho scelto io, c'è il perché.
+# No value here is a guess: each one either comes from the original design
+# plan or is forced by the 6 GB of VRAM on the RTX 4050. Where I made the
+# choice myself, the reason is given.
 
-seed: 1337                      # fissato e loggato: due run devono coincidere
+seed: 1337                      # fixed and logged: two runs must match
 
 # ---------------------------------------------------------------------------
-# Modello — le chiavi corrispondono a UNetConfig in model/unet.py
+# Model — the keys match UNetConfig in model/unet.py
 # ---------------------------------------------------------------------------
 model:
   in_channels: 3                # hv, hh, incidence_angle
-  n_classes: 3                  # ripiego SPEC §7.4, vedi DECISIONS.md D-020
+  n_classes: 3                  # three-class fallback, see docs/decisions.md D-020
   encoder_channels: [16, 32, 64, 128]
   bottleneck_channels: 256
   groups: 8
-  # Conteggio misurato con questa configurazione: 1.964.182 parametri.
-  # Budget SPEC §7.1: < 2.000.000. Margine: 35.818. Vedi DECISIONS.md D-005.
-  # Se aggiungi il canale distance_to_land (in_channels: 4) il conto sale di
-  # sole 144 unità: il budget regge.
+  # Count measured with this configuration: 1,964,182 parameters.
+  # Parameter budget: < 2,000,000. Margin: 35,818. See docs/decisions.md D-005.
+  # Adding the distance_to_land channel (in_channels: 4) raises the count by
+  # only 144: the budget holds.
 
 # ---------------------------------------------------------------------------
-# Dati
+# Data
 # ---------------------------------------------------------------------------
 data:
   patch_size: 256
   cache_dir: data/processed
 
-  # Le patch su disco restano a 6 classi: il collasso avviene in lettura, così
-  # cambiare schema non costa una nuova estrazione da 15 GB.
+  # Patches on disk stay at 6 classes: the collapse happens on read, so
+  # changing scheme does not cost a new 15 GB extraction.
   collapse_classes: true
-  num_workers: 8                # 22 core disponibili; 8 satura già l'I/O su NVMe
+  num_workers: 8                # 22 cores available; 8 already saturates NVMe I/O
   pin_memory: true
 
 # ---------------------------------------------------------------------------
-# Ottimizzazione
+# Optimisation
 # ---------------------------------------------------------------------------
 train:
-  batch_size: 16                # SPEC §7.2. Se va in OOM scendere a 8 E LOGGARLO
+  batch_size: 16                # On OOM, drop to 8 AND LOG IT
   epochs: 60
-  amp: true                     # obbligatoria: senza, 6 GB non bastano
+  amp: true                     # mandatory: without it, 6 GB is not enough
   amp_dtype: fp16
 
   optimizer:
@@ -61,61 +62,61 @@ train:
     mode: max
     patience: 10
 
-  grad_clip_norm: 1.0           # non nella SPEC: rete piccola + AMP fp16, il clip
-                                # costa nulla ed evita che un singolo batch
-                                # degenere mandi a NaN un training di ore
+  grad_clip_norm: 1.0           # not in the original plan: small network + AMP fp16,
+                                # clipping costs nothing and stops a single degenerate
+                                # batch from sending an hours-long run to NaN
 
 # ---------------------------------------------------------------------------
-# Loss — SPEC §7.2: CrossEntropy con ignore_index + Dice sulle classi valide
+# Loss — CrossEntropy with ignore_index + Dice over the valid classes
 # ---------------------------------------------------------------------------
 loss:
   ce_weight: 1.0
   dice_weight: 0.5
-  ignore_index: 255             # convenzione AI4Arctic: 255 = pixel da ignorare
-                                # DA VERIFICARE con inspect.py (P-01)
+  ignore_index: 255             # AI4Arctic convention: 255 = pixel to ignore
+                                # TO BE VERIFIED with inspect.py (P-01)
 
-  # Pesi di classe inversamente proporzionali alla frequenza. Le classi di old
-  # ice sono rare ed è esattamente su quelle che il routing prende le decisioni:
-  # senza pesi il modello impara a non predirle mai e il mIoU resta comunque alto.
+  # Class weights inversely proportional to frequency. The old-ice classes are
+  # rare, and they are exactly the ones routing makes its decisions on: without
+  # weights the model learns never to predict them and the mIoU stays high anyway.
   class_weights:
     mode: inverse_frequency
-    # Calcolati da artifacts/data_stats.json, non scritti a mano.
+    # Computed from artifacts/data_stats.json, not written by hand.
     normalize: true
-    clip_max: 10.0              # senza tetto, una classe allo 0,01% otterrebbe
-                                # peso 10.000 e dominerebbe il gradiente
+    clip_max: 10.0              # without a cap, a class at 0.01% would get
+                                # weight 10,000 and dominate the gradient
 
 # ---------------------------------------------------------------------------
-# Checkpoint e logging
+# Checkpoints and logging
 # ---------------------------------------------------------------------------
 output:
   checkpoint_dir: artifacts/models
   best_checkpoint: artifacts/models/unet3_fp32.pt
-  log_csv: artifacts/logs/train3_log.csv    # CSV, non wandb: la demo deve
-                                           # funzionare senza rete
+  log_csv: artifacts/logs/train3_log.csv    # CSV, not wandb: the demo must
+                                           # work with the network off
   onnx_fp32: artifacts/models/unet3_fp32.onnx
   onnx_int8: artifacts/models/unet3_int8.onnx
 
 # ---------------------------------------------------------------------------
-# Valutazione — SPEC §7.3 e §7.5
+# Evaluation
 # ---------------------------------------------------------------------------
 eval:
   tile_size: 256
-  tile_overlap: 32              # SPEC §7.3: inferenza a scena intera con blending
+  tile_overlap: 32              # whole-scene inference with blending
   batch_size: 8
 
-  # Soglie minime accettabili per la demo (SPEC §7.4). Sotto queste si riduce
-  # il problema a binario, non si aggiusta il numero.
-  # ATTENZIONE: 0,60 è la soglia SPEC §7.4 per le SEI classi SOD. Qui il
-  # problema è a TRE classi ed è più facile: un mIoU sopra 0,60 con questo
-  # schema NON dimostra di aver superato quella soglia. Vedi D-020.
+  # Minimum acceptable thresholds for the demo. Below them the problem is
+  # reduced (to binary), the number is not adjusted.
+  # WARNING: 0.60 is the threshold for the SIX SOD classes. Here the problem
+  # has THREE classes and is easier: an mIoU above 0.60 with this scheme does
+  # NOT show that that threshold has been met. See D-020.
   min_miou: 0.60
   min_binary_accuracy: 0.90
 
 quantize:
-  calibration_patches: 200      # SPEC §7.5
+  calibration_patches: 200
   method: minmax
   per_channel: true
-  # Se il degrado supera 3 punti di mIoU, la SPEC prevede QAT con Brevitas come
-  # opzionale fuori percorso critico. Prima si misura, poi si decide.
+  # If the degradation exceeds 3 mIoU points, the plan allows QAT with Brevitas
+  # as an option off the critical path. Measure first, then decide.
   max_acceptable_miou_drop: 0.03
   latency_runs: 10

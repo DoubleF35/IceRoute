@@ -1,151 +1,150 @@
-# Configurazione dati AI4Arctic.
+# AI4Arctic data configuration.
 #
-# I nomi di variabile qui sotto sono VERIFICATI su una scena reale
-# (20201016T082722_dmi_prep.nc) con `make inspect`, e riscontrati con il file
-# utils.py del toolkit ufficiale astokholm/AI4ArcticSeaIceChallenge.
-# Non sono copiati dalla SPEC: la SPEC li dava per indicativi e infatti due
-# differiscono (vedi `geometry` sotto).
+# The variable names below are VERIFIED on a real scene
+# (20201016T082722_dmi_prep.nc) with `make inspect`, and cross-checked against
+# utils.py in the official toolkit astokholm/AI4ArcticSeaIceChallenge.
+# They are not copied from the original design notes: those gave them as
+# indicative, and in fact two of them differ (see `geometry` below).
 #
-# Regola: se un nome cambia, si aggiorna QUESTO file, non il codice.
+# Rule: if a name changes, update THIS file, not the code.
 #
-# Lo split congelato sta in configs/split.yaml, che è GENERATO. Questo file è
-# scritto a mano e i suoi commenti sono documentazione: nessuno script lo
-# riscrive.
+# The frozen split lives in configs/split.yaml, which is GENERATED. This file is
+# written by hand and its comments are documentation: no script rewrites it.
 
 # ---------------------------------------------------------------------------
-# Sorgente — Figshare (data.dtu.dk), collection DOI 10.11583/DTU.c.6244065
+# Source — Figshare (data.dtu.dk), collection DOI 10.11583/DTU.c.6244065
 # ---------------------------------------------------------------------------
 source:
   collection_id: 6244065
 
   articles:
-    # Ready-To-Train: già preprocessato, standard-scaled, NaN gestiti.
+    # Ready-To-Train: already preprocessed, standard-scaled, NaNs handled.
     train:
       id: 21316608
-      n_files: 512                 # + il manuale PDF
-      total_bytes: 60201065698     # 60,20 GB per l'intero articolo
+      n_files: 512                 # + the PDF manual
+      total_bytes: 60201065698     # 60.20 GB for the whole article
       pattern: '*_prep.nc'
     test:
       id: 21762830
       n_files: 20                  # + 20 *_reference.nc + 20 *_charts.png
       total_bytes: 2511719753
       pattern: '*_prep.nc'
-      reference_pattern: '*_prep_reference.nc'   # le label, ~790 KB l'una
+      reference_pattern: '*_prep_reference.nc'   # the labels, ~790 KB each
 
-    # NON scaricare: 260 GB, e il preprocessing SAR è fuori scope (SPEC regola 3).
+    # DO NOT download: 260 GB, and SAR preprocessing is out of scope for this project.
     raw_train_do_not_download: 21284967
     raw_test_do_not_download: 21762848
 
   manual_file_id: 38640908         # AI4Arctic_challenge-dataset-manual_21.12.2022.pdf
 
-  # Verificato: nessuna autenticazione. download_url è 302 verso un URL S3
-  # prefirmato con X-Amz-Expires=10, quindi il redirect va seguito subito.
-  # Le richieste Range funzionano ma SOLO con GET: una HEAD riceve 403 perché
-  # la firma S3 è valida solo per GET.
+  # Verified: no authentication. download_url is a 302 to a presigned S3 URL
+  # with X-Amz-Expires=10, so the redirect must be followed immediately.
+  # Range requests work but ONLY with GET: a HEAD gets 403 because the S3
+  # signature is valid only for GET.
   auth_required: false
   supports_range: true
   use_head_requests: false
 
 # ---------------------------------------------------------------------------
-# Selezione del sottoinsieme
+# Subset selection
 # ---------------------------------------------------------------------------
 subset:
-  n_train_scenes: 60               # SPEC §5.3
+  n_train_scenes: 60               # design target for the training subset
   download_all_test: true
 
-  # Il nome file NON contiene la regione: è <YYYYMMDD>T<HHMMSS>_<service>_prep.nc
-  # e `service` vale solo {dmi, cis}. La regione sta nell'attributo HDF5
-  # `original_id` nella root del netCDF, leggibile con una GET Range di 2 KB
-  # senza scaricare la scena. La mappa completa è in data/scene_regions.json.
+  # The file name does NOT contain the region: it is <YYYYMMDD>T<HHMMSS>_<service>_prep.nc
+  # and `service` is only {dmi, cis}. The region is in the HDF5 attribute
+  # `original_id` at the root of the netCDF, readable with a 2 KB Range GET
+  # without downloading the scene. The full map is in data/scene_regions.json.
   stratify_by: [region, month]
   region_source: data/scene_regions.json
 
-  min_free_gb: 25                  # sotto questa soglia il download si ferma con errore
+  min_free_gb: 25                  # below this threshold the download stops with an error
 
-# Lo split vive in configs/split.yaml — generato una volta e mai rigenerato.
+# The split lives in configs/split.yaml — generated once and never regenerated.
 split_file: configs/split.yaml
 
 # ---------------------------------------------------------------------------
-# Variabili netCDF — VERIFICATE su scena reale
+# netCDF variables — VERIFIED on a real scene
 # ---------------------------------------------------------------------------
 variables:
-  # SAR Sentinel-1 dual-pol, corretto per il rumore (NERSC), 80 m/px.
-  # Nota: già standard-scaled dal dataset. Sulla scena verificata i valori vanno
-  # da -1,9 a 2,7 — non sono dB. Nessuna ulteriore normalizzazione.
+  # Sentinel-1 dual-pol SAR, noise-corrected (NERSC), 80 m/px.
+  # Note: already standard-scaled by the dataset. On the verified scene the values
+  # range from -1.9 to 2.7 — they are not dB. No further normalisation.
   sar_hh: nersc_sar_primary
   sar_hv: nersc_sar_secondary
-  incidence_angle: sar_incidenceangle     # anch'esso standard-scaled, non gradi
-  distance_to_land: distance_map          # canale opzionale (ablation, SPEC §7.1)
+  incidence_angle: sar_incidenceangle     # also standard-scaled, not degrees
+  distance_to_land: distance_map          # optional channel (ablation)
 
   targets:
-    sic: SIC          # concentrazione, 0-10 in decimi (+ 255 = ignora)
-    sod: SOD          # stage of development — è il target del progetto
-    floe: FLOE        # non usato: fuori scope (SPEC §3)
+    sic: SIC          # concentration, 0-10 in tenths (+ 255 = ignore)
+    sod: SOD          # stage of development — the project's target
+    floe: FLOE        # not used: out of scope
 
-  # ATTENZIONE — qui la SPEC sbagliava il nome.
-  # La SPEC ipotizzava `sar_grid_latitude` / `sar_grid_longitude` con indici di
-  # linea/campione separati. I nomi reali sono questi, e sono griglie 2D già
-  # formate, il che semplifica la geocodifica.
+  # WARNING — the original design notes had this name wrong.
+  # They assumed `sar_grid_latitude` / `sar_grid_longitude` with separate line/
+  # sample indices. The real names are these, and they are ready-made 2D grids,
+  # which simplifies geocoding.
   geometry:
-    latitude: sar_grid2d_latitude         # 21×21 su una scena 4996×5246
+    latitude: sar_grid2d_latitude         # 21×21 on a 4996×5246 scene
     longitude: sar_grid2d_longitude
     grid_shape: [21, 21]
-    # → serve interpolazione a risoluzione piena prima di riproiettare (SPEC §8.1)
+    # → needs interpolation to full resolution before reprojecting onto the routing grid
 
-  passive_amsr2:                          # non usati nel modello base
+  passive_amsr2:                          # not used in the base model
     [btemp_6_9h, btemp_6_9v, btemp_7_3h, btemp_7_3v, btemp_10_7h, btemp_10_7v,
      btemp_18_7h, btemp_18_7v, btemp_23_8h, btemp_23_8v, btemp_36_5h,
      btemp_36_5v, btemp_89_0h, btemp_89_0v]
 
-  weather_era5:                           # non usate nel modello base
+  weather_era5:                           # not used in the base model
     [u10m_rotated, v10m_rotated, t2m, skt, tcwv, tclw]
 
-# Attributi globali presenti in ogni scena, verificati.
+# Global attributes present in every scene, verified.
 global_attrs:
   scene_id: scene_id
-  original_id: original_id       # contiene regione e prodotto S1 di origine
+  original_id: original_id       # contains the region and the source S1 product
   ice_service: ice_service       # {dmi, cis}
-  pixel_spacing: pixel_spacing   # 80 (metri)
-  flip: flip                     # 1 sulla scena verificata — DA GESTIRE in geocode.py
+  pixel_spacing: pixel_spacing   # 80 (metres)
+  flip: flip                     # 1 on the verified scene — MUST BE HANDLED in geocode.py
 
-fill_value: 255                  # verificato: 'mask' in SIC/SOD/FLOE_LOOKUP del toolkit
+fill_value: 255                  # verified: 'mask' in the toolkit's SIC/SOD/FLOE_LOOKUP
 
 # ---------------------------------------------------------------------------
-# Classi SOD e mappatura verso POLARIS — IL GIUNTO CRITICO (SPEC §6.3)
+# SOD classes and mapping to POLARIS — THE CRITICAL JOINT
 # ---------------------------------------------------------------------------
-# Le 6 classi SOD sono quelle prodotte da SOD_LOOKUP del toolkit ufficiale, che
-# accorpa i codici WMO dell'ice chart. Coincidono con il target di 5-6 classi
-# della SPEC: non serve accorpare ulteriormente.
+# The 6 SOD classes are those produced by SOD_LOOKUP in the official toolkit,
+# which groups the WMO codes of the ice chart. They match the 5-6 class target
+# of the original design: no further grouping is needed.
 sod_classes:
   0: {name: "Open water",  wmo_codes: [0, 80]}
   1: {name: "New ice",     wmo_codes: [81, 82]}       # new ice, nilas/ring ice
   2: {name: "Young ice",   wmo_codes: [83, 84, 85]}   # young, grey, grey-white
-  3: {name: "Thin FYI",    wmo_codes: [87, 88, 89]}   # thin FYI + stadi 1 e 2
-  4: {name: "Thick FYI",   wmo_codes: [86, 91, 93]}   # FYI generico, medium, thick
+  3: {name: "Thin FYI",    wmo_codes: [87, 88, 89]}   # thin FYI + stages 1 and 2
+  4: {name: "Thick FYI",   wmo_codes: [86, 91, 93]}   # generic FYI, medium, thick
   5: {name: "Old ice",     wmo_codes: [95, 96, 97]}   # old, second year, multi-year
-  255: {name: "Ignora",    wmo_codes: [98, 99]}       # glacier ice, sconosciuto
+  255: {name: "Ignore",    wmo_codes: [98, 99]}       # glacier ice, unknown
 
 n_classes: 6
 
-# Mappatura da classe SOD alla colonna di data/polaris_rv.csv.
+# Mapping from SOD class to the column of data/polaris_rv.csv.
 #
-# Ogni classe SOD copre più tipi di ghiaccio POLARIS, quindi la scelta della
-# colonna è una decisione. Regola adottata: **si sceglie sempre la colonna con
-# il RIV più basso fra quelle coperte**, cioè la più cauta. Un errore in questa
-# direzione produce una rotta più prudente del necessario; l'errore opposto
-# manda una nave in ghiaccio che non può affrontare.
+# Each SOD class covers several POLARIS ice types, so the choice of column is a
+# decision. Rule adopted: **always take the column with the lowest RIV among
+# those covered**, i.e. the most cautious one. An error in this direction
+# produces a route more prudent than necessary; the opposite error sends a ship
+# into ice it cannot handle.
 #
-# Giustificazione per riga (nomenclatura WMO):
-#   Young ice = 10-30 cm = grey (10-15) + grey-white (15-30). Si prende
-#     grey_white_ice: per IB vale 1 contro il 2 di grey_ice.
-#   Thin FYI = 30-70 cm = 1st stage (30-50) + 2nd stage (50-70). Si prende
-#     thin_fyi_2nd_stage: per IA vale 0 contro 1.
-#   Thick FYI: la classe SOD 4 accorpa anche il medium FYI (codice 91). Si
-#     prende thick_fyi: per PC6 vale -1 contro lo 0 di medium_fyi.
-#   Old ice = second year + multi-year. Si prende heavy_multi_year_ice, che è
-#     anche la colonna che la circolare §1.1.2 impone quando non si può
-#     determinare con sicurezza che il multi-year sia sotto 2,5 m — e da un
-#     chart SOD non si può.
+# Justification per row (WMO nomenclature):
+#   Young ice = 10-30 cm = grey (10-15) + grey-white (15-30). Take
+#     grey_white_ice: for IB it is 1 against 2 for grey_ice.
+#   Thin FYI = 30-70 cm = 1st stage (30-50) + 2nd stage (50-70). Take
+#     thin_fyi_2nd_stage: for IA it is 0 against 1.
+#   Thick FYI: SOD class 4 also includes medium FYI (code 91). Take
+#     thick_fyi: for PC6 it is -1 against 0 for medium_fyi.
+#   Old ice = second year + multi-year. Take heavy_multi_year_ice, which is
+#     also the column the circular's §1.1.2 requires when it cannot be
+#     determined with confidence that the multi-year ice is under 2.5 m — and
+#     from a SOD chart it cannot.
 sod_to_polaris:
   0: ice_free
   1: new_ice
@@ -155,38 +154,38 @@ sod_to_polaris:
   5: heavy_multi_year_ice
 
 # ---------------------------------------------------------------------------
-# Estrazione patch (SPEC §6.2)
+# Patch extraction
 # ---------------------------------------------------------------------------
 patches:
   size: 256
-  stride: 192                      # sovrapposizione 64 px
-  max_invalid_fraction: 0.30       # scarta patch con >30% di pixel non validi
+  stride: 192                      # 64 px overlap
+  max_invalid_fraction: 0.30       # discard patches with >30% invalid pixels
 
-  # Bilanciamento: una scena artica è per lo più acqua aperta o ghiaccio
-  # uniforme. Senza questo, il modello impara a predire una classe sola.
-  margin_fraction_target: 0.40     # almeno il 40% delle patch con un margine
+  # Balancing: an Arctic scene is mostly open water or uniform ice. Without
+  # this, the model learns to predict a single class.
+  margin_fraction_target: 0.40     # at least 40% of patches contain a margin
   margin_criterion:
-    min_classes: 2                 # ≥2 classi SOD nella patch...
-    min_class_fraction: 0.10       # ...ciascuna con ≥10% dei pixel validi
+    min_classes: 2                 # ≥2 SOD classes in the patch...
+    min_class_fraction: 0.10       # ...each with ≥10% of the valid pixels
 
-  # COME si ottiene quel 40%. Vedi DECISIONS.md D-017.
+  # HOW that 40% is obtained. See docs/decisions.md D-017.
   #
-  #   discard — si buttano le patch uniformi in eccesso. Semplice, ma alla prima
-  #             misura reale teneva 1.850 patch su 12.594 valide: il 14,7%. Il
-  #             modello andava in overfitting a mIoU 0,26 con la loss di training
-  #             ancora in discesa. Il rapporto era giusto e i dati non c'erano.
-  #   sampler — si tiene TUTTO nella cache e il 40% si ottiene pesando il
-  #             campionamento durante il training. Stesso bilanciamento, 6,8×
-  #             i dati. Costa spazio su disco (~15 GB contro 2,2 GB).
+  #   discard — the excess uniform patches are thrown away. Simple, but on the
+  #             first real measurement it kept 1,850 patches out of 12,594 valid
+  #             ones: 14.7%. The model overfitted at mIoU 0.26 with the training
+  #             loss still falling. The ratio was right and the data was not there.
+  #   sampler — EVERYTHING is kept in the cache and the 40% is obtained by
+  #             weighting the sampling during training. Same balance, 6.8× the
+  #             data. Costs disk space (~15 GB against 2.2 GB).
   #
-  # 'discard' resta disponibile per rigenerare la cache piccola di un confronto.
+  # 'discard' remains available to regenerate the small cache for a comparison.
   balance: sampler
 
   augmentation:
     hflip: true
     vflip: true
     rot90: true
-    # VIETATI: rotazione arbitraria (interpola un target categorico) e color
-    # jitter (il backscatter è una grandezza fisica, non estetica). SPEC §6.2.
+    # FORBIDDEN: arbitrary rotation (it interpolates a categorical target) and
+    # colour jitter (backscatter is a physical quantity, not an aesthetic one).
     arbitrary_rotation: false
     color_jitter: false

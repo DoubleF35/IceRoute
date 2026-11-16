@@ -1,6 +1,6 @@
 """Choose between the trained models, on the official test set. Writes the winner.
 
-Three things make this a script rather than a judgement call at 3 a.m.:
+Three things make this a script rather than a late-night judgement call:
 
 * **The comparison is on the official test set**, never on validation. Every one
   of these models early-stopped on val mIoU, so val flatters each of them by an
@@ -33,19 +33,19 @@ MIN_GAIN = 0.01
 # no way to express the case that actually occurred. It was written expecting
 # the trade-off to be "more accurate but more permissive", and treated the
 # permissive fraction purely as a veto against such a challenger. Lovász was the
-# opposite: accuracy indistinguishable (-0,0028 pooled, +0,025 per-scene) and
+# opposite: accuracy indistinguishable (-0.0028 pooled, +0.025 per-scene) and
 # ten points safer. Under the old rule that model was rejected — not by a
 # judgement about safety, but because the rule had no branch for it.
 #
 # The asymmetry justifying this is not new and is not fitted to the result: it
-# is the same one behind D-008 and rio_error.py. Being too cautious costs time;
+# is the same one behind docs/decisions.md D-008 and rio_error.py. Being too cautious costs time;
 # being too permissive costs the ship.
 SAFETY_MARGIN = 0.05
 
 CANDIDATES = [
     ("baseline", "configs/train3.yaml", "artifacts/metrics.json"),
     ("lovasz", "configs/train3_lovasz.yaml", "artifacts/eval_lovasz/metrics.json"),
-    ("piu_dati", "configs/train3_more.yaml", "artifacts/eval_more/metrics.json"),
+    ("more_data", "configs/train3_more.yaml", "artifacts/eval_more/metrics.json"),
 ]
 
 
@@ -82,9 +82,9 @@ def choose(found: list, incumbent: tuple) -> tuple:
 
     The first version walked the list and compared each candidate against the
     running best. That is order-dependent, and here it actually changed the
-    answer: ``piu_dati`` is 6,9 points safer than the baseline at
+    answer: ``more_data`` is 6.9 points safer than the baseline at
     indistinguishable accuracy, so it would win if it came first, and then
-    ``lovasz`` — only 3,5 points safer than *it* — would fail to displace it.
+    ``lovasz`` — only 3.5 points safer than *it* — would fail to displace it.
     Same three models, same numbers, different winner depending on how the list
     was written. A selection rule that does that will eventually swap the demo's
     model for no reason anybody can reconstruct.
@@ -111,8 +111,8 @@ def choose(found: list, incumbent: tuple) -> tuple:
             clear.append((f, gain))
         elif gain > MIN_GAIN:
             log.info(
-                "\n%s ha mIoU migliore (%+.4f) ma frazione permissiva peggiore "
-                "(%.2f%% contro %.2f%%): SCARTATO.",
+                "\n%s has a better mIoU (%+.4f) but a worse permissive fraction "
+                "(%.2f%% against %.2f%%): REJECTED.",
                 f[0],
                 gain,
                 100 * u,
@@ -120,9 +120,7 @@ def choose(found: list, incumbent: tuple) -> tuple:
             )
     if clear:
         f, gain = max(clear, key=lambda x: x[1])
-        log.info(
-            "\n%s batte %s di %+.4f di mIoU senza peggiorare la sicurezza.", f[0], inc_name, gain
-        )
+        log.info("\n%s beats %s by %+.4f mIoU without making safety worse.", f[0], inc_name, gain)
         return f
 
     # -- 2. accuracy indistinguishable: the safety metric decides -----------
@@ -136,8 +134,8 @@ def choose(found: list, incumbent: tuple) -> tuple:
         safety_gain = ui - _unsafe(f[2])
         if safety_gain >= SAFETY_MARGIN:
             log.info(
-                "\n%s ha mIoU indistinguibile da %s (%+.4f, sotto la soglia di %.2f) "
-                "ma è più sicuro di %.1f punti (%.2f%% contro %.2f%%).",
+                "\n%s has an mIoU indistinguishable from %s (%+.4f, below the %.2f threshold) "
+                "but is %.1f points safer (%.2f%% against %.2f%%).",
                 f[0],
                 inc_name,
                 f[2]["miou"] - inc["miou"],
@@ -147,13 +145,13 @@ def choose(found: list, incumbent: tuple) -> tuple:
                 100 * ui,
             )
             log.info(
-                "Un errore troppo cauto costa tempo, uno troppo permissivo costa la "
-                "nave: a parità di accuratezza decide la sicurezza."
+                "An error that is too cautious costs time, one that is too permissive "
+                "costs the ship: at equal accuracy, safety decides."
             )
             return f
 
     # -- 3. nothing convincing ---------------------------------------------
-    log.info("\nNessun candidato batte %s in modo convincente: resta lui.", inc_name)
+    log.info("\nNo candidate convincingly beats %s: it stays.", inc_name)
     return incumbent
 
 
@@ -164,14 +162,16 @@ def main() -> int:
     for name, cfg, metrics in CANDIDATES:
         r = read(metrics)
         if r is None:
-            log.info("%-10s nessuna valutazione", name)
+            log.info("%-10s no evaluation", name)
             continue
-        if r["split"] != "test_ufficiale":
-            log.info("%-10s valutato su '%s', non sul test ufficiale: escluso", name, r["split"])
+        if r["split"] != "official_test":
+            log.info(
+                "%-10s evaluated on '%s', not on the official test set: excluded", name, r["split"]
+            )
             continue
         found.append((name, cfg, r))
         log.info(
-            "%-10s mIoU %.4f (per scena %.4f) · gh/acqua %.4f · permissiva peggiore %s",
+            "%-10s mIoU %.4f (per scene %.4f) · ice/water %.4f · worst permissive %s",
             name,
             r["miou"],
             r["miou_per_scene"] if isinstance(r["miou_per_scene"], float) else float("nan"),
@@ -180,7 +180,7 @@ def main() -> int:
         )
 
     if not found:
-        log.info("\nNessun candidato valutato: resta configs/train3.yaml")
+        log.info("\nNo candidate evaluated: keeping configs/train3.yaml")
         Path("artifacts/best_config.txt").write_text("configs/train3.yaml\n")
         return 0
 
@@ -188,9 +188,9 @@ def main() -> int:
     best_name, best_cfg, best = choose(found, incumbent)
 
     Path("artifacts/best_config.txt").write_text(best_cfg + "\n")
-    log.info("\nSCELTO: %s (%s)", best_name, best_cfg)
+    log.info("\nPICKED: %s (%s)", best_name, best_cfg)
     log.info(
-        "mIoU %.4f (per scena %.4f) · ghiaccio/acqua %.4f · permissiva peggiore %s",
+        "mIoU %.4f (per scene %.4f) · ice/water %.4f · worst permissive %s",
         best["miou"],
         best["miou_per_scene"] if isinstance(best["miou_per_scene"], float) else float("nan"),
         best["binary"],

@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""Project status: which gates are green, what is missing, how much time is left.
+"""Project status: which pipeline stages are done and what is missing.
 
 Run with ``make status``. Reads the filesystem only — it never re-runs anything,
-so it is safe to call at any moment, including five minutes before the pitch.
+so it is safe to call at any moment, including right before a live demo.
 """
 
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-
-FEATURE_FREEZE = date(2026, 10, 1)
-PITCH_DAY = date(2026, 10, 7)
 
 GREEN, YELLOW, RED, DIM, BOLD, RESET = (
     "\033[32m",
@@ -66,62 +62,61 @@ def main() -> int:
     n_patch = _count("*.npz", "data/processed")
     raw_gb = _size_gb("data/raw")
 
-    print(f"\n{BOLD}IceRoute — stato{RESET}")
+    print(f"\n{BOLD}IceRoute — status{RESET}")
     print("=" * 62)
 
-    # --- Calendario ---------------------------------------------------------
-    today = date.today()
-    to_freeze = (FEATURE_FREEZE - today).days
-    to_pitch = (PITCH_DAY - today).days
-    freeze_col = RED if to_freeze <= 7 else YELLOW if to_freeze <= 14 else DIM
-    print(f"\n{BOLD}Calendario{RESET}")
-    print(f"  Oggi                {today.isoformat()}")
-    print(
-        f"  Feature freeze      {FEATURE_FREEZE.isoformat()}  {freeze_col}fra {to_freeze} giorni{RESET}"
-    )
-    print(f"  Wave / OGR Torino   {PITCH_DAY.isoformat()}  {DIM}fra {to_pitch} giorni{RESET}")
-
-    # --- Gate ---------------------------------------------------------------
-    print(f"\n{BOLD}Gate{RESET}")
+    # --- Pipeline stages ----------------------------------------------------
+    print(f"\n{BOLD}Stages{RESET}")
 
     g01 = _exists(".venv/bin/python") and _exists("requirements.txt")
-    print(f"  {mark(g01)} 0.1  ambiente + CUDA")
+    print(f"  {mark(g01)} 0.1  environment + CUDA")
 
     g02 = _exists("configs/data.yaml") and _count("inspect_*.png", "artifacts/figures") > 0
-    print(f"  {mark(g02, partial=n_train > 0)} 0.2  ispezione dati, nomi variabile verificati")
+    print(f"  {mark(g02, partial=n_train > 0)} 0.2  data inspection, variable names verified")
 
     g1 = n_patch > 0 and _exists("artifacts/data_stats.json")
-    print(f"  {mark(g1, partial=n_patch > 0)} 1    pipeline patch")
+    print(f"  {mark(g1, partial=n_patch > 0)} 1    patch pipeline")
 
-    has_miou = "miou" in str(m).lower()
-    g2 = _exists("artifacts/models/unet_int8.onnx") and has_miou
+    best_cfg = REPO / "artifacts" / "best_config.txt"
+    stem = "unet3lov"
+    if best_cfg.exists():
+        import yaml
+
+        cfg = yaml.safe_load((REPO / best_cfg.read_text().strip()).read_text())
+        stem = Path(cfg["output"]["onnx_int8"]).name.replace("_int8.onnx", "")
+    has_eval = bool(m.get("evaluation", {}).get("scenes", {}).get("aggregate"))
+    g2 = _exists(f"artifacts/models/{stem}_int8.onnx") and has_eval
     print(
-        f"  {mark(g2, partial=_exists('artifacts/models/unet_fp32.pt'))} 2    modello addestrato + INT8"
+        f"  {mark(g2, partial=_exists(f'artifacts/models/{stem}_fp32.pt'))} 2    "
+        f"trained model + INT8 ({stem})"
     )
 
-    n_geojson = _count("*.geojson", "data/demo")
-    g3 = n_geojson >= 15  # 5 scene demo × 3 ice class
-    print(f"  {mark(g3, partial=n_geojson > 0)} 3    geocodifica + POLARIS + rotte")
+    g_cal = _exists("artifacts/calibration.json") and _exists("artifacts/risk_curve.json")
+    print(f"  {mark(g_cal, partial=_exists('artifacts/calibration.json'))} 2.5  calibration + risk")
 
-    g4 = _exists("data/demo/scene_meta.json") and _count("*.mp4", "artifacts/video") > 0
-    print(f"  {mark(g4, partial=_exists('data/demo/scene_meta.json'))} 4    demo + video di backup")
+    n_geojson = _count("*.geojson", "data/demo/routes")
+    g3 = n_geojson >= 15  # 5 demo scenes x 3 ice classes
+    print(f"  {mark(g3, partial=n_geojson > 0)} 3    geocoding + POLARIS + routes")
 
-    # --- Dati ---------------------------------------------------------------
-    print(f"\n{BOLD}Dati{RESET}")
-    print(f"  Scene train         {n_train:>4}  {DIM}(obiettivo 60){RESET}")
-    print(f"  Scene test          {n_test:>4}")
-    print(f"  Patch in cache      {n_patch:>4}")
+    g4 = _exists("data/demo/index.json") and _exists("console.html") and _exists("demo.html")
+    print(f"  {mark(g4, partial=_exists('data/demo/index.json'))} 4    demo bundle + pages")
+
+    # --- Data ---------------------------------------------------------------
+    print(f"\n{BOLD}Data{RESET}")
+    print(f"  Train scenes        {n_train:>4}  {DIM}(target 60){RESET}")
+    print(f"  Test scenes         {n_test:>4}")
+    print(f"  Cached patches      {n_patch:>4}")
     print(f"  data/raw/           {raw_gb:>4.1f} GB")
     n_part = _count("*.part", "data/raw/train") + _count("*.part", "data/raw/test")
     if n_part:
         print(
-            f"  {YELLOW}Download parziali   {n_part:>4}{RESET}  {DIM}(riprendi con 'make download'){RESET}"
+            f"  {YELLOW}Partial downloads   {n_part:>4}{RESET}  {DIM}(resume with 'make download'){RESET}"
         )
 
-    # --- Numeri misurati ----------------------------------------------------
-    print(f"\n{BOLD}Numeri misurati{RESET}")
+    # --- Measured numbers ---------------------------------------------------
+    print(f"\n{BOLD}Measured numbers{RESET}")
     if not m:
-        print(f"  {DIM}artifacts/metrics.json non esiste ancora — 'make report'{RESET}")
+        print(f"  {DIM}artifacts/metrics.json does not exist yet — 'make report'{RESET}")
     else:
 
         def show(label: str, *keys: str, fmt: str = "{}") -> None:
@@ -133,28 +128,43 @@ def main() -> int:
                 cur = cur[k]
             print(f"  {label:<20}{fmt.format(cur)}")
 
-        show("mIoU (val)", "model", "miou", fmt="{:.3f}")
-        show("Acc. ghiaccio/acqua", "model", "binary_accuracy", fmt="{:.3f}")
-        show("Modello INT8", "onboard", "int8_size_mb", fmt="{:.2f} MB")
-        show("Latenza scena", "onboard", "latency_median_s", fmt="{:.2f} s")
-        show("Compressione", "downlink", "ratio", fmt="{:.1f}:1")
+        show("mIoU (test)", "evaluation", "scenes", "aggregate", "miou", fmt="{:.3f}")
+        show(
+            "Ice/water accuracy",
+            "evaluation",
+            "scenes",
+            "aggregate",
+            "binary_accuracy",
+            fmt="{:.3f}",
+        )
+        show("INT8 model", "quantization", "size", "int8_mb", fmt="{:.2f} MB")
+        show(
+            "INT8 tile latency",
+            "quantization",
+            "latency",
+            "single_thread",
+            "int8",
+            "median_ms_per_tile",
+            fmt="{:.1f} ms (1 thread)",
+        )
+        show("Downlink ratio", "compression", "ratio_median", fmt="{:.0f}:1")
 
-    # --- PROVVISORI aperti --------------------------------------------------
-    dec = REPO / "DECISIONS.md"
+    # --- Open provisional values --------------------------------------------
+    dec = REPO / "docs" / "decisions.md"
     if dec.exists():
         open_items = [
             ln
             for ln in dec.read_text().splitlines()
-            if ln.startswith("| P-") and "| Aperta |" in ln
+            if ln.startswith("| P-") and "Closed" not in ln.split("|")[3]
         ]
         colour = RED if open_items else GREEN
-        print(f"\n{BOLD}Voci PROVVISORIE aperte{RESET}  {colour}{len(open_items)}{RESET}")
+        print(f"\n{BOLD}Open PROVISIONAL values{RESET}  {colour}{len(open_items)}{RESET}")
         for ln in open_items:
             parts = [p.strip() for p in ln.split("|")]
             if len(parts) >= 3:
                 print(f"  {DIM}{parts[1]}{RESET}  {parts[2]}")
         if open_items:
-            print(f"  {DIM}Nessuna di queste può finire nel deck finché è aperta.{RESET}")
+            print(f"  {DIM}None of these may appear in a public claim while it is open.{RESET}")
 
     print()
     return 0

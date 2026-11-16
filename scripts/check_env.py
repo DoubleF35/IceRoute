@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Environment gate (SPEC Gate 0.1).
+"""Environment check.
 
 Verifies the machine can actually run the project before anyone wastes a day
 discovering otherwise. Exits non-zero on a hard failure, prints a warning and
@@ -57,40 +57,43 @@ def check_python() -> None:
     else:
         # Not fatal, but the pins in requirements.txt were resolved for 3.11.
         warn(
-            f"Python {v.major}.{v.minor}.{v.micro} (atteso 3.11)",
-            "I pin in requirements.txt sono risolti per 3.11. Rigenerali se cambi versione.",
+            f"Python {v.major}.{v.minor}.{v.micro} (expected 3.11)",
+            "The pins in requirements.txt are resolved for 3.11. Regenerate them if you change version.",
         )
     print(f"    {DIM}{sys.executable}{RESET}")
 
 
 def check_torch() -> None:
-    section("PyTorch e GPU")
+    section("PyTorch and GPU")
     try:
         torch = importlib.import_module("torch")
     except ImportError as exc:
-        fail("torch non importabile", str(exc))
+        fail("torch cannot be imported", str(exc))
         return
 
     ok(f"torch {torch.__version__}")
 
     if not torch.cuda.is_available():
         fail(
-            "CUDA non disponibile — torch.cuda.is_available() è False",
-            "Il training su CPU non è praticabile nei tempi previsti. "
-            "Verifica driver NVIDIA e che la ruota torch sia quella CUDA, non la +cpu.",
+            "CUDA not available — torch.cuda.is_available() is False",
+            "Training on CPU is not practical in any reasonable time. "
+            "Check the NVIDIA driver and that the torch wheel is the CUDA one, not +cpu.",
         )
         return
 
     name = torch.cuda.get_device_name(0)
     props = torch.cuda.get_device_properties(0)
     vram_gb = props.total_memory / 1024**3
-    ok(f"CUDA disponibile — {name}")
+    ok(f"CUDA available — {name}")
     print(
         f"    {DIM}CUDA runtime {torch.version.cuda} · capability {props.major}.{props.minor}{RESET}"
     )
 
     if vram_gb < 5.0:
-        warn(f"VRAM {vram_gb:.1f} GB", "Sotto le attese: riduci batch size in configs/train.yaml.")
+        warn(
+            f"VRAM {vram_gb:.1f} GB",
+            "Below expectations: lower the batch size in configs/train.yaml.",
+        )
     else:
         ok(f"VRAM {vram_gb:.1f} GB")
 
@@ -103,39 +106,39 @@ def check_torch() -> None:
         del a
         torch.cuda.empty_cache()
         if b != b:  # NaN check
-            warn("matmul fp16 su GPU ha prodotto NaN")
+            warn("fp16 matmul on GPU produced NaN")
         else:
-            ok("allocazione e matmul fp16 su GPU riuscite")
-    except Exception as exc:  # noqa: BLE001 — vogliamo davvero qualsiasi eccezione qui
-        fail("La GPU non esegue una matmul", str(exc))
+            ok("fp16 allocation and matmul on GPU succeeded")
+    except Exception as exc:  # noqa: BLE001 — we really do want any exception here
+        fail("The GPU cannot run a matmul", str(exc))
 
-    # AMP is mandatory per SPEC §7.2 given 6 GB of VRAM.
+    # AMP is mandatory given 6 GB of VRAM (see configs/train.yaml).
     if hasattr(torch, "amp") and hasattr(torch.amp, "autocast"):
-        ok("torch.amp disponibile (AMP obbligatoria con 6 GB)")
+        ok("torch.amp available (AMP is mandatory with 6 GB)")
     else:
-        fail("torch.amp non disponibile")
+        fail("torch.amp not available")
 
 
 def check_imports() -> None:
-    section("Dipendenze")
+    section("Dependencies")
     # (module, why it matters if missing)
     required = [
         ("numpy", "array"),
-        ("scipy", "interpolazione griglia geografica"),
-        ("xarray", "lettura netCDF"),
+        ("scipy", "geographic grid interpolation"),
+        ("xarray", "netCDF reading"),
         ("netCDF4", "backend netCDF"),
-        ("skimage", "morfologia mask"),
-        ("sklearn", "matrice di confusione, soglia baseline"),
-        ("pyproj", "CRS e distanza geodetica (test geocodifica)"),
-        ("pyresample", "ricampionamento su EPSG:3413"),
-        ("shapely", "semplificazione rotta"),
+        ("skimage", "mask morphology"),
+        ("sklearn", "confusion matrix, baseline threshold"),
+        ("pyproj", "CRS and geodesic distance (geocoding test)"),
+        ("pyresample", "resampling onto EPSG:3413"),
+        ("shapely", "route simplification"),
         ("onnx", "export"),
-        ("onnxruntime", "inferenza INT8"),
+        ("onnxruntime", "INT8 inference"),
         ("streamlit", "demo"),
-        ("matplotlib", "figure"),
+        ("matplotlib", "figures"),
         ("yaml", "config"),
-        ("requests", "download dataset"),
-        ("psutil", "RAM di picco"),
+        ("requests", "dataset download"),
+        ("psutil", "peak RAM"),
     ]
     missing = []
     for mod, why in required:
@@ -147,20 +150,19 @@ def check_imports() -> None:
             missing.append((mod, why))
 
     for mod, why in missing:
-        fail(f"{mod} mancante", f"serve per: {why}")
+        fail(f"{mod} missing", f"needed for: {why}")
 
 
 def check_disk() -> None:
-    section("Disco")
+    section("Disk")
     usage = shutil.disk_usage(REPO_ROOT)
     free_gb = usage.free / 1024**3
     total_gb = usage.total / 1024**3
-    msg = f"{free_gb:.0f} GB liberi su {total_gb:.0f} GB"
+    msg = f"{free_gb:.0f} GB free of {total_gb:.0f} GB"
     if free_gb < MIN_FREE_GB:
         fail(
-            f"Spazio insufficiente: {msg}",
-            f"Servono almeno {MIN_FREE_GB:.0f} GB per il sottoinsieme del dataset "
-            "e la cache delle patch.",
+            f"Not enough space: {msg}",
+            f"At least {MIN_FREE_GB:.0f} GB is needed for the dataset subset and the patch cache.",
         )
     else:
         ok(msg)
@@ -170,25 +172,25 @@ def check_disk() -> None:
         n = len(list(raw.rglob("*.nc")))
         if n:
             size_gb = sum(f.stat().st_size for f in raw.rglob("*.nc")) / 1024**3
-            ok(f"data/raw/: {n} scene, {size_gb:.1f} GB")
+            ok(f"data/raw/: {n} scenes, {size_gb:.1f} GB")
         else:
-            print(f"    {DIM}data/raw/ vuota — lancia 'make download'{RESET}")
+            print(f"    {DIM}data/raw/ empty — run 'make download'{RESET}")
 
 
 def check_optional_tools() -> None:
-    section("Strumenti opzionali")
+    section("Optional tools")
     for tool, why in [
-        ("ffmpeg", "video di backup (make video) — richiesto entro il 1 ottobre"),
-        ("git", "versionamento"),
+        ("ffmpeg", "backup video (make video)"),
+        ("git", "version control"),
     ]:
         if shutil.which(tool):
             ok(tool)
         else:
-            warn(f"{tool} non installato", why)
+            warn(f"{tool} not installed", why)
 
 
 def main() -> int:
-    print("\nIceRoute — verifica ambiente (Gate 0.1)")
+    print("\nIceRoute — environment check")
     print("=" * 60)
 
     check_python()
@@ -199,16 +201,18 @@ def main() -> int:
 
     print("\n" + "=" * 60)
     if _failures:
-        print(f"{RED}Gate 0.1 NON superato{RESET} — {len(_failures)} problema/i bloccante/i:")
+        print(f"{RED}Environment check FAILED{RESET} — {len(_failures)} blocking problem(s):")
         for f in _failures:
             print(f"  · {f}")
         print()
         return 1
 
     if _warnings:
-        print(f"{GREEN}Gate 0.1 superato{RESET} con {len(_warnings)} avviso/i non bloccante/i.")
+        print(
+            f"{GREEN}Environment check passed{RESET} with {len(_warnings)} non-blocking warning(s)."
+        )
     else:
-        print(f"{GREEN}Gate 0.1 superato.{RESET}")
+        print(f"{GREEN}Environment check passed.{RESET}")
     print()
     return 0
 

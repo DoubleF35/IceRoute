@@ -1,4 +1,4 @@
-"""Quantify *how* the model is wrong, not just how often. Evidence for D-018.
+"""Quantify *how* the model is wrong, not just how often. Evidence for docs/decisions.md D-018.
 
 The mIoU says a fraction of pixels are wrong. It does not say whether the model
 was hesitating between two candidates or certain of the wrong answer, and that
@@ -96,12 +96,12 @@ def combine(per_scene: list[dict]) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Misura la confidenza sugli errori. D-018.")
+    ap = argparse.ArgumentParser(description="Measure the confidence on the errors. D-018.")
     ap.add_argument(
         "--train-config",
         type=Path,
         default=None,
-        help="default: artifacts/best_config.txt, cioè il modello scelto",
+        help="default: artifacts/best_config.txt, i.e. the picked model",
     )
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--raw-dir", type=Path, default=Path("data/raw/test"))
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         args.train_config = Path(
             picked.read_text().strip() if picked.exists() else "configs/train3.yaml"
         )
-    log.info("Modello: %s", args.train_config)
+    log.info("Model: %s", args.train_config)
 
     import torch
 
@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         : args.scenes
     ]
     if not paths:
-        log.error("Nessuna scena con etichette in %s", args.raw_dir)
+        log.error("No labelled scene in %s", args.raw_dir)
         return 1
 
     per_scene = []
@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         row["scene_id"] = scene.meta.scene_id
         per_scene.append(row)
         log.info(
-            "[%2d/%d] %s  errori %5.1f%%  p(sbagliata) %.3f  p(vera) %.4f",
+            "[%2d/%d] %s  errors %5.1f%%  p(wrong) %.3f  p(true) %.4f",
             i,
             len(paths),
             scene.meta.scene_id[:18],
@@ -177,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "config": str(args.train_config),
                 "n_classes": n_classes,
-                "split": "test_ufficiale",
+                "split": "official_test",
                 "aggregate": agg,
                 "per_scene": per_scene,
             },
@@ -187,23 +187,21 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info("=" * 64)
     if not agg.get("n_wrong"):
-        log.info("Nessun errore da analizzare.")
+        log.info("No errors to analyse.")
         return 0
-    log.info("Su %s pixel sbagliati, in mediana il modello mette:", f"{agg['n_wrong']:,}")
-    log.info("  %.3f sulla classe SBAGLIATA che ha scelto", agg["median_p_predicted"])
-    log.info("  %.4f sulla classe VERA", agg["median_p_true"])
+    log.info("Over %s wrong pixels, the model puts, at the median:", f"{agg['n_wrong']:,}")
+    log.info("  %.3f on the WRONG class it chose", agg["median_p_predicted"])
+    log.info("  %.4f on the TRUE class", agg["median_p_true"])
     log.info(
-        "  il %.1f%% degli errori lascia alla classe vera meno dell'1%%",
+        "  %.1f%% of the errors leave the true class less than 1%%",
         100 * agg["frac_true_below_1pct"],
     )
-    log.info(
-        "  il %.1f%% degli errori è un quasi-pareggio (margine < 0,10)", 100 * agg["frac_near_tie"]
-    )
+    log.info("  %.1f%% of the errors are near-ties (margin < 0.10)", 100 * agg["frac_near_tie"])
     log.info("")
     # The verdict keys on frac_near_tie, and getting this wrong once already
     # produced the opposite conclusion from the data. The first version tested
-    # frac_true_below_1pct > 0.5: at 44,6% it printed "worth trying margin
-    # fixes" while only 3,4% of errors were actually near-ties.
+    # frac_true_below_1pct > 0.5: at 44.6% it printed "worth trying margin
+    # fixes" while only 3.4% of errors were actually near-ties.
     #
     # The two are not complements. An error where the true class holds 3% is
     # not below 1%, but it is nowhere near winning either — the winner holds
@@ -211,18 +209,14 @@ def main(argv: list[str] | None = None) -> int:
     # whether there is a margin small enough for a decision rule to close.
     tie = agg["frac_near_tie"]
     if tie < 0.20:
-        log.info(
-            "VERDETTO: il modello sbaglia con sicurezza. Solo il %.1f%% degli errori", 100 * tie
-        )
-        log.info("ha un margine abbastanza stretto da poter essere ribaltato. Le correzioni")
-        log.info("a tempo di inferenza (temperatura, soglie, riordino della decisione) non")
-        log.info("hanno su cosa lavorare: agiscono sul margine fra candidati, e il candidato")
-        log.info("giusto non è in gara. Vedi D-018.")
+        log.info("VERDICT: the model is confidently wrong. Only %.1f%% of the errors", 100 * tie)
+        log.info("have a margin narrow enough to be overturned. Inference-time corrections")
+        log.info("(temperature, thresholds, reordering the decision) have nothing to work")
+        log.info("with: they act on the margin between candidates, and the right candidate")
+        log.info("is not in the running. See docs/decisions.md D-018.")
     else:
-        log.info(
-            "VERDETTO: il %.1f%% degli errori è un quasi-pareggio: una correzione sul", 100 * tie
-        )
-        log.info("margine potrebbe ribaltarne una parte. Vale la pena misurarla.")
+        log.info("VERDICT: %.1f%% of the errors are near-ties: a correction on the", 100 * tie)
+        log.info("margin could overturn some of them. It is worth measuring.")
     return 0
 
 

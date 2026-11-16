@@ -1,138 +1,138 @@
-# Geocodifica, POLARIS, modello di velocità e A*.
+# Geocoding, POLARIS, speed model and A*.
 #
-# LEGGERE PRIMA DI TOCCARE I NUMERI
-# ---------------------------------
-# Ogni valore qui sotto è marcato con la sua provenienza:
+# READ BEFORE TOUCHING THE NUMBERS
+# --------------------------------
+# Every value below is tagged with where it comes from:
 #
-#   [IMO]          preso da MSC.1/Circ.1519. Non modificare senza rileggere la circolare.
-#   [MISURATO]     prodotto da uno script del repo.
-#   [SCELTA]       parametro di implementazione, non una grandezza fisica.
-#   [PROVVISORIO]  NON HA UNA FONTE. Non può finire nel deck finché non ne ha una.
-#                  Compare in DECISIONS.md §99 e la UI lo segnala.
+#   [IMO]          taken from MSC.1/Circ.1519. Do not change without re-reading the circular.
+#   [MEASURED]     produced by a script in this repository.
+#   [CHOICE]       implementation parameter, not a physical quantity.
+#   [PROVISIONAL]  HAS NO SOURCE. It may not appear in any public claim until it has one.
+#                  Listed in docs/decisions.md, *Provisional values*, and flagged by the UI.
 
 # ---------------------------------------------------------------------------
-# Griglia
+# Grid
 # ---------------------------------------------------------------------------
 grid:
-  crs: "EPSG:3413"          # [SCELTA] WGS84 / NSIDC Polar Stereographic North,
-                            # standard per il ghiaccio marino artico
-  resolution_m: 500         # [SCELTA] SPEC §8.1. Gli 80 m nativi sono inutili per
-                            # il routing e rendono A* lentissimo.
+  crs: "EPSG:3413"          # [CHOICE] WGS84 / NSIDC Polar Stereographic North,
+                            # the standard for Arctic sea ice
+  resolution_m: 500         # [CHOICE] The native 80 m is useless for routing
+                            # and makes A* extremely slow.
 
-  # EPSG:3413 è in scala esatta solo a 70°N. Alle latitudini artiche una distanza
-  # piana sottostima quella reale fino al 2,8%. Vedi DECISIONS.md D-010.
-  # Disattivarlo fa fallire tests/test_geocode.py, ed è voluto.
-  apply_scale_factor: true  # [SCELTA] non è opzionale nei fatti
+  # EPSG:3413 is true to scale only at 70°N. At Arctic latitudes a planar distance
+  # underestimates the real one by up to 2.8%. See docs/decisions.md D-010.
+  # Turning this off makes tests/test_geocode.py fail, on purpose.
+  apply_scale_factor: true  # [CHOICE] not optional in practice
 
 # ---------------------------------------------------------------------------
-# Nave
+# Vessel
 # ---------------------------------------------------------------------------
 vessel:
-  # Classi mostrate nella demo. SPEC §8.2 chiede almeno PC6, PC7 e una
-  # rinforzata non-PC: il cambio di classe deve cambiare visibilmente la rotta.
-  classes: [PC6, PC7, IA]   # [SCELTA]
+  # Classes shown in the demo: at least PC6, PC7 and one non-PC ice-strengthened
+  # class, because changing the class has to change the route visibly.
+  classes: [PC6, PC7, IA]   # [CHOICE]
   default_class: PC6
 
-  # ─── L'UNICO NUMERO SENZA FONTE IN QUESTO FILE ───────────────────────────
-  # Velocità in acqua libera. Serve a convertire le distanze in tempi.
+  # ─── THE ONLY UNSOURCED NUMBER IN THIS FILE ──────────────────────────────
+  # Open-water speed. Used to convert distances into times.
   #
-  # La circolare IMO fissa i limiti in condizioni di rischio elevato (Tabella
-  # 1.2, sotto) ma NON la velocità in acqua libera, che dipende dalla nave e
-  # non dalla normativa. Non ho trovato una fonte citabile per una PC6 tipo.
+  # The IMO circular sets the limits under elevated risk (Table 1.2, below) but
+  # NOT the open-water speed, which depends on the ship and not on the
+  # regulation. I found no citable source for a typical PC6.
   #
-  # Conseguenze, da rispettare:
-  #   · il RISPARMIO PERCENTUALE è robusto: v_open si semplifica quasi del tutto
-  #     nel rapporto fra le due rotte;
-  #   · le ORE ASSOLUTE scalano con 1/v_open e vanno mostrate dichiarando
-  #     l'assunzione a schermo;
-  #   · SPEC §10.1: niente dollari senza fonte. Si mostrano le ore.
-  open_water_speed_kn: 12.0   # [PROVVISORIO] vedi DECISIONS.md P-05
+  # Consequences, to be respected:
+  #   · the PERCENTAGE SAVING is robust: v_open almost entirely cancels out in
+  #     the ratio between the two routes;
+  #   · ABSOLUTE HOURS scale with 1/v_open and must be shown with the
+  #     assumption stated on screen;
+  #   · no dollars without a source. Hours are shown instead.
+  open_water_speed_kn: 12.0   # [PROVISIONAL] see docs/decisions.md P-05
 
 # ---------------------------------------------------------------------------
-# Modello di velocità — da RIO a nodi
+# Speed model — from RIO to knots
 # ---------------------------------------------------------------------------
 speed_model:
-  # Tre fasce, che corrispondono ai tre livelli di operazione della circolare
-  # §1.3.2. Non è una curva inventata: è la normativa resa eseguibile.
+  # Three bands, matching the three levels of operation of the circular,
+  # §1.3.2. It is not an invented curve: it is the regulation made executable.
   #
-  #   RIO >= 0         operazione normale        → velocità piena
-  #   -10 <= RIO < 0   rischio elevato           → limite di Tabella 1.2 [IMO]
-  #                                                 (solo Polar Class; sotto PC7
-  #                                                  questa fascia è già no-go)
-  #   RIO < -10        considerazione speciale   → cella impraticabile
+  #   RIO >= 0         normal operation          → full speed
+  #   -10 <= RIO < 0   elevated risk             → Table 1.2 limit [IMO]
+  #                                                 (Polar Class only; below PC7
+  #                                                  this band is already no-go)
+  #   RIO < -10        special consideration     → impassable cell
   #
-  # Limiti in nodi, Tabella 1.2 della circolare. [IMO]
+  # Limits in knots, Table 1.2 of the circular. [IMO]
   elevated_speed_limit_kn:
     PC1: 11.0
     PC2: 8.0
     PC3: 5.0
     PC4: 5.0
     PC5: 5.0
-    PC6: 3.0        # la tabella dice "Below PC5"
+    PC6: 3.0        # the table says "Below PC5"
     PC7: 3.0
 
-  # Interpolazione dentro la fascia di rischio elevato. La circolare dà un
-  # limite, non un profilo: 'step' applica il limite piatto su tutta la fascia
-  # (interpretazione letterale), 'linear' degrada da v_open al limite man mano
-  # che RIO va da 0 a -10.
-  # Si usa 'step': è quello che la circolare dice. 'linear' è più realistico ma
-  # è una nostra invenzione e produrrebbe tempi non difendibili.
-  band_profile: step        # [SCELTA] letterale rispetto alla norma
+  # Interpolation inside the elevated-risk band. The circular gives a limit,
+  # not a profile: 'step' applies the flat limit across the whole band
+  # (literal reading), 'linear' degrades from v_open to the limit as RIO goes
+  # from 0 to -10.
+  # 'step' is used: it is what the circular says. 'linear' is more realistic but
+  # it is our own invention and would produce times that cannot be defended.
+  band_profile: step        # [CHOICE] literal with respect to the regulation
 
 # ---------------------------------------------------------------------------
 # A*
 # ---------------------------------------------------------------------------
 astar:
-  # 16-connessa, non 8. Su griglia 8-connessa il cammino ottimo sovrastima la
-  # lunghezza reale di circa l'8% sulle diagonali (errore di digitalizzazione),
-  # e su una demo che mostra un risparmio percentuale quell'8% è più grande
-  # dell'effetto da mostrare. SPEC §8.4.
-  connectivity: 16          # [SCELTA] motivata sopra
+  # 16-connected, not 8. On an 8-connected grid the optimal path overestimates
+  # the true length by about 8% on diagonals (digitisation error), and on a
+  # demo that shows a percentage saving that 8% is larger than the effect being
+  # shown.
+  connectivity: 16          # [CHOICE] justified above
 
-  # Euristica: distanza euclidea sulla griglia proiettata diviso v_open.
-  # Ammissibile per costruzione, perché nessuna cella può essere percorsa più
-  # velocemente di v_open. Un valore > 1.0 la rende inammissibile e il cammino
-  # non è più ottimo: si guadagna velocità e si perde la garanzia.
-  heuristic_weight: 1.0     # [SCELTA] non alzare senza dichiararlo
+  # Heuristic: Euclidean distance on the projected grid divided by v_open.
+  # Admissible by construction, because no cell can be crossed faster than
+  # v_open. A value > 1.0 makes it inadmissible and the path is no longer
+  # optimal: you gain speed and lose the guarantee.
+  heuristic_weight: 1.0     # [CHOICE] do not raise without declaring it
 
-  # Margine di sicurezza dalla costa. Una rotta che rade la terraferma è
-  # tecnicamente ottima e nauticamente assurda.
-  land_buffer_cells: 2      # [SCELTA]
+  # Safety margin from the coast. A route that grazes the land is technically
+  # optimal and nautically absurd.
+  land_buffer_cells: 2      # [CHOICE]
 
-  max_expansions: 20000000  # [SCELTA] guardia contro un loop su griglia grande
+  max_expansions: 20000000  # [CHOICE] guard against a runaway search on a large grid
 
-  # Raddrizzamento (string pulling) dopo A*. Su griglia, anche 16-connessa, un
-  # tratto che dovrebbe correre a 20° viene costruito con passi a 0°, 26,6° e
-  # 45°: la rotta serpeggia in acqua libera, ed è più lenta di quanto serva.
-  # Il passaggio sostituisce un tratto con la retta solo se ogni cella che
-  # attraversa è praticabile, se NON abbassa il RIO minimo del tratto
-  # sostituito, e se è davvero più veloce. Vedi DECISIONS.md D-040.
-  straighten: true          # [SCELTA]
+  # Straightening (string pulling) after A*. On a grid, even a 16-connected
+  # one, a leg that should run at 20° is built from steps at 0°, 26.6° and
+  # 45°: the route zigzags in open water and is slower than it needs to be.
+  # The pass replaces a leg with the straight line only if every cell it
+  # crosses is passable, if it does NOT lower the minimum RIO of the replaced
+  # leg, and if it really is faster. See docs/decisions.md D-040.
+  straighten: true          # [CHOICE]
 
 # ---------------------------------------------------------------------------
-# Waypoint della demo
+# Demo waypoints
 # ---------------------------------------------------------------------------
-# [PROVVISORIO] Da fissare quando le 5 scene demo saranno scelte a mano: i
-# waypoint devono cadere dentro la scena e su acqua navigabile. Vedi P-07.
+# [PROVISIONAL] To be fixed once the 5 demo scenes are chosen by hand: the
+# waypoints must fall inside the scene and on navigable water. See P-07.
 waypoints: {}
 
 # ---------------------------------------------------------------------------
-# Semplificazione della rotta
+# Route simplification
 # ---------------------------------------------------------------------------
 simplify:
-  max_waypoints: 40         # [SCELTA] SPEC §8.5
-  tolerance_m: 2000         # [SCELTA] Douglas-Peucker; 4 celle a 500 m
-  max_turn_deg: 60          # [SCELTA] virata oltre la quale si segnala un
-                            # segmento non realistico
+  max_waypoints: 40         # [CHOICE]
+  tolerance_m: 2000         # [CHOICE] Douglas-Peucker; 4 cells at 500 m
+  max_turn_deg: 60          # [CHOICE] turn beyond which a leg is flagged
+                            # as unrealistic
 
 # ---------------------------------------------------------------------------
-# Baseline di confronto
+# Comparison baseline
 # ---------------------------------------------------------------------------
 baseline:
-  # Rotta geodetica fra gli stessi due waypoint, con la sola land mask
-  # applicata, che ignora il ghiaccio. È il confronto onesto: "cosa farebbe una
-  # nave con solo una carta nautica". SPEC §8.5.
-  mode: geodesic            # [SCELTA]
-  # La baseline naviga a v_open ovunque tranne dove il ghiaccio la fermerebbe:
-  # se attraversa celle no-go, il tempo non è definito e si dichiara.
+  # Geodesic route between the same two waypoints, with only the land mask
+  # applied, ignoring the ice. It is the honest comparison: "what a ship with
+  # only a nautical chart would do".
+  mode: geodesic            # [CHOICE]
+  # The baseline sails at v_open everywhere except where the ice would stop it:
+  # if it crosses no-go cells, the time is undefined and this is declared.
   report_infeasible: true

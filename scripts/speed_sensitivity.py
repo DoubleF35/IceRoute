@@ -1,4 +1,5 @@
-"""How much does the demo's headline depend on the unsourced speed? Closes P-05.
+"""How much does the demo's headline depend on the unsourced speed? Closes P-05
+(docs/decisions.md, *Provisional values*).
 
 ``open_water_speed_kn`` has no citable source (P-05), and every transit time the
 demo prints scales with it. The usual reflex is to hunt for a "typical" value
@@ -48,7 +49,7 @@ log = logging.getLogger("speed")
 
 # The band to sweep. Bottom end is a cautious loaded transit; the top is the
 # open-water capability quoted for modern ice-class cargo vessels. The nominal
-# 12,0 of configs/routing.yaml sits inside it.
+# 12.0 of configs/routing.yaml sits inside it.
 DEFAULT_SPEEDS = [10.0, 12.0, 14.2, 16.0, 19.5]
 
 
@@ -102,7 +103,7 @@ def sweep_scene(
     try:
         wp = choose_waypoints(geo.grid, nominal)
     except ValueError as exc:
-        return {"scene_id": scene.meta.scene_id, "error": f"waypoint non selezionabili: {exc}"}
+        return {"scene_id": scene.meta.scene_id, "error": f"waypoints cannot be chosen: {exc}"}
 
     out: dict = {"scene_id": scene.meta.scene_id, "by_class": {}}
     for ic in ice_classes:
@@ -139,7 +140,8 @@ def sweep_scene(
             )
             # compare() is the demo's own logic, reused rather than reimplemented:
             # it already refuses to report a saving against an infeasible
-            # baseline (SPEC rule 2), and the point of this sweep is to measure
+            # baseline (a number that is not defined is never shown), and the
+            # point of this sweep is to measure
             # the quantity the demo actually displays.
             cmp = compare(route, base)
             row |= {
@@ -180,7 +182,7 @@ def summarise(results: list[dict]) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Sensibilità alla velocità in acqua libera. P-05.")
+    ap = argparse.ArgumentParser(description="Sensitivity to the open-water speed. P-05.")
     ap.add_argument("--config", type=Path, default=Path("configs/routing.yaml"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
     ap.add_argument("--train-config", type=Path, default=None)
@@ -213,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_dir = Path(demo_cfg.get("source_dir", "data/raw/test"))
     scenes = [e["id"] for e in demo_cfg["scenes"]]
 
-    log.info("Velocità sotto esame: %s nodi", ", ".join(f"{v:g}" for v in args.speeds))
+    log.info("Speeds under test: %s knots", ", ".join(f"{v:g}" for v in args.speeds))
     results = []
     for i, sid in enumerate(scenes, 1):
         path = raw_dir / sid
@@ -234,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         except Exception as exc:  # noqa: BLE001 — one bad scene must not stop the sweep
-            log.exception("  fallita: %s", exc)
+            log.exception("  failed: %s", exc)
         if device == "cuda":
             torch.cuda.empty_cache()
 
@@ -247,37 +249,35 @@ def main(argv: list[str] | None = None) -> int:
     log.info("=" * 66)
     hs = agg["hours_relative_spread_median"]
     if hs is not None:
-        log.info(
-            "Ore di transito: variano del %.0f%% (mediana) sull'intervallo di velocità.", 100 * hs
-        )
-        log.info("  → NON citabili senza una fonte per la velocità. P-05 resta su questo.")
+        log.info("Transit hours: vary by %.0f%% (median) across the speed range.", 100 * hs)
+        log.info("  → NOT quotable without a source for the speed. P-05 stays open on this.")
     # A small spread means "stable" only if there is enough of it to be a
-    # spread. The first version reported "0,0 punti → STABILE, usalo nel deck"
+    # spread. The first version reported "0.0 points → STABLE, quote it publicly"
     # off two series out of fifteen: that is not stability, it is a quantity
     # that is almost never defined. Coverage is checked before dispersion.
     n_ok, n_all = agg["n_comparable_series"], agg["n_series"]
-    log.info("Risparmio percentuale: definito in %d serie su %d.", n_ok, n_all)
+    log.info("Percentage saved: defined in %d series out of %d.", n_ok, n_all)
     if n_ok < max(3, n_all // 2):
-        log.info("  → NON è una metrica utilizzabile su queste scene. Le scene demo sono")
-        log.info("    state scelte perché la rotta diretta è VIETATA dal ghiaccio, quindi")
-        log.info("    nella maggior parte dei casi non esiste una baseline percorribile")
-        log.info("    contro cui calcolare un risparmio (SPEC regola 2).")
+        log.info("  → NOT a usable metric on these scenes. The demo scenes were chosen")
+        log.info("    because the direct route is FORBIDDEN by the ice, so in most cases")
+        log.info("    there is no passable baseline to compute a saving against (a number")
+        log.info("    that is not defined is never shown).")
     elif agg["saved_percent_spread_max_points"] < 5.0:
         log.info(
-            "  → varia di %.1f punti al massimo: STABILE rispetto alla velocità.",
+            "  → varies by %.1f points at most: STABLE with respect to speed.",
             agg["saved_percent_spread_max_points"],
         )
     else:
         log.info(
-            "  → varia di %.1f punti: serve comunque la fonte.",
+            "  → varies by %.1f points: a source is needed anyway.",
             agg["saved_percent_spread_max_points"],
         )
 
     log.info("")
-    log.info("CONSEGUENZA PER IL DECK. Nessuna delle due grandezze temporali regge da sola:")
-    log.info("le ore dipendono da un'assunzione senza fonte, la percentuale quasi non")
-    log.info("esiste. L'affermazione difendibile è CATEGORICA e non usa la velocità:")
-    log.info("«la rotta diretta è vietata da POLARIS, IceRoute ne trova una che non lo è».")
+    log.info("CONSEQUENCE FOR PUBLIC CLAIMS. Neither time quantity holds up on its own:")
+    log.info("the hours depend on an unsourced assumption, the percentage barely exists.")
+    log.info("The defensible claim is CATEGORICAL and does not use the speed:")
+    log.info('"the direct route is forbidden by POLARIS; IceRoute finds one that is not".')
     return 0
 
 

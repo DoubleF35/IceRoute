@@ -1,19 +1,20 @@
-# Assunzioni dietro ogni numero mostrato nella demo. SPEC §10.1 — file obbligatorio.
+# Assumptions behind every number shown in the demo. This file is mandatory: it is
+# the single place every economic and performance claim comes from.
 #
-# REGOLA: nessun valore inventato. Ogni voce ha `source:`. Dove la fonte non c'è,
-# `provisional: true` e il numero NON può comparire in una affermazione economica.
-# La SPEC §10.1 è esplicita: se un dato non si trova, si mostra il risparmio in ORE
-# DI TRANSITO — che deriva dal modello di velocità e si difende — non in dollari.
+# RULE: no invented values. Every entry has a `source:`. Where there is no source,
+# `provisional: true`, and the number may NOT appear in an economic claim.
+# The rule is explicit: if a figure cannot be sourced, savings are shown in TRANSIT
+# HOURS — which follow from the speed model and can be defended — not in dollars.
 #
-# Il footer della demo apre questo file. È deliberato: mostra il rigore e disinnesca
-# in anticipo la domanda "su cosa si basano questi numeri".
+# The demo footer opens this file. That is deliberate: it shows the rigour and
+# answers the question "what are these numbers based on?" before it is asked.
 
 meta:
   updated: 2026-09-05
-  spec_section: "10.1"
+  decisions: "docs/decisions.md D-033"
 
 # ---------------------------------------------------------------------------
-# Nave di riferimento
+# Reference vessel
 # ---------------------------------------------------------------------------
 vessel:
   reference_class: PC6
@@ -22,20 +23,20 @@ vessel:
   open_water_speed_kn: 12.0
   open_water_speed_source: null
   open_water_speed_provisional: true
-  # P-05. Nessuna fonte citabile trovata per la velocità di crociera di una PC6
-  # generica in acqua libera. 12 nodi è plausibile per una cargo rinforzata ma
-  # NON è documentato.
+  # P-05. No citable source found for the cruising speed of a generic PC6 in open
+  # water. 12 knots is plausible for an ice-strengthened cargo ship but is NOT
+  # documented.
   #
-  # Cosa ne dipende e cosa no:
-  #   - le ORE ASSOLUTE di transito scalano con 1/v_open: se il valore vero è 14
-  #     nodi, tutti i tempi calano del 14%;
-  #   - il RISPARMIO PERCENTUALE è robusto, perché numeratore e denominatore
-  #     scalano insieme;
-  #   - il fatto che una rotta sia percorribile o no non dipende affatto da questo:
-  #     dipende dal RIO, cioè da POLARIS.
-  # Nella demo il tempo assoluto va etichettato come dipendente da questa assunzione.
+  # What depends on it and what does not:
+  #   - ABSOLUTE transit HOURS scale with 1/v_open: if the true value is 14
+  #     knots, every time drops by 14%;
+  #   - the PERCENTAGE SAVING is robust, because numerator and denominator
+  #     scale together;
+  #   - whether a route is passable or not does not depend on it at all:
+  #     that depends on the RIO, i.e. on POLARIS.
+  # In the demo the absolute time must be labelled as depending on this assumption.
 
-  # Limiti di velocità in regime di rischio elevato: questi SÌ hanno fonte.
+  # Speed limits under elevated risk: these DO have a source.
   elevated_speed_limits_kn:
     PC1: 11
     PC2: 8
@@ -44,15 +45,15 @@ vessel:
     PC5: 5
     PC6: 3
     PC7: 3
-  elevated_speed_limits_source: "IMO MSC.1/Circ.1519, Tabella 1.2"
+  elevated_speed_limits_source: "IMO MSC.1/Circ.1519, Table 1.2"
 
   fuel_consumption_t_per_day: null
   fuel_consumption_source: null
   fuel_consumption_provisional: true
-  # Senza questo e senza il prezzo, NON si mostrano dollari. Vedi `economics`.
+  # Without this and without the price, NO dollars are shown. See `economics`.
 
 # ---------------------------------------------------------------------------
-# Carburante — P-09
+# Fuel — P-09
 # ---------------------------------------------------------------------------
 fuel:
   price_usd_per_t: null
@@ -61,56 +62,57 @@ fuel:
   provisional: true
 
 economics:
-  # L'interruttore che impedisce a un numero non fondato di finire su una slide.
-  # La UI legge questo, non decide da sé.
+  # The switch that keeps an unsourced number out of any public claim.
+  # The UI reads this; it does not decide on its own.
   show_dollar_savings: false
   reason: >-
-    Né il consumo giornaliero né il prezzo del carburante hanno una fonte citabile
-    (P-09). SPEC §10.1: senza fonte si mostrano ORE risparmiate, non dollari. Ore
-    risparmiate deriva dal modello di velocità ed è difendibile; dollari senza
-    fonte è un numero che un investitore smonta in una domanda.
+    Neither daily fuel consumption nor fuel price has a citable source (P-09).
+    Without a source, HOURS saved are shown, not dollars. Hours saved follow from
+    the speed model and can be defended; a dollar figure without a source is a
+    number that falls apart at the first question.
   show_hours_saved: true
 
 # ---------------------------------------------------------------------------
-# POLARIS — tutto con fonte primaria
+# POLARIS — everything from the primary source
 # ---------------------------------------------------------------------------
 polaris:
-  source: "IMO MSC.1/Circ.1519, Tabelle 1.1, 1.2, 1.3"
+  source: "IMO MSC.1/Circ.1519, Tables 1.1, 1.2, 1.3"
   risk_values_file: data/polaris_rv.csv
   thresholds:
     normal_operation: "RIO >= 0"
     elevated_risk: "-10 <= RIO < 0"
     special_consideration: "RIO < -10"
-  thresholds_source: "IMO MSC.1/Circ.1519, Tabella 1.1"
+  thresholds_source: "IMO MSC.1/Circ.1519, Table 1.1"
   open_water_rio: 30.0
   note: >-
-    Il RIO include sempre il resto di acqua libera: RIO = SIC*RIV + (10-SIC)*RIV_open.
-    Ometterlo è l'errore classico e produce rotte più pessimistiche del vero.
+    The RIO always includes the open-water remainder: RIO = SIC*RIV + (10-SIC)*RIV_open.
+    Leaving it out is the classic mistake and produces routes more pessimistic than reality.
 
 # ---------------------------------------------------------------------------
-# Classi di ghiaccio mostrate — ripiego SPEC §7.4, vedi D-020
+# Ice classes shown — three-class fallback, see docs/decisions.md D-020
 # ---------------------------------------------------------------------------
 segmentation:
-  scheme: "3 classi (ripiego SPEC §7.4)"
+  scheme: "3 classes (fallback, docs/decisions.md D-020)"
   classes:
-    0: {name: "Acqua libera",     polaris_type: ice_free}
-    1: {name: "Ghiaccio sottile", polaris_type: thin_fyi_2nd_stage}
-    2: {name: "Ghiaccio spesso",  polaris_type: heavy_multi_year_ice}
+    0: {name: "Open water", polaris_type: ice_free}
+    1: {name: "Thin ice",   polaris_type: thin_fyi_2nd_stage}
+    2: {name: "Thick ice",  polaris_type: heavy_multi_year_ice}
   mapping_rule: >-
-    Ogni classe raggruppata eredita il risk value del membro PIÙ PERICOLOSO. Verificato
-    che il membro peggiore sia lo stesso per PC6, PC7 e IA, altrimenti un solo tipo
-    POLARIS non rappresenterebbe il gruppo. L'arrotondamento va verso il pericolo,
-    quindi la riduzione non può produrre errori permissivi.
-  reduced_from: "6 classi SOD AI4Arctic"
+    Each grouped class inherits the risk value of its MOST DANGEROUS member. Checked
+    that the worst member is the same for PC6, PC7 and IA; otherwise a single POLARIS
+    type would not represent the group. Rounding goes towards danger, so the
+    reduction cannot produce permissive errors.
+  reduced_from: "6 AI4Arctic SOD classes"
   reduction_reason: >-
-    Il modello a 6 classi si è fermato a mIoU 0,272 sul test ufficiale contro una
-    soglia di 0,60, sbagliando con sicurezza (D-018). Il ripiego è previsto dalla
-    SPEC §7.4.
-  # ATTENZIONE: i numeri prodotti con 3 classi non sono confrontabili con la soglia
-  # 0,60, che si riferisce alle 6 classi SOD. È un problema diverso e più facile.
+    The 6-class model stalled at mIoU 0.272 on the official test set against a
+    threshold of 0.60, and it was confidently wrong (D-018). The fallback was
+    planned in advance: below the threshold the problem is reduced, the number is
+    not adjusted.
+  # WARNING: numbers produced with 3 classes are not comparable with the 0.60
+  # threshold, which refers to the 6 SOD classes. It is a different, easier problem.
 
 # ---------------------------------------------------------------------------
-# Griglia e geodesia
+# Grid and geodesy
 # ---------------------------------------------------------------------------
 grid:
   crs: "EPSG:3413"
@@ -119,12 +121,12 @@ grid:
   true_scale_lat: 70.0
   scale_correction: true
   scale_correction_note: >-
-    Le distanze planari in EPSG:3413 sono divise per il fattore di scala puntuale
-    calcolato da PROJ. Senza correzione l'errore è -1,94% a 78°N e -2,83% a 85°N,
-    sistematico e sempre nello stesso verso. Vedi D-010.
+    Planar distances in EPSG:3413 are divided by the point scale factor computed
+    by PROJ. Without the correction the error is -1.94% at 78°N and -2.83% at 85°N,
+    systematic and always in the same direction. See D-010.
 
 # ---------------------------------------------------------------------------
-# Dati
+# Data
 # ---------------------------------------------------------------------------
 dataset:
   name: "AI4Arctic Sea Ice Challenge Dataset"
@@ -136,79 +138,84 @@ dataset:
   scenes_demo: 5
   scenes_test_official: 20
   test_set_note: >-
-    Le 20 scene di test sono il set ufficiale della challenge, mai usate per training,
-    selezione del modello o scelta delle scene demo. È l'unica stima non distorta.
+    The 20 test scenes are the challenge's official test set, never used for training,
+    model selection or choosing the demo scenes. It is the only unbiased estimate.
 
 # ---------------------------------------------------------------------------
-# Misure — riempite da metrics.json, MAI a mano
+# Measurements — filled from metrics.json, NEVER by hand
 # ---------------------------------------------------------------------------
 downlink:
-  # Le tre cifre vengono dalla STESSA scena — quella la cui compressione è la mediana —
-  # perché raw / payload deve fare esattamente `ratio`. Tre mediane indipendenti danno
-  # un quoziente che non è nessuno dei numeri stampati, e in sala qualcuno divide.
-  ratio_scene: "20180917T121813_cis_prep.nc" # SCRITTO da pitch/assumptions.py
-  raw_scene_bytes: 64991441    # SCRITTO da pitch/assumptions.py
-  payload_bytes: 147931        # SCRITTO da pitch/assumptions.py
-  ratio: 439.3                 # SCRITTO da pitch/assumptions.py
-  ratio_min: 281.3             # SCRITTO da pitch/assumptions.py
-  ratio_max: 770.2             # SCRITTO da pitch/assumptions.py
-  provisional: false           # SCRITTO da pitch/assumptions.py
+  # The three figures come from the SAME scene — the one with the median compression —
+  # because raw / payload must come out at exactly `ratio`. Three independent medians
+  # give a quotient that is none of the printed numbers, and a reader will divide them.
+  ratio_scene: "20180917T121813_cis_prep.nc" # written by iceroute.report.assumptions
+  raw_scene_bytes: 64991441    # written by iceroute.report.assumptions
+  payload_bytes: 147931        # written by iceroute.report.assumptions
+  ratio: 439.3                 # written by iceroute.report.assumptions
+  ratio_min: 281.3             # written by iceroute.report.assumptions
+  ratio_max: 770.2             # written by iceroute.report.assumptions
+  provisional: false           # written by iceroute.report.assumptions
   numerator_definition: >-
-    Canali SAR compressi senza perdita. Non i byte grezzi: un payload reale comprime
-    prima di trasmettere, e dal 7% al 58% di una scena è padding di swath a 0.0.
-    Confrontarsi con dati non compressi significa battere una baseline che nessuno
-    manderebbe in orbita.
+    SAR channels, losslessly compressed. Not the raw bytes: a real payload compresses
+    before transmitting, and 7% to 58% of a scene is swath padding at 0.0.
+    Comparing against uncompressed data means beating a baseline nobody would ever
+    put in orbit.
   payload_definition: >-
-    Maschera di ghiaccio PREDETTA (PNG) + rotta (GeoJSON) + metadati. NON contiene la
-    rotta diretta di confronto, che il satellite non trasmette (D-028).
-    Attenzione a cosa c'è dentro: la maschera è circa il 99,7% del pacchetto, la rotta
-    da sola sono ~430 byte. I deck di giugno dichiarano «< 4 KB, un vettore tattico,
-    non immagini»: è A-10 di §98, sbagliato di circa 37 volte. Il numero da citare è
-    payload_bytes, e la frase che lo accompagna va cambiata insieme al numero.
+    PREDICTED ice mask (PNG) + route (GeoJSON) + metadata. It does NOT contain the
+    direct comparison route, which the satellite does not transmit (D-028).
+    Mind what is inside: the mask is about 99.7% of the packet, the route alone is
+    ~430 bytes. An early estimate claimed "< 4 KB, a tactical vector, not images":
+    that is A-10 in docs/decisions.md, *Early estimates vs. measurements*, off by a
+    factor of about 37. The number to quote is payload_bytes, and the sentence that
+    goes with it must change together with the number.
   note: >-
-    P-06 chiusa il 07/09. Misurato sulla maschera predetta, non sull'ice chart: quella
-    è disegnata a poligoni e si comprime molto meglio dell'uscita di una rete, quindi
-    dava 1012:1 invece di 439:1 (D-016). La SPEC ipotizzava 200:1.
+    P-06 closed on 2026-09-07. Measured on the predicted mask, not on the ice chart:
+    the chart is drawn as polygons and compresses much better than a network's
+    output, so it gave 1012:1 instead of 439:1 (D-016). The original design target
+    assumed 200:1.
 
 # ---------------------------------------------------------------------------
-# Budget di link — A-10 di §98, deciso il 09/09
+# Link budget — A-10 in docs/decisions.md, *Early estimates vs. measurements*,
+# settled on 2026-09-09
 # ---------------------------------------------------------------------------
-# Queste NON sono misure nostre: sono le velocità dichiarate dagli operatori.
-# Servono a rispondere alla sola obiezione seria contro il pacchetto da 148 KB
-# ("il link della nave ce la fa?"), e vanno citate come specifica di terzi.
-# I secondi sono DERIVATI dalla velocità di picco: il throughput reale è più
-# basso, quindi vanno detti come ordine di grandezza, non come cronometro.
+# These are NOT our measurements: they are the speeds the operators declare.
+# They answer the only serious objection to the 148 KB packet ("can the ship's
+# link handle it?"), and must be quoted as a third-party specification.
+# The seconds are DERIVED from the peak rate: real throughput is lower, so they
+# should be stated as an order of magnitude, not as a stopwatch reading.
 link:
   iridium_certus_100_kbps: 88
-  iridium_certus_100_source: "Iridium, scheda prodotto Certus 100 (IP data fino a 88 kbps)"
+  iridium_certus_100_source: "Iridium, Certus 100 product sheet (IP data up to 88 kbps)"
   inmarsat_fleetbroadband_kbps: 432
-  inmarsat_fleetbroadband_source: "Inmarsat FleetBroadband, fino a 432 kbps"
+  inmarsat_fleetbroadband_source: "Inmarsat FleetBroadband, up to 432 kbps"
   iridium_sbd_message_bytes: 300
-  iridium_sbd_source: "Iridium Short Burst Data, messaggi fino a ~300 byte"
+  iridium_sbd_source: "Iridium Short Burst Data, messages up to ~300 bytes"
   note: >-
-    Il pacchetto completo (148 KB) impiega circa 13 s a 88 kbps e circa 3 s a 432 kbps.
-    La sola rotta (~430 byte) sta in DUE messaggi SBD, cioè nel canale dati marittimo
-    più economico e diffuso che esista. FleetBroadband distribuisce già aggiornamenti
-    ECDIS in tempo reale come servizio ordinario: 148 KB di strato di ghiaccio sono
-    esattamente il tipo di traffico per cui quel link è pensato.
+    The full packet (148 KB) takes about 13 s at 88 kbps and about 3 s at 432 kbps.
+    The route alone (~430 bytes) fits in TWO SBD messages, i.e. in the cheapest and
+    most widespread maritime data channel there is. FleetBroadband already delivers
+    real-time ECDIS updates as an ordinary service: 148 KB of ice layer is exactly
+    the kind of traffic that link is designed for.
 
 model:
-  parameters: 1964131          # SCRITTO da pitch/assumptions.py
-  onnx_int8_bytes: 2148589     # SCRITTO da pitch/assumptions.py
-  latency_ms_per_tile: 39.744  # SCRITTO da pitch/assumptions.py
-  int8_degradation: 0.0046     # SCRITTO da pitch/assumptions.py
-  provisional: false           # SCRITTO da pitch/assumptions.py
+  parameters: 1964131          # written by iceroute.report.assumptions
+  onnx_int8_bytes: 2148589     # written by iceroute.report.assumptions
+  latency_ms_per_tile: 39.744  # written by iceroute.report.assumptions
+  int8_degradation: 0.0046     # written by iceroute.report.assumptions
+  provisional: false           # written by iceroute.report.assumptions
   latency_note: >-
-    Misurata a 1 thread. Il portatile ha 22 core, il payload no: citare il numero
-    a 22 thread per un target FPGA non vorrebbe dire niente.
+    Measured on 1 thread. The laptop has 22 cores, the payload does not: quoting
+    the 22-thread number for an FPGA target would mean nothing.
   size_note: >-
-    Il deck di giugno dichiara 58 KB (A-02 di §98). Implicherebbero circa 59.000
-    parametri, contro i quasi due milioni reali: era aritmeticamente impossibile.
-    Per confronto utile in sala: CloudScout, il modello che ESA ha davvero fatto
-    volare su PhiSat-1 nel 2020, occupava 2,1 MB.
+    An early estimate put the model at 58 KB (A-02 in docs/decisions.md, *Early
+    estimates vs. measurements*). That would imply about 59,000 parameters, against
+    the almost two million actually there: it was arithmetically impossible.
+    For a useful comparison: CloudScout, the model ESA actually flew on PhiSat-1
+    in 2020, took 2.1 MB.
   degradation_note: >-
-    È la DIFFERENZA fra fp32 e INT8, misurata sulle stesse scene attraverso lo stesso
-    identico codice di tiling. Solo la differenza è citabile: le mIoU assolute di
-    quella verifica girano su scene di training, già viste. La qualità vera è mIoU
-    0,532 su test ufficiale. Il deck dichiara «1–3% mIoU lost to INT8» (A-04): il
-    misurato è più basso, cioè migliore del dichiarato.
+    This is the DIFFERENCE between fp32 and INT8, measured on the same scenes
+    through exactly the same tiling code. Only the difference can be quoted: the
+    absolute mIoU values of that check run on training scenes the model has already
+    seen. The real quality is mIoU 0.532 on the official test set. The early
+    estimate was "1–3% mIoU lost to INT8" (A-04): the measured drop is lower, i.e.
+    better than estimated.

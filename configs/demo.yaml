@@ -1,55 +1,55 @@
-# Scene della demo. Vedi DECISIONS.md D-022.
+# Demo scenes. See docs/decisions.md D-022.
 #
-# NON vengono dal split congelato: vengono dal **test set ufficiale AI4Arctic**,
-# 20 scene che il modello non ha mai visto e che non sono state usate per
-# selezionarlo. È una posizione più solida di quella prevista dalla SPEC §5.3,
-# non più debole: mostrare a un investitore una scena su cui il modello si è
-# addestrato è la prima cosa che un tecnico in sala chiede di escludere.
+# They do NOT come from the frozen split: they come from the **official AI4Arctic
+# test set**, 20 scenes the model has never seen and that were not used to select
+# it. That is a stronger position than the original plan of hand-picking demo
+# scenes from the frozen split, not a weaker one: showing a scene the model was
+# trained on is the first thing any technical reviewer asks to rule out.
 #
-# Le etichette di queste scene stanno in file `_prep_reference.nc` affiancati;
-# `precompute` li risolve da solo guardando su disco.
+# The labels of these scenes are in sibling `_prep_reference.nc` files;
+# `precompute` finds them on its own by looking on disk.
 
 source_dir: data/raw/test
 
-# Criteri di selezione, applicati ai numeri e non a occhio (D-021):
-#   1. la rotta diretta deve essere vietata DAL GHIACCIO per tutte e tre le
-#      classi di nave — non fuori copertura, che è un'altra cosa (D-011);
-#   2. copertura dell'ice chart alta, altrimenti il confronto con la baseline
-#      non è difendibile;
-#   3. dove possibile, la rotta deve CAMBIARE con la classe di nave;
-#   4. il modello non deve andare male sulla scena — aggiunto il 06/09, vedi
-#      D-024. I criteri 1-3 guardano il GHIACCIO, e da soli avevano fatto
-#      entrare nel carosello la scena su cui il modello sbaglia di più fra
-#      tutte e venti. Il numero che decide è la frazione permissiva, non il
-#      mIoU: è la frazione di pixel che manderebbe la nave in ghiaccio vietato.
+# Selection criteria, applied to the numbers and not by eye (D-021):
+#   1. the direct route must be forbidden BY THE ICE for all three vessel
+#      classes — not out of coverage, which is a different thing (D-011);
+#   2. high ice-chart coverage, otherwise the comparison with the baseline
+#      cannot be defended;
+#   3. where possible, the route must CHANGE with the vessel class;
+#   4. the model must not perform badly on the scene — added on 2026-09-06, see
+#      D-024. Criteria 1-3 look at the ICE, and on their own they had let into
+#      the carousel the scene the model gets most wrong out of all twenty. The
+#      deciding number is the permissive fraction, not the mIoU: it is the
+#      fraction of pixels that would send the ship into forbidden ice.
 #
-# I criteri 1-3 sono calcolati sull'ice chart (`precompute --use-chart`), quindi
-# sulle proprietà del ghiaccio e non su un modello ancora in addestramento. Il
-# criterio 4 viene da `artifacts/metrics.json`, sul test ufficiale.
+# Criteria 1-3 are computed on the ice chart (`precompute --use-chart`), i.e. on
+# the properties of the ice and not on a model still in training. Criterion 4
+# comes from `artifacts/metrics.json`, on the official test set.
 
 scenes:
-  # --- la scena di apertura -------------------------------------------------
+  # --- the opening scene ----------------------------------------------------
   - id: 20180707T113313_cis_prep.nc
     coverage: 0.57
     routes_differ: true
     n_no_go_cells: 352
     why: >-
-      La più forte del lotto: 352 celle vietate dal ghiaccio e la rotta cambia
-      con la classe di nave. Entrambi i momenti della demo su una scena sola.
+      The strongest of the batch: 352 cells forbidden by the ice and the route
+      changes with the vessel class. Both key points of the demo on one scene.
 
   - id: 20180917T121813_cis_prep.nc
     coverage: 0.66
     routes_differ: true
     n_no_go_cells: 128
-    why: Copertura alta e rotta che cambia con la classe.
+    why: High coverage and a route that changes with the class.
 
   - id: 20200701T114012_cis_prep.nc
     coverage: 0.52
     routes_differ: true
     n_no_go_cells: 81
-    why: Terza scena in cui il selettore di classe fa qualcosa di reale.
+    why: Third scene in which the class selector does something real.
 
-  # --- le due con copertura molto alta -------------------------------------
+  # --- the two with very high coverage --------------------------------------
   - id: 20201013T080448_dmi_prep.nc
     coverage: 0.8124
     routes_differ: true
@@ -57,28 +57,29 @@ scenes:
     miou: 0.5723
     worst_unsafe_fraction: 0.0238
     why: >-
-      Sostituisce 20180623 (D-024). Tiene il ruolo di scena ad alta copertura —
-      81%, la più alta fra le candidate — e in più fa cambiare la rotta con la
-      classe di nave, cosa che l'uscente non faceva.
-      LIMITE, dichiarato: qui il criterio 1 vale solo in parte. La rotta diretta
-      è percorribile da PC6 e PC7 (0 celle vietate, IceRoute costa +1%), ed è
-      vietata solo per IA, 14 celle. Il momento "la linea retta non si può fare"
-      lo portano le prime tre scene; questa porta il momento "cambio classe e la
-      risposta cambia", su una carta coperta all'81%.
+      Replaces 20180623 (D-024). Keeps the role of the high-coverage scene —
+      81%, the highest among the candidates — and in addition makes the route
+      change with the vessel class, which the outgoing scene did not.
+      LIMITATION, stated: here criterion 1 holds only in part. The direct route
+      is passable for PC6 and PC7 (0 forbidden cells, IceRoute costs +1%), and
+      is forbidden only for IA, 14 cells. The point "the straight line cannot
+      be sailed" is carried by the first three scenes; this one carries the
+      point "change the class and the answer changes", on a chart with 81%
+      coverage.
 
   - id: 20210506T075557_dmi_prep.nc
     coverage: 0.81
     routes_differ: false
     n_no_go_cells: 344
     why: >-
-      344 celle vietate su una copertura dell'81%. La scena in cui il ghiaccio
-      è visibilmente il protagonista.
+      344 forbidden cells at 81% coverage. The scene in which the ice is
+      visibly the main subject.
 
-# La scena che il modello sbaglia di più, tenuta APPOSTA e etichettata come
-# tale. Non è nel carosello: `precompute` la genera insieme alle altre e la UI
-# la mostra in fondo con un avviso. Esiste perché "e quando sbaglia?" è la
-# domanda che un tecnico in sala fa sempre, e avere la risposta già pronta vale
-# più che sperare che non la faccia. Vedi D-024.
+# The scene the model gets most wrong, kept ON PURPOSE and labelled as such.
+# It is not in the carousel: `precompute` generates it together with the others
+# and the UI shows it at the end with a warning. It exists because "and when is
+# it wrong?" is the question every technical reviewer asks, and having the answer
+# ready is worth more than hoping nobody asks. See D-024.
 worst_case:
   id: 20180623T114935_cis_prep.nc
   coverage: 0.9477
@@ -87,18 +88,18 @@ worst_case:
   miou: 0.2527
   worst_unsafe_fraction: 0.5172
   why: >-
-    Peggiore delle 20 scene del test ufficiale per mIoU (0,25 contro 0,54 di
-    aggregato) e per frazione permissiva (51,7%: su più di metà dei pixel il
-    modello dichiara percorribile del ghiaccio che POLARIS vieta a quella
-    classe). Nel caso peggiore sovrastima il RIO di 80 punti.
-    Era nel carosello fino al 06/09 perché scelta sui soli criteri 1-3.
+    Worst of the 20 official test scenes by mIoU (0.25 against 0.54 aggregate)
+    and by permissive fraction (51.7%: on more than half of the pixels the model
+    declares passable ice that POLARIS forbids to that class). In the worst case
+    it overestimates the RIO by 80 points.
+    It was in the carousel until 2026-09-06 because it was chosen on criteria 1-3 alone.
 
-# Le 5 scene demo del split congelato NON si usano più. Motivo, da D-021:
-# una sola faceva cambiare la rotta (e per 3 celle, su copertura al 12%), e
-# `20180108T184332` era inutilizzabile perché la geodetica usciva dalla carta
-# per tutte le classi. Restano nel split: il file non si rigenera (SPEC §5.3).
+# The 5 demo scenes of the frozen split are NO LONGER used. Reason, from D-021:
+# only one made the route change (and by 3 cells, at 12% coverage), and
+# `20180108T184332` was unusable because the geodesic left the chart for every
+# class. They stay in the split: the file is never regenerated.
 superseded:
-  - 20180108T184332_dmi_prep.nc   # inutilizzabile: geodetica fuori copertura
+  - 20180108T184332_dmi_prep.nc   # unusable: geodesic outside coverage
   - 20180806T184330_dmi_prep.nc
   - 20200919T161650_cis_prep.nc
   - 20210118T075356_dmi_prep.nc
