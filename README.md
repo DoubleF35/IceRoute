@@ -15,7 +15,7 @@ of the image: 148 KB instead of 55 MB, of which the route is 431 bytes.
 
 🏆 **First prize — ESA EO MakerSpace Hackathon** (Frascati, June 2026)
 
-[**Live demo**](https://doublef35.github.io/IceRoute/) ·
+[**Live demo**](https://federicofassio.it/IceRoute/) ·
 [Architecture](docs/architecture.md) ·
 [Model card](docs/model-card.md) ·
 [Decision log (43 entries)](docs/decisions.md) ·
