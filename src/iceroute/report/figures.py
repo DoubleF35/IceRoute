@@ -1,14 +1,14 @@
-"""The five figures for the deck. SPEC §10.3.
+"""The five summary figures of the project.
 
-Each one answers a question an investor actually asks, in order:
+Each one answers a question a technical reviewer actually asks, in order:
 
 1. ``works``        — SAR, predicted mask, chart, side by side
 2. ``useful``       — IceRoute route against the baseline, KPI in overlay
 3. ``onboard``      — model size and latency, fp32 against INT8
 4. ``business``     — raw scene bytes against downlinked payload, log scale
-5. ``confusion``    — the confusion matrix, for technical due diligence
+5. ``confusion``    — the confusion matrix, for a detailed technical review
 
-300 DPI, transparent background, type sized to be read from the back of a room.
+300 DPI, transparent background, type sized to stay legible when projected.
 
 Every figure refuses to draw a number that was not measured. A bar chart with a
 plausible height and no measurement behind it is worse than a missing figure,
@@ -29,11 +29,11 @@ from iceroute.demo import overlay as overlay_mod
 log = logging.getLogger("figures")
 
 DPI = 300
-# Same palette as the demo, so the deck and the live run look like one product.
+# Same palette as the demo, so the figures and the live run look like one product.
 COL_WATER, COL_THIN, COL_THICK = "#0a2859", "#00c8ff", "#ffffff"
 # Magenta appears in neither the ice-class palette (blue/cyan/white) nor the
 # RIO one (green/yellow/red), which is the whole reason to use it for the
-# route. Kept identical to demo/overlay.py: the slide and the live run have to
+# route. Kept identical to demo/overlay.py: the figure and the live run have to
 # read as one product, and a route that changes colour between them does not.
 COL_ROUTE, COL_BASE = "#ff2d95", "#f5f5f5"
 COL_INK, COL_MUTED = "#eaf1fa", "#8397ae"
@@ -92,14 +92,14 @@ def figure_works(demo_dir: Path, out: Path, scene: dict | None = None) -> str:
     """SAR, prediction and chart side by side, from the precomputed PNGs."""
     plt = _setup()
     if scene is None:
-        return _missing(plt, out, "Segmentazione", "Manca data/demo/: lancia make precompute.")
+        return _missing(plt, out, "Segmentation", "data/demo/ missing: run make precompute.")
 
     import matplotlib.image as mpimg
 
     panels = [
         ("SAR (HV)", "sar"),
-        ("Predizione IceRoute", "mask_pred"),
-        ("Carta dell'analista", "mask_truth"),
+        ("IceRoute prediction", "mask_pred"),
+        ("Analyst's chart", "mask_truth"),
     ]
     fig, axes = plt.subplots(1, 3, figsize=(16, 6))
     for ax, (title, key) in zip(axes, panels, strict=True):
@@ -109,10 +109,10 @@ def figure_works(demo_dir: Path, out: Path, scene: dict | None = None) -> str:
         if path.exists():
             ax.imshow(mpimg.imread(path))
         else:
-            ax.text(0.5, 0.5, "assente", ha="center", color="#f0b849")
+            ax.text(0.5, 0.5, "missing", ha="center", color="#f0b849")
     fig.suptitle(
         f"{scene['scene_id'][:15]} · {scene.get('region', '')} · "
-        f"inferenza {scene.get('inference_seconds', 0):.1f} s",
+        f"inference {scene.get('inference_seconds', 0):.1f} s",
         y=0.04,
         fontsize=12,
         color=COL_MUTED,
@@ -130,7 +130,7 @@ def figure_useful(demo_dir: Path, out: Path, scene: dict | None, ice_class: str)
     plt = _setup()
     entry = (scene or {}).get("classes", {}).get(ice_class) if scene else None
     if not entry or not entry.get("route_exists"):
-        return _missing(plt, out, "Rotta", "Nessuna rotta precomputata per questa classe.")
+        return _missing(plt, out, "Route", "No precomputed route for this class.")
 
     import matplotlib.image as mpimg
 
@@ -151,21 +151,23 @@ def figure_useful(demo_dir: Path, out: Path, scene: dict | None, ice_class: str)
     cmp_ = entry["comparison"]
     saved = cmp_.get("time_saved_hours")
     if saved is not None:
-        headline = f"{cmp_['iceroute']['time_hours']:.1f} h · {saved:+.1f} h sulla diretta"
+        headline = (
+            f"{cmp_['iceroute']['time_hours']:.1f} h · {saved:+.1f} h against the direct route"
+        )
     elif cmp_["baseline"].get("blocked_by_ice"):
         headline = (
-            f"{cmp_['iceroute']['time_hours']:.1f} h · la rotta diretta e' "
-            f"vietata dal ghiaccio ({cmp_['baseline']['n_no_go_cells']} celle)"
+            f"{cmp_['iceroute']['time_hours']:.1f} h · the direct route is "
+            f"forbidden by ice ({cmp_['baseline']['n_no_go_cells']} cells)"
         )
     else:
-        headline = f"{cmp_['iceroute']['time_hours']:.1f} h · confronto non disponibile"
+        headline = f"{cmp_['iceroute']['time_hours']:.1f} h · comparison not available"
 
     ax.set_title(f"{ice_class} — {headline}", pad=14)
     ax.text(
         0.5,
         -0.04,
-        f"RIO minimo sulla rotta {cmp_['iceroute'].get('min_rio', float('nan')):+.1f} · "
-        f"{entry.get('n_waypoints', '?')} waypoint · soglie IMO MSC.1/Circ.1519",
+        f"minimum RIO on the route {cmp_['iceroute'].get('min_rio', float('nan')):+.1f} · "
+        f"{entry.get('n_waypoints', '?')} waypoints · IMO MSC.1/Circ.1519 thresholds",
         transform=ax.transAxes,
         ha="center",
         fontsize=11,
@@ -187,7 +189,7 @@ def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
         return
     sx, sy = w / cols, h / rows
     if abs(sx - sy) > 0.02 * max(sx, sy):
-        raise ValueError(f"figura {w}x{h} incompatibile con la griglia della rotta {cols}x{rows}")
+        raise ValueError(f"figure {w}x{h} incompatible with the route grid {cols}x{rows}")
 
     base, ours = ov.get("baseline") or {}, ov.get("iceroute") or {}
     if base.get("path"):
@@ -198,12 +200,12 @@ def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
             "--",
             color=COL_BASE,
             lw=2.2,
-            label="rotta diretta",
+            label="direct route",
         )
     if base.get("no_go"):
         # Contiguous stretches, not one marker per cell — see overlay.no_go_runs.
         runs = overlay_mod.no_go_runs(base["no_go"])
-        label = f"vietata da POLARIS ({len(base['no_go'])} celle)"
+        label = f"forbidden by POLARIS ({len(base['no_go'])} cells)"
         for run in runs:
             xs, ys = [c * sx for _, c in run], [r * sy for r, _ in run]
             if len(run) > 2:
@@ -232,7 +234,7 @@ def _draw_routes(ax, ov: dict, w: int, h: int) -> None:
             mec="#0a0e14",
             mew=1.4,
             ls="none",
-            label=f"waypoint trasmessi ({len(wp)})",
+            label=f"transmitted waypoints ({len(wp)})",
         )
     if ax.get_legend_handles_labels()[0]:
         ax.legend(loc="lower right", framealpha=0.3, facecolor="#111823")
@@ -249,17 +251,17 @@ def figure_onboard(metrics: dict, out: Path) -> str:
     q = metrics.get("quantization") or {}
     size, lat = q.get("size"), (q.get("latency") or {}).get("single_thread")
     if not size or not lat:
-        return _missing(plt, out, "A bordo", "Nessuna misura: lancia make quantize.")
+        return _missing(plt, out, "On board", "No measurement: run make quantize.")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.6))
 
     for ax, vals, unit, title in (
-        (ax1, [size["fp32_mb"], size["int8_mb"]], "MB", "Dimensione del modello"),
+        (ax1, [size["fp32_mb"], size["int8_mb"]], "MB", "Model size"),
         (
             ax2,
             [lat["fp32"]["median_ms_per_tile"], lat["int8"]["median_ms_per_tile"]],
             "ms",
-            "Latenza per tile (CPU, 1 thread)",
+            "Latency per tile (CPU, 1 thread)",
         ),
     ):
         bars = ax.bar(["fp32", "INT8"], vals, color=[COL_MUTED, COL_THIN], width=0.55)
@@ -280,7 +282,7 @@ def figure_onboard(metrics: dict, out: Path) -> str:
         ax.text(
             0.5,
             -0.20,
-            f"{vals[0] / vals[1]:.2f}× piu' piccolo/veloce" if vals[1] else "",
+            f"{vals[0] / vals[1]:.2f}× smaller/faster" if vals[1] else "",
             transform=ax.transAxes,
             ha="center",
             fontsize=11,
@@ -290,16 +292,16 @@ def figure_onboard(metrics: dict, out: Path) -> str:
     drop = (q.get("accuracy") or {}).get("miou_drop")
     if isinstance(drop, float):
         note = (
-            "INT8 non degrada in modo misurabile"
+            "INT8 causes no measurable degradation"
             if drop <= 0.002
-            else f"INT8 costa {drop:.3f} di mIoU"
+            else f"INT8 costs {drop:.3f} mIoU"
         )
         fig.text(0.5, -0.08, note, ha="center", fontsize=12, color=COL_MUTED)
     return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
-# 4. It is the business
+# 4. It saves downlink
 # ---------------------------------------------------------------------------
 
 
@@ -309,7 +311,7 @@ def figure_business(metrics: dict, out: Path) -> str:
     comp = metrics.get("compression") or {}
     per = comp.get("per_scene") or []
     if not per:
-        return _missing(plt, out, "Downlink", "Nessuna misura: lancia make report.")
+        return _missing(plt, out, "Downlink", "No measurement: run make report.")
 
     s = per[0]
     raw = s["numerator"]["sar_channels_png"]
@@ -317,13 +319,13 @@ def figure_business(metrics: dict, out: Path) -> str:
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     bars = ax.bar(
-        ["Scena SAR\n(compressa)", "Payload IceRoute\n(maschera + rotta)"],
+        ["SAR scene\n(compressed)", "IceRoute payload\n(mask + route)"],
         [raw, payload],
         color=[COL_MUTED, COL_THIN],
         width=0.5,
     )
     ax.set_yscale("log")
-    ax.set_ylabel("byte (scala logaritmica)")
+    ax.set_ylabel("bytes (log scale)")
     ax.spines[["top", "right"]].set_visible(False)
     for b, v in zip(bars, [raw, payload], strict=True):
         label = f"{v / 1e6:.1f} MB" if v > 1e6 else f"{v / 1e3:.0f} KB"
@@ -334,12 +336,12 @@ def figure_business(metrics: dict, out: Path) -> str:
     ratio = comp.get("ratio_median", raw / max(payload, 1))
     title = f"{ratio:.0f}:1"
     if comp.get("provisional"):
-        title += "  (limite superiore)"
+        title += "  (upper bound)"
     ax.set_title(title, pad=14, fontsize=20)
     ax.text(
         0.5,
         -0.16,
-        "numeratore: canali SAR compressi senza perdita, non byte grezzi",
+        "numerator: SAR channels compressed losslessly, not raw bytes",
         transform=ax.transAxes,
         ha="center",
         fontsize=10.5,
@@ -349,7 +351,7 @@ def figure_business(metrics: dict, out: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 5. Due diligence
+# 5. Technical review
 # ---------------------------------------------------------------------------
 
 
@@ -359,7 +361,7 @@ def figure_confusion(metrics: dict, out: Path) -> str:
     agg = (ev.get("scenes") or {}).get("aggregate") or ev.get("patches") or {}
     matrix = agg.get("confusion_matrix")
     if not matrix:
-        return _missing(plt, out, "Matrice di confusione", "Lancia make eval.")
+        return _missing(plt, out, "Confusion matrix", "Run make eval.")
 
     m = np.array(matrix, dtype="float64")
     support = m.sum(axis=1, keepdims=True)
@@ -370,8 +372,8 @@ def figure_confusion(metrics: dict, out: Path) -> str:
     im = ax.imshow(norm, cmap="Blues", vmin=0, vmax=1)
     ax.set_xticks(range(len(names)), names, rotation=30, ha="right")
     ax.set_yticks(range(len(names)), names)
-    ax.set_xlabel("Predizione")
-    ax.set_ylabel("Carta dell'analista")
+    ax.set_xlabel("Prediction")
+    ax.set_ylabel("Analyst's chart")
     for i in range(len(names)):
         for j in range(len(names)):
             if support[i] > 0:
@@ -386,10 +388,10 @@ def figure_confusion(metrics: dict, out: Path) -> str:
                 )
     ax.set_title(
         f"mIoU {agg.get('miou', float('nan')):.3f} · "
-        f"ghiaccio/acqua {agg.get('binary_accuracy', float('nan')):.3f}",
+        f"ice/water {agg.get('binary_accuracy', float('nan')):.3f}",
         pad=14,
     )
-    fig.colorbar(im, ax=ax, label="frazione della classe vera")
+    fig.colorbar(im, ax=ax, label="fraction of the true class")
     return _save(fig, out)
 
 
@@ -399,7 +401,7 @@ def figure_confusion(metrics: dict, out: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Genera le figure del deck. SPEC §10.3.")
+    ap = argparse.ArgumentParser(description="Generate the project summary figures.")
     ap.add_argument("--demo-dir", type=Path, default=Path("data/demo"))
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--out", type=Path, default=Path("artifacts/figures"))
@@ -437,14 +439,14 @@ def main(argv: list[str] | None = None) -> int:
     lead = max(candidates, key=_separation) if candidates else (scenes[0] if scenes else None)
     if lead:
         log.info(
-            "Scena guida: %s — diretta vietata: %s, le due rotte si separano "
-            "del %.1f%% della diagonale",
+            "Lead scene: %s — direct route forbidden: %s, the two routes diverge "
+            "by %.1f%% of the diagonal",
             lead["scene_id"][:20],
             bool(_blocked(lead)),
             _separation(lead),
         )
 
-    log.info("Figure in %s", args.out)
+    log.info("Figures in %s", args.out)
     figure_works(args.demo_dir, args.out / "01_works.png", lead)
     figure_useful(args.demo_dir, args.out / "02_useful.png", lead, args.ice_class)
 

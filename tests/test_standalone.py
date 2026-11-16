@@ -1,8 +1,8 @@
 """Tests for the single-file offline demo.
 
-This page is the thing that gets opened when the real demo will not start, in
-front of investors, by someone who has no way to check it. So the tests care
-about two properties above all: that it carries no logic of its own, and that
+This page is the thing that gets opened when the full demo will not start, by
+someone who has no way to check it. So the tests care about two properties
+above all: that it carries no logic of its own, and that
 it cannot show a number Python decided to withhold.
 """
 
@@ -50,7 +50,7 @@ def test_a_route_through_the_elevated_band_is_null_at_every_speed():
     """
     t = sa.transit_table(_entry(min_rio=-4.0), "PC6", 12.0)
     assert all(v is None for v in t["values"])
-    assert "inventerebbe" in t["note"]
+    assert "would invent time" in t["note"]
 
 
 def test_the_table_matches_the_live_ui_exactly():
@@ -156,7 +156,7 @@ def _ctx():
         "speeds": sa.SPEEDS,
         "nominal_kn": 12.0,
         "hours_per_day": 24.0,
-        "scheme": "3 classi",
+        "scheme": "3 classes",
         "checkpoint": "m.pt",
         "aggregate": {"miou": 0.5324, "binary_accuracy": 0.9059},
         "n_eval_scenes": 20,
@@ -167,10 +167,10 @@ def _ctx():
 
 def test_the_page_is_self_contained():
     """It has to open from a USB stick with the network off. Anything fetched
-    from a host is a blank panel on stage."""
+    from a host is a blank panel in a live demo."""
     page = sa.build_page(_ctx())
     for remote in ("http://", "https://", "//cdn", "<link"):
-        assert remote not in page, f"riferimento esterno: {remote}"
+        assert remote not in page, f"external reference: {remote}"
     assert page.count("<script") == 2  # the data blob and the renderer
 
 
@@ -178,8 +178,8 @@ def test_the_page_says_the_live_computation_is_missing():
     """Hiding the button would make the offline copy quietly claim a capability
     it does not have."""
     page = sa.build_page(_ctx())
-    assert "Non disponibile in questa copia" in page
-    assert "Calcola ora" in page
+    assert "Not available in this copy" in page
+    assert "Compute now" in page
 
 
 def test_the_embedded_data_is_valid_json():
@@ -190,28 +190,30 @@ def test_the_embedded_data_is_valid_json():
 
 def test_the_footer_quotes_the_measured_scores_not_placeholders():
     page = sa.build_page(_ctx())
-    assert "0,532" in page and "0,906" in page and "20 scene di test ufficiali" in page
+    assert "0.532" in page and "0.906" in page and "20 official test scenes" in page
 
 
-def test_every_score_on_the_page_uses_the_italian_decimal_separator():
-    """The page grouped thousands in Italian and printed decimals in English —
-    "94.220 B" beside "15.6 h", two conventions inside one card. A reader who
-    takes "94.220" as a decimal reads the mask as ninety-four bytes."""
+def test_every_figure_on_the_page_uses_one_number_convention():
+    """The page once grouped thousands in Italian and printed decimals in
+    English — "94.220 B" beside "15.6 h", two conventions inside one card. A
+    reader who takes "94.220" as a decimal reads the mask as ninety-four bytes.
+    One convention now: comma-grouped thousands, decimal point."""
     page = sa.build_page(_ctx())
     # Only the rendered markup: the embedded blob is raw data, where 0.5324 is
-    # the measurement itself and localising it would corrupt it.
+    # the measurement itself.
     shell = page.split("<script>")[0]
-    assert "0.532" not in shell and "0.906" not in shell
+    assert "0,532" not in shell and "0,906" not in shell
     js = page.split("<script>")[-1]
-    # Exactly one toFixed survives, inside the formatter that appends the comma.
+    # Exactly one toFixed survives, inside the formatter every figure goes through,
+    # and the byte counts are grouped with the same locale.
     assert js.count("toFixed") == 1
-    assert ".replace('.', ',')" in js
+    assert "it-IT" not in js and "toLocaleString('en-US')" in js
 
 
 def test_a_page_without_an_evaluation_states_nothing_rather_than_zero():
     ctx = _ctx() | {"aggregate": {}, "n_eval_scenes": None}
     page = sa.build_page(ctx)
-    assert "mIoU 0.000" not in page and "0 scene di test" not in page
+    assert "mIoU 0.000" not in page and "0 official test scenes" not in page
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +227,7 @@ def test_the_generated_page_carries_every_demo_route():
     page = Path("demo.html")
     index = Path("data/demo/index.json")
     if not (page.exists() and index.exists()):
-        pytest.skip("demo.html o data/demo/ assenti")
+        pytest.skip("demo.html or data/demo/ missing")
 
     text = page.read_text()
     blob = json.loads(re.search(r"const D = (\{.*?\});</script>", text, re.S).group(1))
@@ -236,9 +238,9 @@ def test_the_generated_page_carries_every_demo_route():
         for ice_class, e in s["classes"].items():
             if not e["route_exists"]:
                 continue
-            assert e["svg"], f"{s['id']}/{ice_class}: rotta senza SVG"
+            assert e["svg"], f"{s['id']}/{ice_class}: route without SVG"
             assert 'class="lay-iceroute"' in e["svg"]
-            assert e["transit"]["values"], f"{s['id']}/{ice_class}: nessuna tabella dei tempi"
+            assert e["transit"]["values"], f"{s['id']}/{ice_class}: no transit table"
 
 
 # ---------------------------------------------------------------------------
@@ -253,13 +255,13 @@ def test_the_offline_copy_carries_the_link_time_too():
 
     page = Path("demo.html")
     if not page.exists():
-        pytest.skip("demo.html assente")
+        pytest.skip("demo.html missing")
     blob = json.loads(re.search(r"const D = (\{.*?\});</script>", page.read_text(), re.S).group(1))
     pays = [c["payload"] for s in blob["scenes"] for c in s["classes"].values() if c.get("payload")]
-    assert pays, "nessun payload nella pagina"
+    assert pays, "no payload in the page"
 
     measured = [p for p in pays if p.get("total")]
-    assert measured, "nessun payload con byte misurati"
+    assert measured, "no payload with measured bytes"
     for p in measured:
         lk = p["link"]
         assert lk and lk["s"] > 0 and lk["kbps"] == 88, lk
@@ -270,7 +272,7 @@ def test_the_offline_copy_carries_the_link_time_too():
     # A transmission time next to an unmeasured payload would be pure invention.
     for p in pays:
         if not p.get("total"):
-            assert p["link"] is None, "tempo di link senza byte misurati"
+            assert p["link"] is None, "link time without measured bytes"
 
 
 def test_without_assumptions_the_page_shows_no_transmission_time():
@@ -279,7 +281,7 @@ def test_without_assumptions_the_page_shows_no_transmission_time():
 
     demo_dir = Path("data/demo")
     if not (demo_dir / "index.json").exists():
-        pytest.skip("data/demo assente")
+        pytest.skip("data/demo missing")
     ctx = sa.collect(demo_dir, {}, {})
     for s in ctx["scenes"]:
         for c in s["classes"].values():
@@ -318,7 +320,7 @@ def test_the_legend_colours_come_from_the_modules_that_paint_the_rasters():
 def test_no_legend_colour_is_typed_into_the_javascript():
     page = sa.build_page(_ctx())
     js = page.split("<script>")[-1]
-    assert "#0a2859" not in page, "il vecchio refuso è tornato"
+    assert "#0a2859" not in page, "the old typo is back"
     for literal in (
         "'#2ecc71'",
         "'#f1c40f'",
@@ -328,7 +330,7 @@ def test_no_legend_colour_is_typed_into_the_javascript():
         "'#ff2020'",
         "'#ff2d95'",
     ):
-        assert literal not in js, f"colore ribattuto a mano: {literal}"
+        assert literal not in js, f"colour retyped by hand: {literal}"
 
 
 def test_the_interface_accent_is_not_the_colour_of_our_route():
@@ -355,7 +357,7 @@ def test_the_command_bar_states_which_model_produced_the_page():
     page = sa.build_page(_ctx())
     assert '<div id="top">' in page
     bar = page.split('<div id="top">')[1].split('</div>\n\n<div class="wrap">')[0]
-    assert "m.pt" in bar and "3 classi" in bar and "20 scene" in bar
+    assert "m.pt" in bar and "3 classes" in bar and "20 scenes" in bar
 
 
 def test_the_status_line_is_filled_by_the_renderer_not_hardcoded():
@@ -367,4 +369,4 @@ def test_the_status_line_is_filled_by_the_renderer_not_hardcoded():
 
 def test_a_page_without_a_checkpoint_omits_the_cell_instead_of_guessing():
     page = sa.build_page(_ctx() | {"checkpoint": None, "aggregate": {}})
-    assert "modello</span>" not in page and "miou</span>" not in page
+    assert "model</span>" not in page and "miou</span>" not in page

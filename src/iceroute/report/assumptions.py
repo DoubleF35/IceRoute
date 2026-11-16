@@ -1,20 +1,21 @@
-"""Write the measured numbers into ``configs/assumptions.yaml``. SPEC §10.1.
+"""Write the measured numbers into ``configs/assumptions.yaml``.
 
-That file is the one place every economic and performance claim is supposed to
-come from, and it carries a ``source:`` beside each value so an investor can ask
-"based on what?" and get an answer. Several of its entries were written as
-``null`` with a comment saying *MISURATO da pitch/compression.py* — an intention
+That file is the one place every economic and performance figure is supposed to
+come from, and it carries a ``source:`` beside each value so anyone reading it can
+ask "based on what?" and get an answer. Several of its entries were written as
+``null`` with a comment saying *MEASURED by report/compression.py* — an intention
 nobody implemented. So the file kept saying ``provisional: true`` for quantities
 ``metrics.json`` had already measured, and the demo footer renders the file
-verbatim: the audience was being shown "provvisorio" next to the very numbers
-being quoted at them as measured.
+verbatim: the person reading the console was being shown "provisional" next to
+the very numbers being presented to them as measured.
 
 Three things about how this writes.
 
 **It edits lines, it does not dump YAML.** ``yaml.safe_dump`` would round-trip
 the data and delete every comment in the file. Those comments are not
 decoration — they are the justification for each number, which is the entire
-point of SPEC §10.1, and they are on screen during the pitch. A naked
+point of keeping every assumption in one sourced file, and they are on screen
+whenever the demo runs. A naked
 ``ratio: 439.2`` with no note saying what the numerator is would be a worse file
 than the one with the ``null`` in it.
 
@@ -112,8 +113,8 @@ def representative_scene(metrics: dict) -> dict | None:
 
     The three downlink numbers must come from the *same* scene. Taking a median
     numerator and a median denominator independently gives a pair whose quotient
-    is not the median ratio — and someone in the audience will divide the two
-    numbers we printed and get a third one we never said. One scene, three
+    is not the median ratio — and a careful reader will divide the two numbers
+    we printed and get a third one we never stated. One scene, three
     numbers, and the division works.
     """
     comp = metrics.get("compression") or {}
@@ -168,8 +169,8 @@ def set_value(text: str, section: str, key: str, value: Any, fmt: str = "{}") ->
 
     if target is None:
         raise SyncError(
-            f"{section}.{key} non esiste in {ASSUMPTIONS}. Questo modulo non aggiunge "
-            f"chiavi: aggiungila a mano, con il commento che spiega cosa significa."
+            f"{section}.{key} does not exist in {ASSUMPTIONS}. This module does not add "
+            f"keys: add it by hand, with the comment that explains what it means."
         )
 
     i, m = target
@@ -177,8 +178,8 @@ def set_value(text: str, section: str, key: str, value: Any, fmt: str = "{}") ->
     body, sep, comment = rest.partition("#")
     if not _REPLACEABLE.match(body):
         raise SyncError(
-            f"{section}.{key} contiene «{body.strip()}», che non è un valore misurato. "
-            f"Qualcuno ci ha scritto qualcosa a mano: non lo sovrascrivo."
+            f"{section}.{key} contains '{body.strip()}', which is not a measured value. "
+            f"Someone wrote it by hand: it will not be overwritten."
         )
 
     new = _render(value, fmt)
@@ -248,23 +249,26 @@ def sync(metrics: dict, text: str) -> Result:
 def run(repo: Path = Path("."), *, dry_run: bool = False) -> Result:
     metrics_path, target = repo / METRICS, repo / ASSUMPTIONS
     if not metrics_path.exists():
-        raise SyncError(f"{METRICS} non esiste: lancia prima make report.")
+        raise SyncError(f"{METRICS} does not exist: run make report first.")
     if not target.exists():
-        raise SyncError(f"{ASSUMPTIONS} non esiste. È obbligatorio, SPEC §10.1.")
+        raise SyncError(
+            f"{ASSUMPTIONS} does not exist. It is mandatory: every published figure "
+            f"must trace back to it."
+        )
 
     metrics = json.loads(metrics_path.read_text())
     original = target.read_text()
     res = sync(metrics, original)
 
     if res.missing:
-        log.warning("Non misurate, restano provvisorie: %s", ", ".join(res.missing))
+        log.warning("Not measured, still provisional: %s", ", ".join(res.missing))
     if res.text != original and not dry_run:
         target.write_text(res.text)
-    verb = "da aggiornare" if dry_run else "aggiornate"
+    verb = "to update" if dry_run else "updated"
     for where in res.changed:
         log.info("  %s %s", where, verb)
     log.info(
-        "%s: %d %s, %d già allineate, %d non misurate",
+        "%s: %d %s, %d already in sync, %d not measured",
         ASSUMPTIONS,
         len(res.changed),
         verb,
@@ -275,17 +279,19 @@ def run(repo: Path = Path("."), *, dry_run: bool = False) -> Result:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Allinea configs/assumptions.yaml alle misure.")
+    ap = argparse.ArgumentParser(
+        description="Bring configs/assumptions.yaml in line with the measurements."
+    )
     ap.add_argument("--repo", type=Path, default=Path("."))
     ap.add_argument(
-        "--check", action="store_true", help="non scrivere; esci 1 se il file è disallineato"
+        "--check", action="store_true", help="do not write; exit 1 if the file is out of sync"
     )
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     res = run(args.repo, dry_run=args.check)
     if args.check and res.wrote:
-        log.error("configs/assumptions.yaml è indietro rispetto alle misure: lancia make report")
+        log.error("configs/assumptions.yaml is behind the measurements: run make report")
         return 1
     return 0
 

@@ -1,14 +1,16 @@
-"""Consolidate every measurement, and rule on what the deck may claim. SPEC §10.3.
+"""Consolidate every measurement, and check the early design estimates against them.
 
 This module produces no numbers of its own. It gathers what the other stages
 measured, measures the downlink ratio on the **predicted** masks, and then does
-the part that matters: for each public claim, it says whether a measurement
-supports it, contradicts it, or is missing.
+the part that matters: for each early design-phase estimate, it says whether a
+measurement supports it, contradicts it, or is missing.
 
-That last step exists because the failure mode of a pitch is not a wrong
-calculation — it is a number that was true of a prototype in June, was never
-re-measured, and gets read aloud in October. ``artifacts/claims.md`` is the
-artefact Federico reads before writing a slide.
+That last step exists because the typical failure of a public figure is not a
+wrong calculation — it is a number that was true of a prototype in June, was
+never re-measured, and keeps being quoted months later.
+``artifacts/estimates_vs_measurements.md`` is the file to read before quoting
+any number about the system (see docs/decisions.md, *Early estimates vs.
+measurements*).
 """
 
 from __future__ import annotations
@@ -34,8 +36,9 @@ def deployed_config(fallback: Path = Path("configs/train3.yaml")) -> Path:
 
     ``configs/train3.yaml`` names the *baseline* checkpoint. The deployed model is
     whatever ``scripts/pick_model.py`` last wrote into ``artifacts/best_config.txt``
-    (D-025: the Lovász run). Defaulting to the fixed name measured a model nobody
-    ships — and did so silently, because both files load and both produce numbers.
+    (docs/decisions.md D-025: the Lovász run). Defaulting to the fixed name
+    measured a model nobody ships — and did so silently, because both files load
+    and both produce numbers.
 
     That is exactly how the compression figure moved from 439:1 to 347:1 on
     2026-09-09 without a line of measurement code changing: ``make report`` had not
@@ -67,17 +70,17 @@ def measure_downlink(
 ) -> dict:
     """Compression ratio on the masks the model actually produces.
 
-    D-016 measured this on the analyst's chart and refused to quote the result,
-    because a chart is drawn as polygons and compresses far better than a
-    network's speckled output. This runs the model so the number is the
+    docs/decisions.md D-016 measured this on the analyst's chart and refused to
+    quote the result, because a chart is drawn as polygons and compresses far
+    better than a network's speckled output. This runs the model so the number is the
     operational one.
     """
     index_path = demo_dir / "index.json"
     if not index_path.exists():
-        return {"error": "data/demo/index.json assente: lancia make precompute."}
+        return {"error": "data/demo/index.json missing: run make precompute."}
     index = json.loads(index_path.read_text())
     if not index.get("generated_from_predicted_mask"):
-        return {"error": "L'indice viene da una classifica su ice chart, non dal modello."}
+        return {"error": "The index comes from an ice-chart classification, not from the model."}
 
     import torch
 
@@ -85,7 +88,7 @@ def measure_downlink(
     from iceroute.model.inference import predict_scene
 
     if checkpoint is None or not Path(checkpoint).exists():
-        return {"error": f"Checkpoint assente: {checkpoint}"}
+        return {"error": f"Checkpoint missing: {checkpoint}"}
     model, _ = load_checkpoint(Path(checkpoint), device)
     channels = ["hh", "hv", "incidence_angle"]
 
@@ -127,26 +130,26 @@ def measure_downlink(
             torch.cuda.empty_cache()
 
     if not results:
-        return {"error": "Nessuna scena misurabile."}
+        return {"error": "No measurable scene."}
     out = summarise(results)
     out["verdict"] = verdict(out, claimed=200.0)
     return out
 
 
 # ---------------------------------------------------------------------------
-# Ruling on the public claims
+# Early design estimates against measurements
 # ---------------------------------------------------------------------------
 
 
 def _fmt(v, spec="{:.3f}"):
-    return spec.format(v) if isinstance(v, int | float) and np.isfinite(v) else "non misurato"
+    return spec.format(v) if isinstance(v, int | float) and np.isfinite(v) else "not measured"
 
 
-def adjudicate(metrics: dict) -> list[dict]:
-    """For each claim in the June deck: supported, contradicted, or unmeasured.
+def compare_estimates(metrics: dict) -> list[dict]:
+    """For each early design estimate (June 2026 prototype): supported, contradicted, or unmeasured.
 
-    Deliberately blunt. A row that says "contraddetta" with both numbers next to
-    it is what stops a slide going out unchanged.
+    Deliberately blunt. A row that says "contradicted" with both numbers next to
+    it is what stops an outdated figure from being repeated unchanged.
     """
     q = metrics.get("quantization") or {}
     size = q.get("size") or {}
@@ -158,98 +161,99 @@ def adjudicate(metrics: dict) -> list[dict]:
 
     rows = []
 
-    def add(claim_id, claimed, measured, status, action):
+    def add(estimate_id, estimate, measured, verdict_, note):
         rows.append(
             {
-                "id": claim_id,
-                "claimed": claimed,
+                "id": estimate_id,
+                "estimate": estimate,
                 "measured": measured,
-                "status": status,
-                "action": action,
+                "verdict": verdict_,
+                "note": note,
             }
         )
 
     int8_kb = size.get("int8_kb")
     add(
         "A-02",
-        "58 KB di pesi INT8",
-        f"{int8_kb:.0f} KB" if int8_kb else "non misurato",
-        "contraddetta" if int8_kb else "non misurata",
-        f"Sostituire con {size.get('int8_mb', 0):.2f} MB. A "
-        f"{size.get('bytes_per_parameter_int8', 0):.2f} byte/parametro i 58 KB sono "
-        f"aritmeticamente impossibili."
+        "58 KB of INT8 weights",
+        f"{int8_kb:.0f} KB" if int8_kb else "not measured",
+        "contradicted" if int8_kb else "not measured",
+        f"Measured size is {size.get('int8_mb', 0):.2f} MB. At "
+        f"{size.get('bytes_per_parameter_int8', 0):.2f} bytes/parameter, 58 KB is "
+        f"arithmetically impossible."
         if int8_kb
-        else "Lancia make quantize.",
+        else "Run make quantize.",
     )
 
     drop = acc.get("miou_drop")
     add(
         "A-04",
-        "1–3% di mIoU perso con INT8",
-        f"{drop:+.4f}" if isinstance(drop, float) else "non misurato",
-        "contraddetta (in meglio)" if isinstance(drop, float) and drop <= 0.01 else "non misurata",
-        "Dire che il degrado misurato e' nullo: e' meglio di quanto dichiarato."
+        "1–3% mIoU lost to INT8",
+        f"{drop:+.4f}" if isinstance(drop, float) else "not measured",
+        "contradicted, favourably" if isinstance(drop, float) and drop <= 0.01 else "not measured",
+        "The measured degradation is negligible: better than the estimate."
         if isinstance(drop, float)
-        else "Lancia make quantize.",
+        else "Run make quantize.",
     )
 
     ratio = comp.get("ratio_median")
     add(
-        "P-06 / compressione",
+        "P-06 / compression",
         "~200:1",
-        f"{ratio:.0f}:1" if ratio else "non misurato",
-        ("provvisoria" if comp.get("provisional") else "sostenuta") if ratio else "non misurata",
-        "Misurata sull'ice chart: non citabile finche' non e' sulla maschera predetta."
+        f"{ratio:.0f}:1" if ratio else "not measured",
+        ("provisional" if comp.get("provisional") else "supported") if ratio else "not measured",
+        "Measured on the ice chart: not quotable until it is measured on the predicted mask."
         if comp.get("provisional")
-        else (f"Usare {ratio:.0f}:1." if ratio else "Lancia make report."),
+        else (f"Measured value: {ratio:.0f}:1." if ratio else "Run make report."),
     )
 
     miou = agg.get("miou")
     add(
         "mIoU",
-        "6 stadi di sviluppo del ghiaccio",
-        f"{_fmt(miou)} su 3 classi" if miou else "non misurato",
-        "ridimensionata",
-        "Il deck deve dire 3 classi: acqua libera, ghiaccio sottile, ghiaccio spesso. "
-        "Il ripiego SPEC §7.4 e' attivo (D-020).",
+        "6 stages of ice development",
+        f"{_fmt(miou)} on 3 classes" if miou else "not measured",
+        "contradicted",
+        "The model distinguishes 3 classes: open water, thin ice, thick ice. The "
+        "3-class fallback is active (docs/decisions.md D-020).",
     )
 
     add(
         "A-03",
-        "5,3 ms per tile (proiezione GPU@SAT)",
-        f"{lat.get('median_ms_per_tile', float('nan')):.0f} ms su CPU 1 thread"
+        "5.3 ms per tile (GPU@SAT projection)",
+        f"{lat.get('median_ms_per_tile', float('nan')):.0f} ms on CPU, 1 thread"
         if lat
-        else "non misurata",
-        "grandezza diversa",
-        "La latenza CPU non valida la proiezione GPU@SAT: sono due cose. "
-        "Etichettare la proiezione come tale.",
+        else "not measured",
+        "different quantity",
+        "CPU latency does not validate the GPU@SAT projection: they are two different "
+        "things. The projection must be labelled as a projection.",
     )
 
     unsafe = (ev.get("scenes") or {}).get("worst_unsafe_fraction")
     if isinstance(unsafe, float):
         add(
-            "sicurezza",
-            "(nessuna affermazione pubblica)",
-            f"{unsafe:.1%} permissiva nel caso peggiore",
-            "da dichiarare",
-            "E' la frazione di pixel dove una rotta passerebbe in ghiaccio vietato. "
-            "Va detta prima che la trovi qualcun altro.",
+            "safety",
+            "(no early estimate)",
+            f"{unsafe:.1%} permissive in the worst case",
+            "undisclosed",
+            "The fraction of pixels where a route would cross forbidden ice. It belongs "
+            "in any statement about the system, stated up front rather than found by someone else.",
         )
     return rows
 
 
-def write_claims(rows: list[dict], path: Path) -> None:
+def write_estimates(rows: list[dict], path: Path) -> None:
     lines = [
-        "# Cosa il deck puo' dire, e cosa no",
+        "# Early design estimates vs. measurements",
         "",
-        "> Generato da `make report`. Ogni riga confronta un'affermazione pubblica",
-        "> con una misura. Non modificare a mano: si rigenera.",
+        "> Written by `make report`. Each row sets an early design-phase estimate",
+        "> (June 2026 prototype) next to the value measured on the current model.",
+        "> Do not edit by hand: the file is regenerated.",
         "",
-        "| ID | Dichiarato | Misurato | Stato | Azione |",
+        "| ID | Early estimate | Measured | Verdict | Note |",
         "|---|---|---|---|---|",
     ]
     lines += [
-        f"| {r['id']} | {r['claimed']} | **{r['measured']}** | {r['status']} | {r['action']} |"
+        f"| {r['id']} | {r['estimate']} | **{r['measured']}** | {r['verdict']} | {r['note']} |"
         for r in rows
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -257,7 +261,9 @@ def write_claims(rows: list[dict], path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Consolida le misure per il pitch. SPEC §10.3.")
+    ap = argparse.ArgumentParser(
+        description="Consolidate the measurements and compare them with the early estimates."
+    )
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--demo-dir", type=Path, default=Path("data/demo"))
     ap.add_argument("--data-config", type=Path, default=Path("configs/data.yaml"))
@@ -265,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         "--train-config",
         type=Path,
         default=None,
-        help="default: il config schierato, da artifacts/best_config.txt",
+        help="default: the deployed config, from artifacts/best_config.txt",
     )
     ap.add_argument("--raw-dir", type=Path, default=None)
     ap.add_argument("--device", default=None)
@@ -278,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
     data_cfg = load_config(args.data_config)
     train_path = args.train_config or deployed_config()
     train_cfg = yaml.safe_load(train_path.read_text())
-    log.info("Modello: %s", train_path)
+    log.info("Model: %s", train_path)
 
     if args.raw_dir is None:
         demo_cfg_path = Path("configs/demo.yaml")
@@ -289,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         import torch
 
         device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-        log.info("Compressione sulle maschere predette...")
+        log.info("Compression on the predicted masks...")
         metrics["compression"] = measure_downlink(
             args.demo_dir,
             data_cfg,
@@ -306,11 +312,11 @@ def main(argv: list[str] | None = None) -> int:
 
     args.metrics.write_text(json.dumps(metrics, indent=2))
 
-    rows = adjudicate(metrics)
-    write_claims(rows, Path("artifacts/claims.md"))
-    log.info("Verdetto sulle affermazioni in artifacts/claims.md")
+    rows = compare_estimates(metrics)
+    write_estimates(rows, Path("artifacts/estimates_vs_measurements.md"))
+    log.info("Early estimates vs. measurements in artifacts/estimates_vs_measurements.md")
     for r in rows:
-        log.info("  %-20s %-14s %s", r["id"], r["status"], r["measured"])
+        log.info("  %-20s %-14s %s", r["id"], r["verdict"], r["measured"])
     return 0
 
 

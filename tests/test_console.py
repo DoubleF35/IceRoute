@@ -48,7 +48,7 @@ def test_a_name_that_is_not_a_sentinel_product_matches_nothing():
     """Then the product panel is empty, which is the right answer: inventing a
     platform for a file that does not name one is the failure this page is
     most exposed to."""
-    assert co.PRODUCT.match("qualcosa_altro.nc") is None
+    assert co.PRODUCT.match("something_else.nc") is None
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ def _overlay(n=100, no_go=(), no_data=()):
 def test_the_trace_counts_the_cells_the_overlay_actually_marks():
     a = co.admissibility(_overlay(100, no_go=range(10, 20)), buckets=10)
     assert a["n_cells"] == 100 and a["n_no_go"] == 10
-    assert a["bars"][1] == [1.0, 0.0], "il secondo decimo è tutto vietato"
+    assert a["bars"][1] == [1.0, 0.0], "the second tenth is entirely forbidden"
     assert a["bars"][0] == [0.0, 0.0]
 
 
@@ -83,7 +83,7 @@ def test_no_baseline_path_means_no_trace_rather_than_an_empty_chart():
 
 
 def test_cells_outside_the_chart_are_a_separate_series_from_forbidden_ones():
-    """ "Fuori copertura" and "vietata da POLARIS" are different statements —
+    """ "Outside coverage" and "forbidden by POLARIS" are different statements —
     one is missing data, the other is a decision — and the page must not blend
     them into one bar."""
     a = co.admissibility(_overlay(20, no_go=(0,), no_data=(10,)), buckets=20)
@@ -134,13 +134,14 @@ def test_a_scene_without_a_route_gets_no_meter_instead_of_an_empty_one():
 
 def test_a_scene_without_its_raw_file_gets_no_product_rows():
     p = co.panels(_entry(), None, None, None, _PAL)
-    assert p["prod"] == [], "senza NetCDF grezzo non c'è un prodotto da dichiarare"
+    assert p["prod"] == [], "without the raw NetCDF there is no product to declare"
 
 
-def test_numbers_are_grouped_and_pointed_in_italian():
-    assert co.it(169558) == f"169{co.NBSP}558"
-    assert co.it(2.604, 3) == "2,604"
-    assert " " not in co.it(169558), "il raggruppamento non deve poter andare a capo"
+def test_numbers_use_one_convention_and_cannot_wrap():
+    assert co.num(169558) == "169,558"
+    assert co.num(2.604, 3) == "2.604"
+    assert " " not in co.num(169558), "grouping must not be able to break across lines"
+    assert co.NBSP not in co.num(169558)
 
 
 # ---------------------------------------------------------------------------
@@ -171,12 +172,12 @@ def test_the_log_omits_the_stages_whose_measurements_are_missing():
         None,
     )
     tags = {t for _, t, _ in rows}
-    assert "TILE" not in tags and "PRODOTTO" not in tags and "A*" not in tags
+    assert "TILE" not in tags and "PRODUCT" not in tags and "A*" not in tags
 
 
 def test_a_scene_warning_reaches_the_log():
     rows = co.event_log(
-        {"id": "S.nc", "shape": None, "warnings": ["mancano dati"]},
+        {"id": "S.nc", "shape": None, "warnings": ["data missing"]},
         "PC6",
         {"route_exists": False},
         None,
@@ -184,7 +185,7 @@ def test_a_scene_warning_reaches_the_log():
         {},
         None,
     )
-    assert any(t == "AVVISO" and "mancano dati" in m for _, t, m in rows)
+    assert any(t == "WARNING" and "data missing" in m for _, t, m in rows)
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +196,7 @@ def test_a_scene_warning_reaches_the_log():
 def _real_ctx():
     demo = Path("data/demo")
     if not (demo / "index.json").exists():
-        pytest.skip("data/demo assente")
+        pytest.skip("data/demo missing")
     import yaml
 
     metrics = (
@@ -225,10 +226,10 @@ def test_every_footprint_sits_where_its_route_does():
         lats = [p[1] for p in f["ring"]]
         for e in s["classes"].values():
             for lon, lat in e.get("route_lonlat") or []:
-                assert min(lons) - 0.5 <= lon <= max(lons) + 0.5, f"{s['id']}: lon fuori"
-                assert min(lats) - 0.5 <= lat <= max(lats) + 0.5, f"{s['id']}: lat fuori"
+                assert min(lons) - 0.5 <= lon <= max(lons) + 0.5, f"{s['id']}: lon outside"
+                assert min(lats) - 0.5 <= lat <= max(lats) + 0.5, f"{s['id']}: lat outside"
                 checked += 1
-    assert checked, "nessuna rotta confrontata con la propria impronta"
+    assert checked, "no route compared against its own footprint"
 
 
 def test_every_pass_is_near_polar():
@@ -242,7 +243,7 @@ def test_every_pass_is_near_polar():
             continue
         az = f["track_az"]
         off = min(abs(az - 190), abs(az - 10), abs(az - 370))
-        assert off < 25, f"{s['id']}: traccia {az}°, non è un passaggio quasi polare"
+        assert off < 25, f"{s['id']}: track {az}°, not a near-polar pass"
 
 
 def test_the_look_direction_is_square_to_the_track():
@@ -254,7 +255,7 @@ def test_the_look_direction_is_square_to_the_track():
         if not f:
             continue
         d = (f["look_az"] - f["track_az"]) % 360
-        assert 75 < d < 105, f"{s['id']}: vista a {d}° dalla traccia"
+        assert 75 < d < 105, f"{s['id']}: look {d}° off the track"
 
 
 def test_the_footprint_matches_the_pixel_grid_it_came_from():
@@ -268,8 +269,8 @@ def test_the_footprint_matches_the_pixel_grid_it_came_from():
             continue
         along = shape[0] * f["pixel_spacing_m"] / 1000
         across = shape[1] * f["pixel_spacing_m"] / 1000
-        assert math.isclose(f["along_km"], along, rel_tol=0.05), f"{s['id']} lungo traccia"
-        assert math.isclose(f["across_km"], across, rel_tol=0.05), f"{s['id']} in range"
+        assert math.isclose(f["along_km"], along, rel_tol=0.05), f"{s['id']} along track"
+        assert math.isclose(f["across_km"], across, rel_tol=0.05), f"{s['id']} across track"
 
 
 def test_the_page_is_self_contained_and_declares_its_charset():
@@ -277,14 +278,14 @@ def test_the_page_is_self_contained_and_declares_its_charset():
     page = co.build_page(ctx)
     assert '<meta charset="utf-8">' in page[:120]
     for remote in ("http://", "https://", "//cdn", "<link"):
-        assert remote not in page, f"riferimento esterno: {remote}"
+        assert remote not in page, f"external reference: {remote}"
 
 
 def test_the_page_says_out_loud_that_it_has_no_coastlines():
     """The one absence a map must admit to: a viewer who assumes a basemap is
     there will read the empty sphere as ocean."""
     page = co.build_page(_real_ctx())
-    assert "Nessuna linea" in page and "costa" in page
+    assert "No coastlines" in page and "no coastline dataset" in page
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +347,7 @@ def test_a_non_ascii_payload_drops_the_ruler_instead_of_misnumbering_it():
     """Character offsets stop being byte offsets the moment a multi-byte
     character appears, and a ruler that is quietly wrong is the kind of detail
     nobody checks."""
-    b = co.bridge(_paid(text='{"nome":"Rotta nord-est — Grønland"}'))
+    b = co.bridge(_paid(text='{"name":"North-east route — Grønland"}'))
     assert b["ruler"] is False and all(o == "" for o, _ in b["lines"])
 
 
@@ -369,11 +370,11 @@ def test_the_byte_rows_quote_only_what_was_measured():
         )
     )
     labels = {k for k, _, _ in b["rows"]}
-    assert "maschera del ghiaccio" in labels and "compressione" in labels
-    assert "in messaggi SBD" in labels
+    assert "ice mask" in labels and "compression" in labels
+    assert "as SBD messages" in labels
     b2 = co.bridge(_paid())
-    assert {k for k, _, _ in b2["rows"]} == {"rotta · 2 waypoint"}, (
-        "senza misure di compressione non si inventano righe"
+    assert {k for k, _, _ in b2["rows"]} == {"route · 2 waypoints"}, (
+        "without compression measurements no rows are invented"
     )
 
 
@@ -386,15 +387,15 @@ def test_every_real_packet_parses_as_the_file_it_claims_to_be():
         for ic, e in s["classes"].items():
             b = (e.get("panels") or {}).get("bridge")
             if not b:
-                assert not e.get("route_exists"), f"{s['id']}/{ic}: rotta senza pacchetto"
+                assert not e.get("route_exists"), f"{s['id']}/{ic}: route without a packet"
                 continue
-            assert not b.get("mismatch"), f"{s['id']}/{ic}: byte incoerenti"
+            assert not b.get("mismatch"), f"{s['id']}/{ic}: inconsistent bytes"
             joined = html.unescape("".join(re.sub(r"<[^>]+>", "", h) for _, h in b["lines"]))
-            assert len(joined.encode()) == b["bytes"], f"{s['id']}/{ic}: byte diversi"
+            assert len(joined.encode()) == b["bytes"], f"{s['id']}/{ic}: bytes differ"
             assert json.loads(joined)["type"] == "FeatureCollection"
-            assert e["payload"]["route"] == b["bytes"], f"{s['id']}/{ic}: conteggio diverso"
+            assert e["payload"]["route"] == b["bytes"], f"{s['id']}/{ic}: count differs"
             checked += 1
-    assert checked, "nessun pacchetto verificato"
+    assert checked, "no packet verified"
 
 
 # ---------------------------------------------------------------------------
@@ -415,20 +416,21 @@ def test_the_geocoded_sar_lands_on_the_same_raster_as_the_mask():
             continue
         geo = Image.open(Path("data/demo/images") / files["mask_geo"]).size
         sar = Image.open(co.CACHE_DIR / files["sar_geo"]).size
-        assert sar == geo, f"{s['id']}: SAR {sar} contro maschera {geo}"
+        assert sar == geo, f"{s['id']}: SAR {sar} vs mask {geo}"
         checked += 1
     if not checked:
-        pytest.skip("nessun SAR geocodificato in questa build")
+        pytest.skip("no geocoded SAR in this build")
 
 
 def test_a_grid_that_does_not_match_the_overlay_produces_no_layer(tmp_path):
     """Refusing is the point. A layer one cell out would put the route in the
-    wrong place while looking perfectly convincing — D-027, again."""
+    wrong place while looking perfectly convincing — docs/decisions.md D-027,
+    again."""
     raw = Path("data/raw/test/20180707T113313_cis_prep.nc")
     if not raw.is_file():
-        pytest.skip("scena grezza assente")
+        pytest.skip("raw scene missing")
     assert co.sar_geocoded(raw, [10, 10], 500.0, tmp_path) is None
-    assert not list(tmp_path.glob("*.png")), "non deve lasciare un raster inutilizzabile"
+    assert not list(tmp_path.glob("*.png")), "must not leave an unusable raster behind"
 
 
 def test_a_cached_raster_of_the_wrong_shape_is_rebuilt_not_served(tmp_path):
@@ -440,7 +442,7 @@ def test_a_cached_raster_of_the_wrong_shape_is_rebuilt_not_served(tmp_path):
     stale = tmp_path / f"{raw.stem}_sargeo.png"
     Image.new("L", (7, 9)).save(stale)
     assert co.sar_geocoded(raw, [10, 10], 500.0, tmp_path) is None
-    assert not stale.exists(), "la cache obsoleta va rimossa, non restituita"
+    assert not stale.exists(), "a stale cache must be removed, not served"
 
 
 def test_the_layer_is_offered_only_when_a_scene_actually_has_it():
@@ -450,7 +452,7 @@ def test_the_layer_is_offered_only_when_a_scene_actually_has_it():
     assert ("sar_geo" in ids) == has
     if has:
         assert ids.index("sar_geo") < ids.index("sar"), (
-            "il livello geocodificato sta accanto a quello a swath, per il confronto"
+            "the geocoded layer sits next to the swath one, for comparison"
         )
 
 
@@ -474,10 +476,10 @@ def test_the_turn_is_the_smallest_one_that_squares_the_scene_up():
         fr = s.get("frame")
         if not fr:
             continue
-        assert -45.0 <= fr["rot"] <= 45.0, f"{s['id']}: rotazione {fr['rot']}°"
-        assert fr["scale"] >= 1.0, f"{s['id']}: ingrandimento {fr['scale']}"
+        assert -45.0 <= fr["rot"] <= 45.0, f"{s['id']}: rotation {fr['rot']}°"
+        assert fr["scale"] >= 1.0, f"{s['id']}: enlargement {fr['scale']}"
         seen += 1
-    assert seen, "nessuna scena raddrizzata"
+    assert seen, "no scene straightened"
 
 
 def test_straightening_never_crops_the_scene():
@@ -498,13 +500,13 @@ def test_straightening_never_crops_the_scene():
         c, sn = math.cos(math.radians(fr["rot"])), math.sin(math.radians(fr["rot"]))
         w = max(x * c - y * sn for x, y in pts) - min(x * c - y * sn for x, y in pts)
         h = max(x * sn + y * c for x, y in pts) - min(x * sn + y * c for x, y in pts)
-        assert w * fr["scale"] <= cols * res + 1, f"{s['id']}: tagliata in larghezza"
-        assert h * fr["scale"] <= rows * res + 1, f"{s['id']}: tagliata in altezza"
+        assert w * fr["scale"] <= cols * res + 1, f"{s['id']}: cropped in width"
+        assert h * fr["scale"] <= rows * res + 1, f"{s['id']}: cropped in height"
         # and it really is the largest such enlargement, not a timid one.
         # The tolerance is the cost of rounding the scale down to four
         # decimals — about forty metres here — not a licence to be loose.
         assert w * fr["scale"] > cols * res * 0.999 or h * fr["scale"] > rows * res * 0.999, (
-            f"{s['id']}: ingrandimento timido"
+            f"{s['id']}: timid enlargement"
         )
 
 
@@ -526,9 +528,9 @@ def test_the_ground_track_has_two_distinct_ends_the_satellite_can_fly_between():
         if not f:
             continue
         a, b = f["track_line"]
-        assert a != b, f"{s['id']}: estremi coincidenti"
+        assert a != b, f"{s['id']}: coincident ends"
         assert co.great_circle_km(tuple(a), tuple(b)) == pytest.approx(f["along_km"], rel=0.01), (
-            f"{s['id']}: la traccia non è lunga quanto dichiarato"
+            f"{s['id']}: the track is not as long as declared"
         )
 
 
@@ -591,12 +593,12 @@ def test_every_text_tier_clears_45_on_every_surface_it_sits_on():
     ):
         for ground in grounds:
             r = _contrast(tok[name], ground)
-            assert r >= 4.5, f"{name} su {ground}: {r:.2f}:1"
+            assert r >= 4.5, f"{name} on {ground}: {r:.2f}:1"
 
 
 def test_a_tag_reads_the_same_whether_its_row_is_selected_or_not():
     """Translucent tag backgrounds borrow whatever is under them, so the same
-    "vietata" measured 4.37:1 on a selected row and 4.9:1 elsewhere. Opaque
+    "forbidden" measured 4.37:1 on a selected row and 4.9:1 elsewhere. Opaque
     grounds, and the contrast is a property of the tag alone."""
     tok = _tokens()
     for kind, text_token in [
@@ -606,9 +608,9 @@ def test_a_tag_reads_the_same_whether_its_row_is_selected_or_not():
         ("info", "--info-t"),
     ]:
         rule = re.search(rf"\.pill\.{kind}\{{background:(#[0-9a-f]{{3,8}});", co.CSS)
-        assert rule, f"regola .pill.{kind} non trovata"
+        assert rule, f"rule .pill.{kind} not found"
         bg = rule.group(1)
-        assert len(bg) == 7, f".pill.{kind} ha un fondo traslucido: {bg}"
+        assert len(bg) == 7, f".pill.{kind} has a translucent background: {bg}"
         r = _contrast(tok[text_token], bg)
         assert r >= 4.5, f".pill.{kind}: {r:.2f}:1"
 
@@ -618,11 +620,11 @@ def test_no_interface_colour_is_typed_by_hand_outside_the_token_block():
     ground; on Blueprint's charcoal two of them fell to 1.2:1. They are tokens
     now, and the legend swatches use the same tokens, so a swatch can no longer
     disagree with the line it describes."""
-    body = co.CSS.split("\n}", 1)[1]  # tutto dopo il blocco :root
+    body = co.CSS.split("\n}", 1)[1]  # everything after the :root block
     data_colours = {"#ff2d95", "#f5f5f5", "#ff2020", "#fff"}
     stray = {m.group(0).lower() for m in re.finditer(r"#[0-9a-fA-F]{3,8}\b", body)}
     stray -= data_colours
-    # i fondi opachi delle pastiglie sono miscele risolte una volta sola
+    # the opaque pill backgrounds are blends resolved once
     stray -= {
         "#304241",
         "#3c5a51",
@@ -633,4 +635,17 @@ def test_no_interface_colour_is_typed_by_hand_outside_the_token_block():
         "#393e46",
         "#4d535c",
     }
-    assert not stray, f"colori a mano fuori dai token: {sorted(stray)}"
+    assert not stray, f"hand-typed colours outside the tokens: {sorted(stray)}"
+
+
+def test_take_duration_survives_an_hour_boundary(monkeypatch):
+    """A take from 11:59:30 to 12:00:30 lasts 60 s, not -3540 s."""
+    m = co.PRODUCT.match("S1B_EW_GRDM_1SDH_20180707T115930_20180707T120030_011704_015877_83D1")
+    assert m is not None
+    from datetime import datetime
+
+    g = m.groupdict()
+    secs = (
+        datetime.strptime(g["t1"], "%Y%m%dT%H%M%S") - datetime.strptime(g["t0"], "%Y%m%dT%H%M%S")
+    ).total_seconds()
+    assert secs == 60

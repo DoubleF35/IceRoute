@@ -1,9 +1,9 @@
 """Tests for the assumptions sync.
 
-The file this writes is shown verbatim to investors and is, per SPEC §10.1, the
-answer to "based on what?". So the tests care less about the arithmetic than
-about two properties: that writing a number never costs a comment, and that the
-module refuses rather than guesses.
+The file this writes is shown verbatim in the demo and is the single sourced
+answer to "based on what?" for every published figure. So the tests care less
+about the arithmetic than about two properties: that writing a number never
+costs a comment, and that the module refuses rather than guesses.
 """
 
 from __future__ import annotations
@@ -20,16 +20,16 @@ meta:
   updated: 2026-09-05
 
 downlink:
-  # Perché una scena sola e non tre mediane.
-  ratio_scene: null            # SCRITTO da pitch/assumptions.py
-  raw_scene_bytes: null        # SCRITTO
-  payload_bytes: null          # SCRITTO
-  ratio: null                  # SCRITTO
+  # Why one scene and not three medians.
+  ratio_scene: null            # WRITTEN by report/assumptions.py
+  raw_scene_bytes: null        # WRITTEN
+  payload_bytes: null          # WRITTEN
+  ratio: null                  # WRITTEN
   ratio_min: null
   ratio_max: null
   provisional: true
   numerator_definition: >-
-    Canali SAR compressi senza perdita.
+    SAR channels compressed losslessly.
 
 model:
   parameters: 1964182
@@ -38,7 +38,7 @@ model:
   int8_degradation: null
   provisional: true
   latency_note: >-
-    Misurata a 1 thread.
+    Measured on 1 thread.
 """
 
 
@@ -77,12 +77,12 @@ def test_every_comment_survives():
     justification, and the justification is the point of the file."""
     out = asm.sync(_metrics(), SAMPLE).text
     for comment in (
-        "# Perché una scena sola e non tre mediane.",
-        "# SCRITTO da pitch/assumptions.py",
-        "Canali SAR compressi senza perdita.",
-        "Misurata a 1 thread.",
+        "# Why one scene and not three medians.",
+        "# WRITTEN by report/assumptions.py",
+        "SAR channels compressed losslessly.",
+        "Measured on 1 thread.",
     ):
-        assert comment in out, f"perso: {comment}"
+        assert comment in out, f"lost: {comment}"
 
 
 def test_untouched_keys_are_byte_identical():
@@ -103,20 +103,20 @@ def test_the_file_stays_valid_yaml():
 def test_a_key_that_does_not_exist_is_an_error_not_an_append():
     """If a measurement has no home in the file, a person decides where it goes
     and what to say about it. Appending a bare key would produce a number with
-    no explanation — exactly what §10.1 forbids."""
-    with pytest.raises(asm.SyncError, match="non esiste"):
-        asm.set_value(SAMPLE, "downlink", "inventata", 1)
+    no explanation — exactly what a sourced assumptions file exists to prevent."""
+    with pytest.raises(asm.SyncError, match="does not exist"):
+        asm.set_value(SAMPLE, "downlink", "invented", 1)
 
 
 def test_a_hand_written_value_is_never_clobbered():
-    text = SAMPLE.replace("  ratio: null", "  ratio: da rimisurare dopo il freeze")
-    with pytest.raises(asm.SyncError, match="a mano"):
+    text = SAMPLE.replace("  ratio: null", "  ratio: to be re-measured after the freeze")
+    with pytest.raises(asm.SyncError, match="by hand"):
         asm.sync(_metrics(), text)
 
 
 def test_a_section_that_does_not_exist_is_an_error():
     with pytest.raises(asm.SyncError):
-        asm.set_value(SAMPLE, "inesistente", "ratio", 1)
+        asm.set_value(SAMPLE, "nonexistent", "ratio", 1)
 
 
 def test_a_key_in_another_section_is_not_confused_for_this_one():
@@ -129,7 +129,7 @@ def test_a_key_in_another_section_is_not_confused_for_this_one():
 
 
 # ---------------------------------------------------------------------------
-# The numbers have to survive being divided by the audience
+# The numbers have to survive being divided by a careful reader
 # ---------------------------------------------------------------------------
 
 
@@ -172,8 +172,10 @@ def test_a_missing_measurement_keeps_its_section_provisional():
     del m["quantization"]["size"]["int8_bytes"]
     res = asm.sync(m, SAMPLE)
     d = yaml.safe_load(res.text)
-    assert d["model"]["provisional"] is True, "una misura manca: la sezione resta provvisoria"
-    assert d["downlink"]["provisional"] is False, "l'altra sezione è misurata per intero"
+    assert d["model"]["provisional"] is True, (
+        "a measurement is missing: the section stays provisional"
+    )
+    assert d["downlink"]["provisional"] is False, "the other section is fully measured"
     assert "model.onnx_int8_bytes" in res.missing
 
 
@@ -213,16 +215,17 @@ def test_the_wrong_hardcoded_parameter_count_gets_corrected():
 def test_the_real_file_is_in_sync():
     """This is the check preflight runs. It failing means make report is due."""
     if not (Path("artifacts/metrics.json").exists() and Path("configs/assumptions.yaml").exists()):
-        pytest.skip("metrics.json o assumptions.yaml assenti")
+        pytest.skip("metrics.json or assumptions.yaml missing")
     res = asm.run(Path("."), dry_run=True)
-    assert not res.changed, f"configs/assumptions.yaml è indietro: {res.changed}"
+    assert not res.changed, f"configs/assumptions.yaml is behind: {res.changed}"
 
 
 def test_the_real_file_still_refuses_dollars():
-    """The one thing this module must never be able to switch on. SPEC §10.1,
-    P-09: no source for fuel price or daily consumption, so no currency."""
+    """The one thing this module must never be able to switch on. docs/decisions.md,
+    *Provisional values*, P-09: no source for fuel price or daily consumption,
+    so no currency."""
     if not Path("configs/assumptions.yaml").exists():
-        pytest.skip("assumptions.yaml assente")
+        pytest.skip("assumptions.yaml missing")
     econ = yaml.safe_load(Path("configs/assumptions.yaml").read_text())["economics"]
     assert econ["show_dollar_savings"] is False
     assert econ["show_hours_saved"] is True

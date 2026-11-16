@@ -1,9 +1,9 @@
-"""Measure the downlink compression ratio. SPEC §10.2. Closes P-06.
+"""Measure the downlink compression ratio. Closes P-06.
 
-The claim is that IceRoute downlinks *mask + route* instead of the raw scene,
-at roughly 200:1. This module measures the ratio on real bytes and, if the
-number is not 200:1, the number in the pitch becomes the measured one — SPEC
-§10.2, no exceptions.
+The early design estimate is that IceRoute downlinks *mask + route* instead of
+the raw scene, at roughly 200:1. This module measures the ratio on real bytes
+and, if the number is not 200:1, the published number becomes the measured one —
+no exceptions (docs/decisions.md, *Early estimates vs. measurements*).
 
 Choosing the numerator honestly
 -------------------------------
@@ -46,8 +46,8 @@ The denominator
 ---------------
 Mask + route + metadata, exactly what goes down. The mask is written as a
 paletted PNG: lossless, 3 bits of real information per pixel, and decodable by
-anything. Run-length encoding would likely beat it — SPEC §10.2 names it as the
-improvement to mention if the ratio disappoints — so a run-length estimate is
+anything. Run-length encoding would likely beat it — it is the designated
+improvement to point to if the ratio disappoints — so a run-length estimate is
 computed alongside for comparison, and clearly marked as an estimate rather
 than a shipped format.
 """
@@ -195,7 +195,7 @@ def encode_sar_png(channels: np.ndarray) -> int:
 
         buf = io.BytesIO()
         # No explicit mode: passing one to reinterpret dtypes is deprecated and
-        # removed in Pillow 13 (October 2026 — the same month as the pitch).
+        # removed in Pillow 13 (October 2026).
         # fromarray infers I;16 from a uint16 array.
         Image.fromarray(q).save(buf, format="PNG", optimize=True, compress_level=9)
         total += buf.getbuffer().nbytes
@@ -205,9 +205,9 @@ def encode_sar_png(channels: np.ndarray) -> int:
 def rle_estimate_bytes(mask: np.ndarray) -> int:
     """Size of a row-wise run-length encoding: 2 bytes run length + 1 byte class.
 
-    An estimate of an alternative, not a shipped format. SPEC §10.2 asks for
-    this comparison so that "what would improve the ratio" has a number attached
-    instead of being a hand-wave.
+    An estimate of an alternative, not a shipped format. The comparison is kept
+    so that "what would improve the ratio" has a number attached instead of
+    being a hand-wave.
     """
     flat = mask.ravel()
     if flat.size == 0:
@@ -232,7 +232,7 @@ def downlink_route(collection: dict | None) -> dict | None:
     carry is not a downlink figure.
 
     Used by both the measurement and the UI panel that shows the payload, so
-    the bytes on screen and the bytes in the deck cannot disagree.
+    the bytes on screen and the bytes in the published figures cannot disagree.
     """
     if not collection:
         return None
@@ -268,13 +268,13 @@ def measure_scene(
     """
     if mask_source not in {"predicted", "ground_truth"}:
         raise ValueError(
-            f"mask_source deve essere 'predicted' o 'ground_truth', non {mask_source!r}. "
-            f"Il rapporto misurato sulle due cose è diverso e va etichettato."
+            f"mask_source must be 'predicted' or 'ground_truth', not {mask_source!r}. "
+            f"The ratio measured on the two differs and has to be labelled."
         )
     if mask.shape != sar_channels.shape[1:]:
         raise ValueError(
-            f"Maschera {mask.shape} e canali SAR {sar_channels.shape[1:]} non coincidono: "
-            f"il rapporto confronterebbe due scene diverse."
+            f"Mask {mask.shape} and SAR channels {sar_channels.shape[1:]} do not match: "
+            f"the ratio would compare two different scenes."
         )
 
     n_px = int(mask.size)
@@ -292,21 +292,21 @@ def measure_scene(
     notes = []
     if route_geojson is None:
         notes.append(
-            "Nessuna rotta inclusa: il denominatore è la sola maschera. "
-            "Il rapporto reale sarà leggermente più basso."
+            "No route included: the denominator is the mask alone. "
+            "The real ratio will be slightly lower."
         )
     if mask_source == "ground_truth":
         notes.append(
-            "PROVVISORIO: misurato sull'ice chart, non su una maschera predetta. "
-            "L'ice chart è disegnata a poligoni dall'analista, quindi si comprime molto "
-            "meglio di quanto farà l'uscita della U-Net. Questo numero è un LIMITE "
-            "SUPERIORE, non il valore operativo."
+            "PROVISIONAL: measured on the ice chart, not on a predicted mask. "
+            "The ice chart is drawn as polygons by the analyst, so it compresses far "
+            "better than the U-Net output will. This number is an UPPER BOUND, not the "
+            "operational value."
         )
     if zero_frac > 0.10:
         notes.append(
-            f"Il {zero_frac:.0%} del SAR è padding a 0.0 esatto. Il numeratore designato "
-            f"è quello compresso proprio per non far pagare alla baseline la "
-            f"trasmissione del nulla."
+            f"{zero_frac:.0%} of the SAR is exact-0.0 padding. The designated numerator "
+            f"is the compressed one precisely so that the baseline is not charged for "
+            f"transmitting nothing."
         )
 
     result = CompressionResult(
@@ -330,9 +330,9 @@ def measure_scene(
     if result.mask_rle_estimate_bytes < result.mask_png_bytes:
         gain = result.mask_png_bytes / max(result.mask_rle_estimate_bytes, 1)
         result.notes.append(
-            f"Un RLE per righe starebbe in {result.mask_rle_estimate_bytes / 1024:.0f} KB "
-            f"contro i {result.mask_png_bytes / 1024:.0f} KB del PNG ({gain:.1f}× meglio): "
-            f"è la strada indicata dalla SPEC §10.2 se il rapporto va migliorato."
+            f"A row-wise RLE would take {result.mask_rle_estimate_bytes / 1024:.0f} KB "
+            f"against {result.mask_png_bytes / 1024:.0f} KB for the PNG ({gain:.1f}× better): "
+            f"it is the designated route if the ratio needs improving."
         )
     return result
 
@@ -341,11 +341,11 @@ def summarise(results: list[CompressionResult]) -> dict:
     """Aggregate over scenes. Reports the range, not just the mean.
 
     A single averaged ratio hides that a scene of open water compresses far
-    better than a scene of broken ice — and the demo will show one specific
+    better than a scene of broken ice — and the demo shows one specific
     scene, whose number a viewer can check against this.
     """
     if not results:
-        return {"error": "Nessuna scena misurata."}
+        return {"error": "No scene measured."}
 
     ratios = [r.ratio for r in results]
     loose = [r.ratio_vs_uncompressed for r in results]
@@ -365,15 +365,16 @@ def summarise(results: list[CompressionResult]) -> dict:
     }
     if provisional:
         out["provisional_reason"] = (
-            f"{len(provisional)}/{len(results)} scene misurate sull'ice chart invece che "
-            f"su una maschera predetta. Numero da trattare come limite superiore finché "
-            f"non si rimisura con il modello addestrato (P-06)."
+            f"{len(provisional)}/{len(results)} scenes measured on the ice chart instead of "
+            f"on a predicted mask. Treat the number as an upper bound until it is "
+            f"re-measured with the trained model (P-06)."
         )
     return out
 
 
 def verdict(summary: dict, claimed: float = 200.0) -> str:
-    """Compare the measurement to the claim. SPEC §10.2 leaves no discretion."""
+    """Compare the measurement to the early estimate. The rule leaves no discretion:
+    the measured value replaces the estimate."""
     if "error" in summary:
         return summary["error"]
 
@@ -381,18 +382,18 @@ def verdict(summary: dict, claimed: float = 200.0) -> str:
     if summary.get("provisional"):
         # Refuse to hand back a quotable headline from an analyst-drawn chart.
         return (
-            f"Rapporto {measured:.0f}:1 misurato sull'ICE CHART, non su una maschera "
-            f"predetta: è un LIMITE SUPERIORE e non va nel pitch. L'ice chart è a "
-            f"poligoni e si comprime molto meglio dell'uscita di una rete. "
-            f"Rimisurare dopo il training. (P-06 resta aperta.)"
+            f"Ratio {measured:.0f}:1 measured on the ICE CHART, not on a predicted "
+            f"mask: it is an UPPER BOUND and must not be quoted. The ice chart is drawn "
+            f"as polygons and compresses far better than a network's output. "
+            f"Re-measure after training. (P-06 stays open.)"
         )
 
     if measured >= claimed:
         return (
-            f"Rapporto misurato {measured:.0f}:1, sopra i {claimed:.0f}:1 dichiarati, "
-            f"già contro una baseline SAR compressa senza perdita. Si usa il misurato."
+            f"Measured ratio {measured:.0f}:1, above the estimated {claimed:.0f}:1, "
+            f"even against a losslessly compressed SAR baseline. The measured value is used."
         )
     return (
-        f"Rapporto misurato {measured:.0f}:1 contro i {claimed:.0f}:1 dichiarati. "
-        f"SPEC §10.2: nel pitch va **{measured:.0f}:1**, non {claimed:.0f}:1."
+        f"Measured ratio {measured:.0f}:1 against the estimated {claimed:.0f}:1. "
+        f"The figure to publish is **{measured:.0f}:1**, not {claimed:.0f}:1."
     )

@@ -2,7 +2,7 @@
 
 The page exists so a human can see project state at a glance, which makes a
 wrong number on it worse than no page. Two of these tests pin bugs that shipped:
-a download count that rendered negative, and Italian formatting that silently
+a download count that rendered negative, and a separator swap that silently
 lost thousands separators.
 """
 
@@ -15,8 +15,8 @@ import pytest
 
 from iceroute.report.dashboard import (
     MISSING,
-    _it,
     _md,
+    _num_fmt,
     bar_rows,
     build_page,
     collect,
@@ -38,26 +38,26 @@ TODAY = date(2026, 9, 5)
 @pytest.mark.parametrize(
     ("value", "decimals", "expected"),
     [
-        (1_964_182, 0, "1.964.182"),
-        (14_188, 0, "14.188"),
-        (0.3649, 3, "0,365"),
-        (2.053, 2, "2,05"),
+        (1_964_182, 0, "1,964,182"),
+        (14_188, 0, "14,188"),
+        (0.3649, 3, "0.365"),
+        (2.053, 2, "2.05"),
         (999, 0, "999"),
         (0, 0, "0"),
-        (-1234.5, 1, "-1.234,5"),
+        (-1234.5, 1, "-1,234.5"),
     ],
 )
-def test_italian_number_formatting(value, decimals, expected):
-    """Regression: a placeholder-based swap once turned the separator into a
-    null byte, and stripping it deleted every thousands separator."""
-    assert _it(value, decimals) == expected
+def test_number_formatting(value, decimals, expected):
+    """Regression: a placeholder-based separator swap once turned the separator
+    into a null byte, and stripping it deleted every thousands separator."""
+    assert _num_fmt(value, decimals) == expected
 
 
 def test_thousands_separator_survives():
-    """The specific failure: 1964182 must not render as 1964182 or 1964,182."""
-    out = _it(1_964_182)
-    assert out.count(".") == 2
-    assert "," not in out
+    """The specific failure: 1964182 must not render as 1964182 or 1964.182."""
+    out = _num_fmt(1_964_182)
+    assert out.count(",") == 2
+    assert "." not in out
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +80,9 @@ def test_download_count_is_never_negative(tmp_path):
 
     out = download_status(tmp_path)
     for key, v in out.items():
-        assert v["have"] >= 0, f"{key} negativo: {v}"
-    assert out["test ufficiale"]["have"] == 3
-    assert out["etichette test"]["have"] == 20
+        assert v["have"] >= 0, f"{key} negative: {v}"
+    assert out["official test"]["have"] == 3
+    assert out["test labels"]["have"] == 20
 
 
 def test_glob_does_not_count_references_as_scenes(tmp_path):
@@ -94,47 +94,52 @@ def test_glob_does_not_count_references_as_scenes(tmp_path):
     (tmp_path / "configs/split.yaml").write_text("split:\n  train: []\n  val: []\n  demo: []\n")
 
     out = download_status(tmp_path)
-    assert out["test ufficiale"]["have"] == 1
+    assert out["official test"]["have"] == 1
 
 
 # ---------------------------------------------------------------------------
-# Parsing DECISIONS.md
+# Parsing docs/decisions.md
 # ---------------------------------------------------------------------------
 
 
-def test_parse_table_reads_claim_rows():
+def test_parse_table_reads_estimate_rows():
     text = (
-        "| A-01 | qualcosa | **CHIUSA** misurata | usare il misurato |\n"
-        "| A-02 | altro | aperta | da fare |\n"
-        "| P-01 | provvisorio | Chiusa 03/09 | vedi D-006 |\n"
+        "| A-01 | something | **CLOSED** measured | use the measured value |\n"
+        "| A-02 | other | open | to do |\n"
+        "| P-01 | provisional | Closed 03/09 | see D-006 |\n"
     )
-    claims = parse_table(text, "A")
-    assert [c["id"] for c in claims] == ["A-01", "A-02"]
-    assert "CHIUSA" in claims[0]["detail"]
+    estimates = parse_table(text, "A")
+    assert [c["id"] for c in estimates] == ["A-01", "A-02"]
+    assert "CLOSED" in estimates[0]["detail"]
     assert [p["id"] for p in parse_table(text, "P")] == ["P-01"]
 
 
 def test_parse_table_ignores_headers_and_separators():
-    text = "| ID | Cosa | Stato | Chiude |\n|---|---|---|---|\n| P-01 | a | b | c |\n"
+    text = "| ID | What | Status | Closes |\n|---|---|---|---|\n| P-01 | a | b | c |\n"
     assert len(parse_table(text, "P")) == 1
 
 
 def test_parse_decisions_extracts_id_title_and_date():
     text = (
-        "## D-001 — Prima decisione\n\n**Data:** 2026-09-02\n\ntesto\n\n"
-        "## D-017 — Ultima decisione\n\n**Data:** 2026-09-05\n\naltro\n"
+        "## D-001 — First decision\n\n**Date:** 2026-09-02\n\ntext\n\n"
+        "## D-017 — Last decision\n\n**Date:** 2026-09-05\n\nmore\n"
     )
     out = parse_decisions(text)
     assert [d["id"] for d in out] == ["D-001", "D-017"]
-    assert out[1]["title"] == "Ultima decisione"
+    assert out[1]["title"] == "Last decision"
     assert out[1]["date"] == "2026-09-05"
+
+
+def test_parse_decisions_still_reads_the_older_date_label():
+    text = "## D-002 — Something\n\n**Data:** 2026-09-03\n"
+    assert parse_decisions(text)[0]["date"] == "2026-09-03"
 
 
 def test_real_decisions_file_parses():
     """The page is only useful if it tracks the actual file."""
-    path = Path("DECISIONS.md")
+    path = Path("docs/decisions.md")
     if not path.exists():
-        pytest.skip("DECISIONS.md assente")
+        pytest.skip("docs/decisions.md missing")
     text = path.read_text()
     assert len(parse_decisions(text)) >= 10
     assert len(parse_table(text, "A")) >= 5
@@ -162,7 +167,7 @@ def test_missing_training_log_is_not_an_error(tmp_path):
 
 def test_malformed_rows_are_skipped(tmp_path):
     csv_path = tmp_path / "t.csv"
-    csv_path.write_text("epoch,val_miou\n1,0.1\nboh,0.2\n2,0.3\n")
+    csv_path.write_text("epoch,val_miou\n1,0.1\nhuh,0.2\n2,0.3\n")
     assert sum(len(r) for r in read_runs(csv_path)) == 2
 
 
@@ -172,7 +177,7 @@ def test_malformed_rows_are_skipped(tmp_path):
 
 
 def test_line_chart_handles_no_data():
-    assert "Nessun dato" in line_chart([{"label": "x", "colour": "#fff", "points": []}])
+    assert "No training data" in line_chart([{"label": "x", "colour": "#fff", "points": []}])
 
 
 def test_line_chart_handles_a_flat_series():
@@ -203,7 +208,7 @@ def test_bar_rows_survive_all_zeros():
 
 
 def test_markdown_bold_and_code_are_rendered_not_escaped():
-    out = _md("un **grassetto** e un `codice`")
+    out = _md("some **bold** and some `code`")
     assert "<b" in out
     assert "mono" in out
 
@@ -248,7 +253,7 @@ def _repo(
             json.dumps(
                 {
                     "evaluation": {
-                        "split": "test_ufficiale",
+                        "split": "official_test",
                         "scenes": {"aggregate": {"miou": test_miou}},
                     }
                 }
@@ -261,8 +266,9 @@ def test_dashboard_reads_the_log_of_the_deployed_model_not_the_last_trained(tmp_
     """The bug this page shipped with.
 
     Every config appends to its own CSV. Reading a fixed path meant that once
-    the §7.4 fallback moved training to a new config, the page kept reporting a
-    six-class run that had already been abandoned — for days, with no error.
+    the three-class fallback (docs/decisions.md D-020) moved training to a new
+    config, the page kept reporting a six-class run that had already been
+    abandoned — for days, with no error.
     """
     repo = _repo(tmp_path, val_miou=0.62)
     # A stale log from an abandoned config, at the path the page used to read.
@@ -276,21 +282,22 @@ def test_dashboard_reads_the_log_of_the_deployed_model_not_the_last_trained(tmp_
 
 
 def test_the_six_class_threshold_is_not_applied_to_a_three_class_score(tmp_path):
-    """SPEC §7.4's 0,60 is about six classes; three is a strictly easier task.
+    """The 0.60 mIoU acceptance threshold is about six classes; three is a
+    strictly easier task.
 
-    Tagging a three-class score "sotto 0,60" compares two different problems
+    Tagging a three-class score "below 0.60" compares two different problems
     and reads as a verdict on the model.
     """
     page = build_page(collect(_repo(tmp_path, n_classes=3, test_miou=0.535), TODAY))
-    assert "sotto 0,60" not in page
-    assert "ripiego §7.4 a 3 classi" in page
+    assert "below 0.60" not in page
+    assert "3-class fallback (D-020)" in page
 
 
 def test_the_threshold_still_applies_when_the_scheme_is_six_class(tmp_path):
     """The tag is suppressed because the schemes differ, not because it is
     inconvenient. On six classes it must come back."""
     page = build_page(collect(_repo(tmp_path, n_classes=6, test_miou=0.535), TODAY))
-    assert "sotto 0,60" in page
+    assert "below 0.60" in page
 
 
 def test_headline_is_the_held_out_score_not_validation(tmp_path):
@@ -298,16 +305,16 @@ def test_headline_is_the_held_out_score_not_validation(tmp_path):
     amount. The number a human reads first has to be the one that did not."""
     ctx = collect(_repo(tmp_path, val_miou=0.62, test_miou=0.535), TODAY)
     page = build_page(ctx)
-    assert "mIoU sul test ufficiale" in page
-    assert _it(0.535, 3) in page
+    assert "mIoU on the official test set" in page
+    assert _num_fmt(0.535, 3) in page
 
 
 def test_headline_says_so_when_there_is_no_held_out_score(tmp_path):
     """Without an evaluation it falls back to validation — but must label it,
     not pass a validation number off as a held-out one."""
     page = build_page(collect(_repo(tmp_path, val_miou=0.62), TODAY))
-    assert "mIoU di validazione" in page
-    assert "nessun held-out" in page
+    assert "Validation mIoU" in page
+    assert "no held-out score" in page
 
 
 def test_gate_4_is_never_green_from_artefacts_alone(tmp_path):
@@ -327,8 +334,8 @@ def test_gate_4_is_never_green_from_artefacts_alone(tmp_path):
 
     gate4 = next(g for g in collect(repo, TODAY)["gates"] if g.name == "Gate 4")
     assert gate4.done is False
-    assert "5 scene precalcolate" in gate4.detail
-    assert "video di riserva mancante" in gate4.detail
+    assert "5 precomputed scenes" in gate4.detail
+    assert "backup video missing" in gate4.detail
 
 
 def test_parameter_count_is_never_invented(tmp_path):
@@ -351,7 +358,7 @@ def test_page_builds_from_an_empty_repo(tmp_path):
 
 
 def test_page_has_no_external_resources():
-    """SPEC §10.4: the demo laptop runs with the network off."""
+    """The demo machine runs with the network off."""
     import re
 
     ctx = collect(Path("."), TODAY)
@@ -359,10 +366,10 @@ def test_page_has_no_external_resources():
     assert not re.search(r'(?:src|href)=["\']https?://', page)
 
 
-def test_page_reports_days_remaining():
-    page = build_page(collect(Path("."), TODAY))
-    assert "32" in page  # to the pitch, 7 Oct 2026
-    assert "26" in page  # to the freeze, 1 Oct 2026
+def test_page_reports_how_many_gates_are_green():
+    ctx = collect(Path("."), TODAY)
+    green = sum(1 for g in ctx["gates"] if g.done)
+    assert f"<b>{green}/{len(ctx['gates'])}</b><small>gates green</small>" in build_page(ctx)
 
 
 def test_page_never_shows_a_number_that_was_not_measured(tmp_path):
@@ -375,7 +382,7 @@ def test_page_never_shows_a_number_that_was_not_measured(tmp_path):
     # With no metrics.json there is nothing to quote, so the compression and
     # INT8 cards must say so rather than render 0.00.
     assert page.count(MISSING) >= 2
-    assert "0,00 MB" not in page
+    assert "0.00 MB" not in page
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +399,7 @@ def _repo_with_route(tmp_path, *, ice_class="PC6", blocked=True, lead_class=None
     (repo / "artifacts/figures/route_lead.json").write_text(
         json.dumps(
             {
-                "scene_id": "SCENA.nc",
+                "scene_id": "SCENE.nc",
                 "ice_class": lead_class or ice_class,
                 "figure": "02_useful.png",
             }
@@ -404,7 +411,7 @@ def _repo_with_route(tmp_path, *, ice_class="PC6", blocked=True, lead_class=None
             {
                 "scenes": [
                     {
-                        "scene_id": "SCENA.nc",
+                        "scene_id": "SCENE.nc",
                         "region": "Kara",
                         "classes": {
                             ice_class: {
@@ -449,7 +456,7 @@ def test_the_route_caption_names_the_class_the_figure_was_drawn_for(tmp_path):
     )
 
     story = collect(repo, TODAY)["route"]
-    assert story["ice_class"] == "PC6", "la didascalia ha scelto una classe diversa dalla figura"
+    assert story["ice_class"] == "PC6", "the caption picked a different class than the figure"
     assert story["n_no_go"] == 104
     assert "999" not in build_page(collect(repo, TODAY))
 
@@ -459,7 +466,7 @@ def test_no_recorded_lead_means_no_route_claim(tmp_path):
     repo = _repo_with_route(tmp_path)
     (repo / "artifacts/figures/route_lead.json").unlink()
     assert collect(repo, TODAY)["route"] == {}
-    assert "celle vietate" not in build_page(collect(repo, TODAY))
+    assert "forbidden cells" not in build_page(collect(repo, TODAY))
 
 
 def test_a_lead_pointing_at_a_missing_scene_makes_no_claim(tmp_path):
@@ -467,7 +474,7 @@ def test_a_lead_pointing_at_a_missing_scene_makes_no_claim(tmp_path):
 
     repo = _repo_with_route(tmp_path)
     (repo / "artifacts/figures/route_lead.json").write_text(
-        json.dumps({"scene_id": "SPARITA.nc", "ice_class": "PC6"})
+        json.dumps({"scene_id": "GONE.nc", "ice_class": "PC6"})
     )
     assert collect(repo, TODAY)["route"] == {}
 
@@ -477,12 +484,12 @@ def test_a_passable_direct_route_is_labelled_a_weak_comparison(tmp_path):
     overlap and the picture argues nothing. The page must say so."""
     repo = _repo_with_route(tmp_path, blocked=False)
     page = build_page(collect(repo, TODAY))
-    assert "confronto debole" in page
-    assert "non può percorrere" not in page
+    assert "weak comparison" in page
+    assert "cannot sail" not in page
 
 
 def test_the_route_section_never_quotes_a_time_saving(tmp_path):
     """D-026: against an impossible voyage there is no time to save."""
     page = build_page(collect(_repo_with_route(tmp_path), TODAY))
-    assert "risparmi" in page and "% in meno" not in page
-    assert "ore risparmiate" not in page
+    assert "No percentage of time saved" in page and "% less" not in page
+    assert "hours saved" not in page

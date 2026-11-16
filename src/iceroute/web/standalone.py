@@ -1,22 +1,22 @@
-"""Freeze the demo into one HTML file. SPEC §10.4.
+"""Freeze the demo into one HTML file that runs with nothing installed.
 
 ``make demo`` needs Python, a virtualenv, Streamlit and a server that stays up.
-On 7 October all four of those are things that can go wrong in front of
-investors, and the mitigation on the list was "record a backup video" — which
-is worse than this in every way: a video cannot be steered when someone asks
-"what about a PC7", and it silently goes stale the moment a number changes.
+In a live demo with the network off, all four of those are things that can go
+wrong, and the usual mitigation — "record a backup video" — is worse than this
+in every way: a video cannot be steered when someone asks "what about a PC7",
+and it silently goes stale the moment a number changes.
 
 This produces ``demo.html``: one file, a few megabytes, double-click, no
 Python, no server, no network. Everything that does not need the model works —
 scenes, vessel classes, layers, both routes, the downlink payload, the speed
-and fuel dials. "Calcola ora" cannot, and the page says so rather than hiding
+and fuel dials. "Compute now" cannot, and the page says so rather than hiding
 the button.
 
 Not a second UI
 ---------------
 It is a *renderer*, and it is built to stay that way, because two things that
 draw the same truth eventually disagree — the failure this project has now hit
-three times (D-025, D-027, D-031).
+three times (docs/decisions.md D-025, D-027, D-031).
 
 * **Every number comes from ``data/demo/index.json``**, the same file the live
   UI reads. Nothing is recomputed here and nothing is typed in.
@@ -57,17 +57,17 @@ MAX_PX = 900  # longest edge of an embedded raster
 JPEG_QUALITY = 78
 
 LAYERS = [
-    ("rio", "RIO — dove si può andare", True),
-    ("mask_geo", "Tipo di ghiaccio", True),
-    ("sic", "Concentrazione", True),
+    ("rio", "RIO — where the ship may go", True),
+    ("mask_geo", "Ice type", True),
+    ("sic", "Concentration", True),
     ("sar", "SAR", False),
-    ("mask_truth", "Carta di riferimento", False),
+    ("mask_truth", "Reference chart", False),
 ]
 MODES = [
-    ("both", "Entrambe"),
-    ("baseline", "Rotta diretta"),
+    ("both", "Both"),
+    ("baseline", "Direct route"),
     ("iceroute", "IceRoute"),
-    ("none", "Nessuna"),
+    ("none", "None"),
 ]
 
 
@@ -79,9 +79,9 @@ def data_uri(path: Path, *, photographic: bool, max_px: int = MAX_PX) -> str:
     would mean inventing navigability. Only the SAR, which is a photograph, is
     resampled smoothly and stored as JPEG.
 
-    ``max_px`` defaults to the size this page needs; the presentation build asks
-    for more, because one raster filling a projector is a different job from
-    forty-two thumbnails in a scrolling page.
+    ``max_px`` defaults to the size this page needs; a caller that shows one
+    raster full-screen can ask for more, because one raster filling a large
+    display is a different job from forty-two thumbnails in a scrolling page.
     """
     from PIL import Image
 
@@ -508,12 +508,13 @@ footer{color:var(--faint);font-size:11px;border-top:1px solid var(--line);paddin
 JS = r"""
 const $ = s => document.querySelector(s);
 const st = {scene: 0, cls: null, layer: 'rio', mode: 'both', tab: 'down'};
-// Italian decimals. The page already grouped thousands with toLocaleString
-// ("94.220 B") while printing decimals with a dot ("15.6 h") — two conventions
-// in the same card. Every displayed figure goes through here.
-const fmt = (v, d = 1) => (typeof v === 'number') ? v.toFixed(d).replace('.', ',')
-                                                  : 'non misurato';
-const B = n => (typeof n === 'number') ? n.toLocaleString('it-IT') + ' B' : 'non misurato';
+// One number convention for the whole page: comma-grouped thousands, decimal
+// point. It once grouped thousands with an Italian locale ("94.220 B") while
+// printing decimals with a dot ("15.6 h") — two conventions in the same card,
+// and "94.220" read as a decimal turns the mask into ninety-four bytes. Every
+// displayed figure goes through here.
+const fmt = (v, d = 1) => (typeof v === 'number') ? v.toFixed(d) : 'not measured';
+const B = n => (typeof n === 'number') ? n.toLocaleString('en-US') + ' B' : 'not measured';
 
 function scene() { return D.scenes[st.scene]; }
 function entry() { return scene().classes[st.cls]; }
@@ -560,39 +561,39 @@ function render() {
   radios($('#r-mode'), D.modes, 'mode', st.mode);
 
   $('#head').textContent = s.id;
-  $('#headrt').textContent = `${s.acquired} · copertura carta `
+  $('#headrt').textContent = `${s.acquired} · chart coverage `
       + Math.round(100 * (s.coverage || 0)) + '%';
-  $('#worst').innerHTML = s.worst_case ? `<div class="box w"><b>Questa è la scena su cui il
-      modello sbaglia di più</b>, fra le 20 del test ufficiale. È qui apposta: serve a
-      rispondere a «e quando sbaglia?» invece di far finta che non succeda. La rotta qui
-      sotto <b>non è affidabile</b>.</div>` : '';
+  $('#worst').innerHTML = s.worst_case ? `<div class="box w"><b>This is the scene the
+      model gets most wrong</b>, out of the 20 in the official test set. It is here on
+      purpose: to answer "and when it is wrong?" instead of pretending it does not
+      happen. The route below <b>is not reliable</b>.</div>` : '';
 
   let transit;
-  if (!e || !e.route_exists) transit = kpi('Tempo di transito',
-      '<span style="color:#f08a8a">nessuna rotta</span>', (e && e.message) || '');
+  if (!e || !e.route_exists) transit = kpi('Transit time',
+      '<span style="color:#f08a8a">no route</span>', (e && e.message) || '');
   else if (typeof c.time_saved_hours === 'number' && c.time_saved_hours > 0)
-    transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
+    transit = kpi('Transit time', fmt(ours.time_hours) + ' h',
       `<span style="color:#4ade9b">${fmt(c.time_saved_hours)} h
-       (${Math.round(c.time_saved_percent)}%)</span> contro ${fmt(base.time_hours)} h della diretta`);
-  else if (base.blocked_by_ice) transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
-      `<span class="tag ok">la rotta diretta è vietata dal ghiaccio</span>
-       ${base.n_no_go_cells} celle oltre il limite POLARIS`);
-  else if (base.feasible) transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
-      `<span class="tag info">la rotta diretta è percorribile</span> IceRoute la segue:
-       ${fmt(c.detour_km)} km in più`);
-  else transit = kpi('Tempo di transito', fmt(ours.time_hours) + ' h',
-      '<span class="tag info">confronto non disponibile</span> la diretta esce dalla copertura');
+       (${Math.round(c.time_saved_percent)}%)</span> against ${fmt(base.time_hours)} h for the direct route`);
+  else if (base.blocked_by_ice) transit = kpi('Transit time', fmt(ours.time_hours) + ' h',
+      `<span class="tag ok">the direct route is forbidden by the ice</span>
+       ${base.n_no_go_cells} cells beyond the POLARIS limit`);
+  else if (base.feasible) transit = kpi('Transit time', fmt(ours.time_hours) + ' h',
+      `<span class="tag info">the direct route is navigable</span> IceRoute follows it:
+       ${fmt(c.detour_km)} km longer`);
+  else transit = kpi('Transit time', fmt(ours.time_hours) + ' h',
+      '<span class="tag info">no comparison available</span> the direct route leaves the coverage');
 
-  const rio = ours.min_rio, band = rio == null ? ['info', 'non misurato']
-      : rio >= 0 ? ['ok', 'navigazione normale']
-      : rio >= -10 ? ['warn', 'rischio elevato'] : ['bad', 'considerazione speciale'];
+  const rio = ours.min_rio, band = rio == null ? ['info', 'not measured']
+      : rio >= 0 ? ['ok', 'normal operation']
+      : rio >= -10 ? ['warn', 'elevated risk'] : ['bad', 'special consideration'];
   $('#kpis').innerHTML = transit
-    + kpi('RIO minimo sulla rotta', rio == null ? '—' : (rio >= 0 ? '+' : '') + fmt(rio),
-          `<span class="tag ${band[0]}">${band[1]}</span> soglie IMO MSC.1/Circ.1519`)
-    + kpi('Volume di downlink', D.compression ? Math.round(D.compression) + ':1' : 'non misurato',
-          'mediana · numeratore: SAR compresso senza perdita')
-    + kpi('Inferenza a bordo', D.quant.int8_mb ? fmt(D.quant.int8_mb, 2) + ' MB' : 'non misurata',
-          'INT8, 1 thread CPU');
+    + kpi('Minimum RIO on the route', rio == null ? '—' : (rio >= 0 ? '+' : '') + fmt(rio),
+          `<span class="tag ${band[0]}">${band[1]}</span> IMO MSC.1/Circ.1519 thresholds`)
+    + kpi('Downlink volume', D.compression ? Math.round(D.compression) + ':1' : 'not measured',
+          'median · numerator: losslessly compressed SAR')
+    + kpi('On-board inference', D.quant.int8_mb ? fmt(D.quant.int8_mb, 2) + ' MB' : 'not measured',
+          'INT8, 1 CPU thread');
 
   const n = imgName();
   $('#img').src = n ? D.images[n] : '';
@@ -600,20 +601,20 @@ function render() {
   $('#svg').innerHTML = (routable && e) ? e.svg : '';
 
   const L = {
-    rio: [[['Navigazione normale', D.palette.rio[0]], ['Rischio elevato', D.palette.rio[1]],
-           ['Considerazione speciale', D.palette.rio[2]]],
-          'Risk Index Outcome per una nave ' + st.cls + '. <b>È questo il livello che decide</b> dove la nave può andare.'],
-    mask_geo: [[['Acqua libera', D.palette.classes[0]],
-                ['Ghiaccio sottile', D.palette.classes[1]],
-                ['Ghiaccio spesso', D.palette.classes[2]]],
-          'Maschera <b>predetta dal modello</b>, non la carta dell\'analista.'],
-    sic: [D.sic_legend, 'Frazione di mare coperta da ghiaccio, in decimi. È <b>l\'altra metà</b> della decisione POLARIS: <code>RIO = C × RIV(tipo) + (10−C) × RIV(acqua libera)</code>.'],
-    sar: [[], 'Banda HV, stiramento per percentili. È l\'ingresso del modello.'],
-    mask_truth: [[], 'La carta disegnata dall\'analista, solo per confronto. Non entra nel calcolo.'],
+    rio: [[['Normal operation', D.palette.rio[0]], ['Elevated risk', D.palette.rio[1]],
+           ['Special consideration', D.palette.rio[2]]],
+          'Risk Index Outcome for a ' + st.cls + ' vessel. <b>This is the layer that decides</b> where the ship may go.'],
+    mask_geo: [[['Open water', D.palette.classes[0]],
+                ['Thin ice', D.palette.classes[1]],
+                ['Thick ice', D.palette.classes[2]]],
+          'Mask <b>predicted by the model</b>, not the analyst\'s chart.'],
+    sic: [D.sic_legend, 'Fraction of the sea covered by ice, in tenths. It is <b>the other half</b> of the POLARIS decision: <code>RIO = C × RIV(type) + (10−C) × RIV(open water)</code>.'],
+    sar: [[], 'HV band, percentile stretch. This is the model\'s input.'],
+    mask_truth: [[], 'The chart drawn by the analyst, for comparison only. It does not enter the computation.'],
   }[st.layer] || [[], ''];
   const routeLeg = routable && st.mode !== 'none' ? [
-    ...(st.mode !== 'iceroute' ? [['Rotta diretta', D.palette.base],
-                                 ['Cella vietata da POLARIS', D.palette.nogo]] : []),
+    ...(st.mode !== 'iceroute' ? [['Direct route', D.palette.base],
+                                 ['Cell forbidden by POLARIS', D.palette.nogo]] : []),
     ...(st.mode !== 'baseline' ? [['IceRoute', D.palette.ours]] : [])] : [];
   const chip = a => a.map(([t, col]) => `<span><i style="background:${col}"></i>${t}</span>`).join('');
   $('#legend').innerHTML = (routeLeg.length ? `<div class="legend">${chip(routeLeg)}</div>` : '')
@@ -622,90 +623,90 @@ function render() {
 
   const cond = (e && e.conditions) || {};
   $('#cond').innerHTML = (st.layer === 'mask_geo' && cond.worst_class_cells) ? `<div class="box i">
-      <b>La rotta attraversa il bianco, ed è regolare.</b>
-      ${Math.round(100 * cond.worst_class_cells / cond.n_cells)}% delle sue celle sono
-      classificate «${cond.worst_class.toLowerCase()}» — ma a una concentrazione mediana di
-      <b>${fmt(cond.worst_class_sic_median, 0)}/10</b>, che dà RIO
-      <b>${fmt(cond.worst_class_rio_median, 0)}</b>: navigazione normale.<br><br>
-      POLARIS non decide sul tipo di ghiaccio ma su <code>RIO = C × RIV(tipo) + (10−C) ×
-      RIV(acqua libera)</code>. Apri <b>Concentrazione</b> per l'altra metà, o <b>RIO</b> per
-      il verdetto.<br><br>Sull'intera rotta: <b>${Math.round(100 * cond.fraction_normal)}%
-      delle celle in navigazione normale</b>, RIO minimo ${fmt(cond.rio_min, 0)}.</div>` : '';
+      <b>The route crosses the white, and that is allowed.</b>
+      ${Math.round(100 * cond.worst_class_cells / cond.n_cells)}% of its cells are
+      classified "${cond.worst_class.toLowerCase()}" — but at a median concentration of
+      <b>${fmt(cond.worst_class_sic_median, 0)}/10</b>, which gives RIO
+      <b>${fmt(cond.worst_class_rio_median, 0)}</b>: normal operation.<br><br>
+      POLARIS does not decide on the ice type but on <code>RIO = C × RIV(type) + (10−C) ×
+      RIV(open water)</code>. Open <b>Concentration</b> for the other half, or <b>RIO</b> for
+      the verdict.<br><br>Over the whole route: <b>${Math.round(100 * cond.fraction_normal)}%
+      of the cells in normal operation</b>, minimum RIO ${fmt(cond.rio_min, 0)}.</div>` : '';
 
   $('#side').innerHTML = !e || !e.route_exists
-    ? `<div class="box e">${(e && e.message) || 'Nessuna rotta trovata.'}</div>`
-    : `<h2>Rotta</h2><div class="kpi"><div class="lab">Distanza</div>
+    ? `<div class="box e">${(e && e.message) || 'No route found.'}</div>`
+    : `<h2>Route</h2><div class="kpi"><div class="lab">Distance</div>
        <div class="val">${Math.round(ours.distance_km)} km</div>
-       <div class="sub">${e.n_waypoints} waypoint trasmessi a terra</div></div>
-       <h2>Rotta diretta</h2>` + (base.blocked_by_ice
-        ? `<div class="box e">Vietata: ${base.n_no_go_cells} celle oltre il limite POLARIS
-           per una nave ${st.cls}.</div>`
+       <div class="sub">${e.n_waypoints} waypoints transmitted to the ground</div></div>
+       <h2>Direct route</h2>` + (base.blocked_by_ice
+        ? `<div class="box e">Forbidden: ${base.n_no_go_cells} cells beyond the POLARIS limit
+           for a ${st.cls} vessel.</div>`
         : base.feasible
-        ? `<div class="box g">Percorribile in ${fmt(base.time_hours)} h. IceRoute devia di
+        ? `<div class="box g">Navigable in ${fmt(base.time_hours)} h. IceRoute deviates by
            ${fmt(c.detour_km)} km.</div>`
-        : `<div class="box i">Fuori dalla copertura della carta: non è il ghiaccio a fermarla.</div>`);
+        : `<div class="box i">Outside the chart's coverage: it is not the ice that stops it.</div>`);
 
   // Chrome, not data: what is on screen, named. No value appears here that is
   // not already shown, formatted, somewhere else on the page.
   $('#maptitle').textContent = (D.layers.find(l => l[0] === st.layer) || [0, st.layer])[1];
-  $('#mapmeta').textContent = routable ? 'griglia geocodificata · rotte disegnabili'
-                                       : 'griglia della scena · rotte non disegnabili';
+  $('#mapmeta').textContent = routable ? 'geocoded grid · routes drawable'
+                                       : 'scene grid · routes not drawable';
   $('#st-scene').textContent = s.id;
   $('#st-cls').textContent = st.cls;
   $('#st-layer').textContent = st.layer;
-  $('#st-mode').textContent = routable ? st.mode : 'n/d';
+  $('#st-mode').textContent = routable ? st.mode : 'n/a';
 
   renderPanes();
 }
 
 function renderPanes() {
   const e = entry(), p = e && e.payload;
-  $('#pane-down').innerHTML = !p ? '<div class="box i">Nessuna rotta: non c\'è payload.</div>'
+  $('#pane-down').innerHTML = !p ? '<div class="box i">No route: no payload.</div>'
     : `<div class="cols"><div>
-        <table><tr><td>Maschera del ghiaccio (PNG)</td><td class="n">${B(p.mask)}</td></tr>
-        <tr><td>Rotta (${p.n_waypoints} waypoint, GeoJSON)</td><td class="n">${B(p.route)}</td></tr>
-        <tr><td>Metadati</td><td class="n">${B(p.meta)}</td></tr></table>
+        <table><tr><td>Ice mask (PNG)</td><td class="n">${B(p.mask)}</td></tr>
+        <tr><td>Route (${p.n_waypoints} waypoints, GeoJSON)</td><td class="n">${B(p.route)}</td></tr>
+        <tr><td>Metadata</td><td class="n">${B(p.meta)}</td></tr></table>
         ${p.total && p.sar ? `<div class="kpi" style="margin-top:14px">
-          <div class="lab">Totale trasmesso, su questa scena</div>
+          <div class="lab">Total transmitted, for this scene</div>
           <div class="val">${Math.round(p.total / 1024)} KB</div>
-          <div class="sub">contro ${fmt(p.sar / 1048576)} MB di SAR compresso senza
-          perdita — <b>${Math.round(p.ratio)}:1</b>. La scheda in alto riporta la
-          <b>mediana</b>.</div></div>` : `<div class="note">${p.note || ''}</div>`}
+          <div class="sub">against ${fmt(p.sar / 1048576)} MB of losslessly compressed
+          SAR — <b>${Math.round(p.ratio)}:1</b>. The card at the top reports the
+          <b>median</b>.</div></div>` : `<div class="note">${p.note || ''}</div>`}
         ${p.link ? `<div class="kpi" style="margin-top:12px">
-          <div class="lab">Tempo sul collegamento</div>
+          <div class="lab">Time on the link</div>
           <div class="val">&asymp; ${p.link.s} s</div>
-          <div class="sub">su ${p.link.terminal} a ${p.link.kbps} kbps, il terminale più
-          lento fra quelli in <code>configs/assumptions.yaml</code>.${p.link.sbd ?
-          ` La sola rotta sta in <b>${p.link.sbd} messaggi Iridium SBD</b>.` : ''}
-          Derivato dalla velocità di picco dichiarata dall'operatore: il throughput reale
-          è più basso.</div></div>` : ''}
-        <div class="note">La rotta di confronto <b>non</b> è qui dentro: è calcolata a terra
-        per argomentare, e un satellite non ha ragione di trasmettere la linea retta fra due
-        punti che il destinatario gli ha dato lui.</div></div>
-        <div><div class="note">Il file che arriva alla nave, per intero — ${p.route} byte:</div>
+          <div class="sub">on ${p.link.terminal} at ${p.link.kbps} kbps, the slowest
+          terminal listed in <code>configs/assumptions.yaml</code>.${p.link.sbd ?
+          ` The route alone fits in <b>${p.link.sbd} Iridium SBD messages</b>.` : ''}
+          Derived from the operator's advertised peak rate: real throughput
+          is lower.</div></div>` : ''}
+        <div class="note">The comparison route is <b>not</b> in here: it is computed on the
+        ground to make the argument, and a satellite has no reason to transmit the straight
+        line between two points the recipient gave it in the first place.</div></div>
+        <div><div class="note">The file that reaches the ship, in full — ${p.route} bytes:</div>
         <pre>${p.text.replace(/</g, '&lt;')}</pre></div></div>`;
 
   const t = e && e.transit;
   if (!t || !t.values.length) { $('#pane-time').innerHTML =
-      '<div class="box i">Nessuna rotta: niente da stimare.</div>'; return; }
+      '<div class="box i">No route: nothing to estimate.</div>'; return; }
   const i = +$('#sp').value, v = D.speeds[i], h = t.values[i], bh = t.baseline[i],
         burn = +$('#bu').value, c = (e.comparison || {}), base = c.baseline || {};
   $('#spv').textContent = fmt(v) + ' kn';
-  $('#buv').textContent = burn ? burn + ' t/giorno' : 'non impostato';
+  $('#buv').textContent = burn ? burn + ' t/day' : 'not set';
   const fuel = (h != null && burn) ? h / D.hours_per_day * burn : null;
   $('#cards-time').innerHTML =
-      (h == null ? kpi('Transito IceRoute', 'non riscalabile', t.note)
-                 : kpi('Transito IceRoute', fmt(h) + ' h',
-                       `a ${fmt(v)} kn · ${Math.round((c.iceroute || {}).distance_km)} km`))
+      (h == null ? kpi('IceRoute transit', 'cannot be rescaled', t.note)
+                 : kpi('IceRoute transit', fmt(h) + ' h',
+                       `at ${fmt(v)} kn · ${Math.round((c.iceroute || {}).distance_km)} km`))
     + (base.blocked_by_ice
-        ? kpi('Rotta diretta', 'vietata', `${base.n_no_go_cells} celle oltre il limite POLARIS.
-             <b>Nessun tempo di riferimento</b>: non esiste un viaggio più lento da cui risparmiare.`)
-        : bh != null ? kpi('Rotta diretta', fmt(bh) + ' h', 'percorribile: IceRoute la segue')
-        : kpi('Rotta diretta', 'fuori copertura', 'non è il ghiaccio a fermarla'))
-    + kpi('Carburante', fuel == null ? 'non impostato' : fmt(fuel) + ' t',
-        fuel == null ? 'serve un consumo, e non ne abbiamo uno con una fonte (P-09)'
-        : `<span class="tag warn">assunzione tua</span> ${burn} t/giorno ×
-           ${fmt(h / D.hours_per_day, 2)} giorni`);
+        ? kpi('Direct route', 'forbidden', `${base.n_no_go_cells} cells beyond the POLARIS limit.
+             <b>No reference time</b>: there is no slower voyage to save time against.`)
+        : bh != null ? kpi('Direct route', fmt(bh) + ' h', 'navigable: IceRoute follows it')
+        : kpi('Direct route', 'outside coverage', 'it is not the ice that stops it'))
+    + kpi('Fuel', fuel == null ? 'not set' : fmt(fuel) + ' t',
+        fuel == null ? 'needs a consumption rate, and we have none with a source (P-09)'
+        : `<span class="tag warn">your assumption</span> ${burn} t/day ×
+           ${fmt(h / D.hours_per_day, 2)} days`);
 }
 
 function tab(which) {
@@ -725,8 +726,8 @@ render(); tab('down');
 
 
 def dec(v: float | None, places: int = 3) -> str | None:
-    """Italian decimal separator, to match the digit grouping already in use."""
-    return None if v is None else f"{v:.{places}f}".replace(".", ",")
+    """Fixed decimal places with a decimal point, the page's one number convention."""
+    return None if v is None else f"{v:.{places}f}"
 
 
 def build_page(ctx: dict) -> str:
@@ -735,12 +736,12 @@ def build_page(ctx: dict) -> str:
     foot = " · ".join(
         x
         for x in [
-            f"schema: {ctx['scheme']}" if ctx["scheme"] else "",
+            f"scheme: {ctx['scheme']}" if ctx["scheme"] else "",
             f"mIoU {dec(agg.get('miou'))}" if isinstance(agg.get("miou"), float) else "",
-            f"ghiaccio/acqua {dec(agg.get('binary_accuracy'))}"
+            f"ice/water {dec(agg.get('binary_accuracy'))}"
             if isinstance(agg.get("binary_accuracy"), float)
             else "",
-            f"{ctx['n_eval_scenes']} scene di test ufficiali" if ctx.get("n_eval_scenes") else "",
+            f"{ctx['n_eval_scenes']} official test scenes" if ctx.get("n_eval_scenes") else "",
         ]
         if x
     )
@@ -750,10 +751,10 @@ def build_page(ctx: dict) -> str:
     data["modes"] = MODES
     data["palette"] = pal
     data["sic_legend"] = [
-        ["0/10 — acqua libera", pal["sic"]["0"]],
+        ["0/10 — open water", pal["sic"]["0"]],
         ["3/10", pal["sic"]["3"]],
         ["6/10", pal["sic"]["6"]],
-        ["10/10 — copertura totale", pal["sic"]["10"]],
+        ["10/10 — full cover", pal["sic"]["10"]],
     ]
 
     # The command bar carries provenance, not measurements: which checkpoint, which
@@ -771,9 +772,9 @@ def build_page(ctx: dict) -> str:
 
     ckpt = Path(str(ctx.get("checkpoint") or "")).name
     meta = (
-        cell("modello", ckpt or None)
-        + cell("schema", ctx.get("scheme") or None)
-        + cell("test", f"{ctx['n_eval_scenes']} scene" if ctx.get("n_eval_scenes") else None)
+        cell("model", ckpt or None)
+        + cell("scheme", ctx.get("scheme") or None)
+        + cell("test", f"{ctx['n_eval_scenes']} scenes" if ctx.get("n_eval_scenes") else None)
         + cell("miou", dec(agg.get("miou")) if isinstance(agg.get("miou"), float) else None)
     )
 
@@ -782,26 +783,26 @@ def build_page(ctx: dict) -> str:
         f"--ours:{pal['ours']}}}"
     )
 
-    return f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>IceRoute — demo</title><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>{CSS}{root}</style></head><body data-mode="both">
 
 <div id="top">
   <div class="mark"><i></i>IceRoute</div>
-  <div class="what">instradamento fra i ghiacci · console</div>
+  <div class="what">routing through sea ice · console</div>
   <div class="sp"></div>
   <div class="meta">{meta}</div>
 </div>
 
 <div class="wrap">
 <aside>
-  <h3>Scena</h3><div id="r-scene"></div>
-  <h3>Classe della nave</h3><div id="r-cls"></div>
-  <h3>Livelli</h3><div id="r-layer"></div>
-  <div id="modes"><h3>Rotte sulla mappa</h3><div id="r-mode"></div></div>
-  <div id="notroutable" class="note" style="display:none;padding:10px 12px">Su questo livello
-   le rotte non sono disegnabili: è il raster della scena grezza, mentre la rotta è calcolata
-   sulla griglia geocodificata a 500 m.</div>
+  <h3>Scene</h3><div id="r-scene"></div>
+  <h3>Vessel class</h3><div id="r-cls"></div>
+  <h3>Layers</h3><div id="r-layer"></div>
+  <div id="modes"><h3>Routes on the map</h3><div id="r-mode"></div></div>
+  <div id="notroutable" class="note" style="display:none;padding:10px 12px">Routes cannot
+   be drawn on this layer: it is the raster of the raw scene, while the route is computed
+   on the 500 m geocoded grid.</div>
 </aside>
 
 <main>
@@ -816,8 +817,8 @@ def build_page(ctx: dict) -> str:
   <div class="cols">
     <div>
       <div class="panel">
-        <div class="ph"><h2 id="maptitle">Vista</h2><span class="rt" id="mapmeta"></span></div>
-        <div class="map"><img id="img" alt="livello"><div id="svg" class="ovwrap"></div></div>
+        <div class="ph"><h2 id="maptitle">View</h2><span class="rt" id="mapmeta"></span></div>
+        <div class="map"><img id="img" alt="layer"><div id="svg" class="ovwrap"></div></div>
         <div class="pb"><div id="legend"></div></div>
       </div>
       <div id="cond"></div>
@@ -826,53 +827,53 @@ def build_page(ctx: dict) -> str:
   </div>
 
   <div class="tabs">
-    <button data-t="down" class="on">Cosa scende a terra</button>
-    <button data-t="time">Tempo e carburante</button>
-    <button data-t="live">Calcola ora</button>
+    <button data-t="down" class="on">What comes down</button>
+    <button data-t="time">Time and fuel</button>
+    <button data-t="live">Compute now</button>
   </div>
   <div class="panes">
   <div class="pane on" id="pane-down"></div>
   <div class="pane" id="pane-time">
-    <div class="box w"><b>Questi due valori non sono nostre misure.</b> La velocità in acqua
-     libera è l'unico numero senza fonte in <code>configs/routing.yaml</code> (P-05) e il
-     consumo non è nel progetto (P-09). Muovili: quello che cambia sotto è quanto pesa
-     l'assunzione, non quanto è brava IceRoute.</div>
+    <div class="box w"><b>These two values are not our measurements.</b> The open-water
+     speed is the only unsourced number in <code>configs/routing.yaml</code> (P-05) and
+     fuel consumption is not in the project at all (P-09). Move them: what changes below is
+     how much the assumption weighs, not how good IceRoute is.</div>
     <div class="dial">
-      <div><label>Velocità in acqua libera — <b id="spv"></b></label>
+      <div><label>Open-water speed — <b id="spv"></b></label>
         <input type="range" id="sp" min="0" step="1"></div>
-      <div><label>Consumo a velocità piena — <b id="buv"></b></label>
+      <div><label>Consumption at full speed — <b id="buv"></b></label>
         <input type="range" id="bu" min="0" max="120" step="5" value="0"></div>
     </div>
     <div class="grid" id="cards-time" style="grid-template-columns:repeat(3,1fr)"></div>
-    <div class="note">Il riscalamento è <b>esatto</b>, e solo quando la rotta resta tutta in
-     operazione normale (RIO ≥ 0): lì ogni tratto va a velocità piena e il tempo è
-     proporzionale a 1/v. Se entra in rischio elevato, POLARIS fissa un limite in nodi che il
-     cursore non muove, e il numero non viene mostrato invece di essere inventato. Tutti i
-     valori sono calcolati in Python a monte: questa pagina li legge, non li ricalcola.</div>
+    <div class="note">The rescaling is <b>exact</b>, and only when the whole route stays in
+     normal operation (RIO ≥ 0): there every leg runs at full speed and the time is
+     proportional to 1/v. If it enters elevated risk, POLARIS sets a limit in knots that the
+     slider does not move, and the number is withheld instead of being invented. Every value
+     is computed upstream in Python: this page reads them, it does not recompute them.</div>
   </div>
   <div class="pane" id="pane-live">
-    <div class="box i"><b>Non disponibile in questa copia.</b> Ricalcolare una rotta significa
-     rileggere il NetCDF grezzo ed eseguire la rete: servono Python, il modello e circa 15
-     secondi di GPU, e nessuna delle tre cose sta dentro un file HTML.<br><br>
-     Nella demo vera (<code>make demo</code>) il pulsante c'è, rifà l'intera catena sulla
-     scena grezza e confronta il risultato con quello precalcolato — finora identico cella per
-     cella. Questa pagina è la <b>rete di sicurezza</b>: serve quando la demo vera non parte.</div>
+    <div class="box i"><b>Not available in this copy.</b> Recomputing a route means
+     re-reading the raw NetCDF and running the network: that needs Python, the model and about
+     15 seconds of GPU, and none of the three fits inside an HTML file.<br><br>
+     In the full demo (<code>make demo</code>) the button is there: it reruns the whole chain
+     on the raw scene and compares the result with the precomputed one — so far identical cell
+     for cell. This page is the <b>safety net</b>: it is for when the full demo will not start.</div>
   </div>
   </div>
 
   <footer>{html.escape(foot)}<br>
-   Pagina autonoma generata da <code>make demo-static</code>: nessuna risorsa esterna, nessun
-   server, funziona con la rete staccata. Ogni numero viene da
-   <code>data/demo/index.json</code> e <code>artifacts/metrics.json</code>, gli stessi file
-   che legge la demo vera.<br>Modello: <code>{html.escape(str(ctx.get("checkpoint") or "—"))}</code>
+   Self-contained page built by <code>make demo-static</code>: no external resources, no
+   server, works with the network off. Every number comes from
+   <code>data/demo/index.json</code> and <code>artifacts/metrics.json</code>, the same files
+   the full demo reads.<br>Model: <code>{html.escape(str(ctx.get("checkpoint") or "—"))}</code>
   </footer>
 </main></div>
 
 <div id="status">
-  <div>scena <b id="st-scene">—</b></div>
-  <div>classe <b id="st-cls">—</b></div>
-  <div>livello <b id="st-layer">—</b></div>
-  <div>rotte <b id="st-mode">—</b></div>
+  <div>scene <b id="st-scene">—</b></div>
+  <div>class <b id="st-cls">—</b></div>
+  <div>layer <b id="st-layer">—</b></div>
+  <div>routes <b id="st-mode">—</b></div>
   <div>data/demo/index.json · artifacts/metrics.json</div>
 </div>
 
@@ -882,7 +883,9 @@ def build_page(ctx: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Congela la demo in un solo file HTML. SPEC §10.4.")
+    ap = argparse.ArgumentParser(
+        description="Freeze the demo into a single self-contained HTML file."
+    )
     ap.add_argument("--demo-dir", type=Path, default=Path("data/demo"))
     ap.add_argument("--metrics", type=Path, default=Path("artifacts/metrics.json"))
     ap.add_argument("--out", type=Path, default=Path("demo.html"))
@@ -890,7 +893,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
 
     if not (args.demo_dir / "index.json").exists():
-        log.error("%s assente: lancia prima 'make precompute'.", args.demo_dir / "index.json")
+        log.error("%s missing: run 'make precompute' first.", args.demo_dir / "index.json")
         return 1
     metrics = json.loads(args.metrics.read_text()) if args.metrics.exists() else {}
     asm_path = Path("configs/assumptions.yaml")
@@ -900,13 +903,13 @@ def main(argv: list[str] | None = None) -> int:
     args.out.write_text(build_page(ctx), encoding="utf-8")
     mb = args.out.stat().st_size / 1e6
     log.info(
-        "%s — %.1f MB, %d scene, %d immagini incorporate",
+        "%s — %.1f MB, %d scenes, %d embedded images",
         args.out,
         mb,
         len(ctx["scenes"]),
         len(ctx["images"]),
     )
-    log.info("Apribile con doppio clic. Nessun server, nessuna rete, nessun Python.")
+    log.info("Opens with a double-click. No server, no network, no Python.")
     return 0
 
 

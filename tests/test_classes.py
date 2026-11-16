@@ -1,4 +1,4 @@
-"""Tests for the deck's ice-class table.
+"""Tests for the generated ice-class table.
 
 The table exists because a hand-written replacement for a wrong table produced a
 second wrong one: three rows that read as equally trustworthy, when thin ice
@@ -18,11 +18,11 @@ from iceroute.report import classes as cl
 
 ASM = {
     "segmentation": {
-        "scheme": "3 classi",
+        "scheme": "3 classes",
         "classes": {
-            0: {"name": "Acqua libera", "polaris_type": "ice_free"},
-            1: {"name": "Ghiaccio sottile", "polaris_type": "thin_fyi_2nd_stage"},
-            2: {"name": "Ghiaccio spesso", "polaris_type": "heavy_multi_year_ice"},
+            0: {"name": "Open water", "polaris_type": "ice_free"},
+            1: {"name": "Thin ice", "polaris_type": "thin_fyi_2nd_stage"},
+            2: {"name": "Thick ice", "polaris_type": "heavy_multi_year_ice"},
         },
     },
     "vessel": {"classes_shown": ["PC6", "IA"]},
@@ -38,9 +38,9 @@ def _metrics(cm=None):
                     "miou": 0.5324,
                     "binary_accuracy": 0.9059,
                     "per_class": {
-                        "Acqua libera": {"iou": 0.846, "support_px": 168_151_799},
-                        "Ghiaccio sottile": {"iou": 0.136, "support_px": 24_779_694},
-                        "Ghiaccio spesso": {"iou": 0.615, "support_px": 109_062_176},
+                        "Open water": {"iou": 0.846, "support_px": 168_151_799},
+                        "Thin ice": {"iou": 0.136, "support_px": 24_779_694},
+                        "Thick ice": {"iou": 0.615, "support_px": 109_062_176},
                     },
                     # rows = truth, columns = predicted
                     "confusion_matrix": cm or [[928, 12, 60], [56, 200, 745], [137, 87, 776]],
@@ -60,7 +60,7 @@ def _metrics(cm=None):
 
 def test_the_weakest_class_shows_its_score():
     page = cl.render(cl.collect(_metrics(), ASM, cl.RV_TABLE))
-    assert "0.136" in page, "il ghiaccio sottile deve mostrare il proprio IoU"
+    assert "0.136" in page, "thin ice must show its own IoU"
     assert "0.846" in page and "0.615" in page
 
 
@@ -77,8 +77,8 @@ def test_the_safe_direction_is_distinguished_from_the_dangerous_one():
     same kind of error. A table that only reported accuracy would hide that."""
     c = cl.collect(_metrics(), ASM, cl.RV_TABLE)
     rows = {r.name: r for r in c["rows"]}
-    assert rows["Ghiaccio sottile"].mistaken_for == "Ghiaccio spesso"
-    assert rows["Ghiaccio spesso"].mistaken_for == "Acqua libera"
+    assert rows["Thin ice"].mistaken_for == "Thick ice"
+    assert rows["Thick ice"].mistaken_for == "Open water"
 
 
 def test_the_worst_case_is_reported_not_just_the_median():
@@ -95,9 +95,9 @@ def test_the_worst_case_is_reported_not_just_the_median():
 def test_each_class_carries_its_risk_value_per_vessel():
     c = cl.collect(_metrics(), ASM, cl.RV_TABLE)
     rows = {r.name: r for r in c["rows"]}
-    assert rows["Acqua libera"].riv["PC6"] == 3
-    assert rows["Ghiaccio spesso"].riv["PC6"] < 0
-    assert rows["Ghiaccio spesso"].riv["IA"] < rows["Ghiaccio spesso"].riv["PC6"]
+    assert rows["Open water"].riv["PC6"] == 3
+    assert rows["Thick ice"].riv["PC6"] < 0
+    assert rows["Thick ice"].riv["IA"] < rows["Thick ice"].riv["PC6"]
 
 
 def test_the_formula_is_on_the_page():
@@ -108,7 +108,7 @@ def test_the_formula_is_on_the_page():
 
 def test_ridges_are_addressed_rather_than_silently_dropped():
     page = cl.render(cl.collect(_metrics(), ASM, cl.RV_TABLE))
-    assert "ridge" in page.lower() and "non può imparare" in page
+    assert "ridge" in page.lower() and "cannot learn" in page
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def test_ridges_are_addressed_rather_than_silently_dropped():
 def test_no_evaluation_means_no_invented_scores():
     c = cl.collect({}, ASM, cl.RV_TABLE)
     page = cl.render(c)
-    assert "non misurato" in page
+    assert "not measured" in page
     assert "0.000" not in page
 
 
@@ -130,7 +130,7 @@ def test_a_confusion_matrix_of_the_wrong_shape_is_ignored_not_guessed():
 
 
 def test_a_missing_risk_table_still_produces_a_page():
-    c = cl.collect(_metrics(), ASM, Path("nessun/file.csv"))
+    c = cl.collect(_metrics(), ASM, Path("no/such/file.csv"))
     assert "—" in cl.render(c)
 
 
@@ -140,11 +140,11 @@ def test_a_missing_risk_table_still_produces_a_page():
 
 
 def test_the_generated_file_matches_the_current_measurements():
-    """If this fails, `make report` is due — the deck table has drifted from the
-    model, which is the whole failure mode A-11 is about."""
-    out = Path("pitch/class_table.md")
+    """If this fails, `make report` is due — the published table has drifted from
+    the model, which is the whole failure mode A-11 is about."""
+    out = Path("artifacts/class_table.md")
     if not (out.exists() and Path("artifacts/metrics.json").exists()):
-        pytest.skip("class_table.md o metrics.json assenti")
+        pytest.skip("class_table.md or metrics.json missing")
     import json
 
     c = cl.collect(
@@ -152,13 +152,13 @@ def test_the_generated_file_matches_the_current_measurements():
         yaml.safe_load(Path("configs/assumptions.yaml").read_text()),
         cl.RV_TABLE,
     )
-    assert out.read_text() == cl.render(c), "pitch/class_table.md è indietro: make report"
+    assert out.read_text() == cl.render(c), "artifacts/class_table.md is stale: run make report"
 
 
 def test_the_real_table_has_three_classes_and_none_of_them_is_a_ridge():
-    out = Path("pitch/class_table.md")
+    out = Path("artifacts/class_table.md")
     if not out.exists():
-        pytest.skip("class_table.md assente")
+        pytest.skip("class_table.md missing")
     text = out.read_text()
     for name in ("Open water", "Thin ice", "Thick ice"):
         assert f"**{name}**" in text

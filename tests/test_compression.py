@@ -80,7 +80,7 @@ def test_a_speckled_mask_compresses_worse_than_a_polygon_mask():
     """
     polygon = len(encode_mask_png(_polygon_mask(), 6))
     speckled = len(encode_mask_png(_speckled_mask(), 6))
-    assert speckled > polygon * 2, f"atteso un divario netto, ottenuto {polygon} vs {speckled} byte"
+    assert speckled > polygon * 2, f"expected a clear gap, got {polygon} vs {speckled} bytes"
 
 
 def test_rle_estimate_counts_runs_not_pixels():
@@ -112,7 +112,7 @@ def test_measure_rejects_an_unknown_mask_source():
 
 def test_measure_rejects_mismatched_shapes():
     """Comparing a mask and SAR of different sizes compares two scenes."""
-    with pytest.raises(ValueError, match="non coincidono"):
+    with pytest.raises(ValueError, match="do not match"):
         measure_scene(
             "s",
             np.zeros((10, 10), dtype="uint8"),
@@ -153,7 +153,7 @@ def test_payload_includes_the_route():
 
 def test_missing_route_is_disclosed():
     r = measure_scene("s", _polygon_mask(), _sar(), n_classes=6, mask_source="predicted")
-    assert any("Nessuna rotta" in n for n in r.notes)
+    assert any("No route" in n for n in r.notes)
 
 
 def test_sar_padding_is_disclosed():
@@ -171,33 +171,34 @@ def test_sar_padding_is_disclosed():
 
 
 def test_ground_truth_measurement_refuses_to_produce_a_headline():
-    """SPEC rule 2. An upper bound must not be quotable as the real figure."""
+    """A number that was not measured on the real output must not be quotable:
+    an upper bound is not the real figure."""
     r = measure_scene("s", _polygon_mask(), _sar(), n_classes=6, mask_source="ground_truth")
     assert r.is_provisional
-    assert any("PROVVISORIO" in n for n in r.notes)
+    assert any("PROVISIONAL" in n for n in r.notes)
 
     s = summarise([r])
     assert s["provisional"]
     text = verdict(s)
-    assert "LIMITE SUPERIORE" in text
-    assert "non va nel pitch" in text
+    assert "UPPER BOUND" in text
+    assert "must not be quoted" in text
 
 
 def test_predicted_measurement_produces_a_usable_verdict():
     r = measure_scene("s", _speckled_mask(), _sar(), n_classes=6, mask_source="predicted")
     s = summarise([r])
     assert not s["provisional"]
-    assert "LIMITE SUPERIORE" not in verdict(s)
+    assert "UPPER BOUND" not in verdict(s)
 
 
 def test_verdict_replaces_the_claim_when_measurement_is_lower():
-    """SPEC §10.2: if it is not 200:1, the pitch number becomes the measured one."""
+    """If it is not 200:1, the published number becomes the measured one."""
     r = measure_scene("s", _speckled_mask(), _sar(), n_classes=6, mask_source="predicted")
     s = summarise([r])
     s["ratio_median"] = 47.0
     text = verdict(s, claimed=200.0)
     assert "47:1" in text
-    assert "non 200:1" in text
+    assert "not 200:1" in text
 
 
 def test_summary_reports_the_range_not_just_the_mean():

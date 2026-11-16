@@ -1,9 +1,10 @@
-"""The ice-class table for the deck, generated from what the model measured.
+"""The ice-class table, generated from what the model measured.
 
-A-11 of §98: the June decks print five ice classes, one of which — *Deformed
-Ice / Ridges* — does not exist in any AI4Arctic label, and the model actually
-deploys three. Replacing a wrong table by hand invites a second wrong table, so
-this writes it from ``artifacts/metrics.json``, ``configs/assumptions.yaml`` and
+A-11 in docs/decisions.md, *Early estimates vs. measurements*: the June 2026
+prototype material listed five ice classes, one of which — *Deformed Ice /
+Ridges* — does not exist in any AI4Arctic label, and the model actually deploys
+three. Replacing a wrong table by hand invites a second wrong table, so this
+writes it from ``artifacts/metrics.json``, ``configs/assumptions.yaml`` and
 ``data/polaris_rv.csv``.
 
 The reason it is worth generating rather than typing is not tidiness. Writing the
@@ -21,7 +22,7 @@ that matters is not accuracy but *direction*:
   it may not go, and it is the number to publish.
 
 That second figure is the honest headline of this whole section, and it is
-better said by us first than found by someone else.
+better stated up front than found by someone else.
 """
 
 from __future__ import annotations
@@ -42,22 +43,21 @@ log = logging.getLogger("classes")
 METRICS = Path("artifacts/metrics.json")
 ASSUMPTIONS = Path("configs/assumptions.yaml")
 RV_TABLE = Path("data/polaris_rv.csv")
-OUT = Path("pitch/class_table.md")
+OUT = Path("artifacts/class_table.md")
 
-# What each deployed class means to a bridge, in the deck's own register. The
+# What each deployed class means to a bridge, in plain operational terms. The
 # wording is a judgement, so it lives here and not in a config: everything
 # numeric on the row is measured, this column is what we choose to say.
 MEANING = {
-    "Acqua libera": ("Open water", "Navigate freely"),
-    "Ghiaccio sottile": ("Thin ice", "POLARIS decides — depends on concentration"),
-    "Ghiaccio spesso": ("Thick ice", "POLARIS decides — often forbidden at high concentration"),
+    "Open water": "Navigate freely",
+    "Thin ice": "POLARIS decides — depends on concentration",
+    "Thick ice": "POLARIS decides — often forbidden at high concentration",
 }
 
 
 @dataclass
 class Row:
     name: str
-    english: str
     meaning: str
     polaris_type: str
     iou: float | None
@@ -88,8 +88,8 @@ def load_riv(path: Path, ice_classes: tuple[str, ...]) -> dict[str, dict[str, in
 def confusion_rows(agg: dict) -> tuple[dict[str, tuple[str, float]], float | None]:
     """For each class: what it is most often mistaken for, and how often.
 
-    Also returns the one number that belongs on a safety slide — the share of
-    thick ice called open water — because that is the mistake with a
+    Also returns the one number that belongs in any safety statement — the share
+    of thick ice called open water — because that is the mistake with a
     consequence. Everything else costs a detour.
     """
     cm = agg.get("confusion_matrix")
@@ -107,8 +107,8 @@ def confusion_rows(agg: dict) -> tuple[dict[str, tuple[str, float]], float | Non
         worst[name] = (other, pct * 100)
 
     permissive = None
-    if "Ghiaccio spesso" in names and "Acqua libera" in names:
-        i, j = names.index("Ghiaccio spesso"), names.index("Acqua libera")
+    if "Thick ice" in names and "Open water" in names:
+        i, j = names.index("Thick ice"), names.index("Open water")
         if m[i].sum() > 0:
             permissive = float(m[i][j] / m[i].sum() * 100)
     return worst, permissive
@@ -128,12 +128,11 @@ def collect(metrics: dict, assumptions: dict, rv_path: Path) -> dict:
         entry = seg[idx] or {}
         name = entry.get("name", "")
         scores = per_class.get(name) or {}
-        english, meaning = MEANING.get(name, (name, ""))
+        meaning = MEANING.get(name, "")
         other, pct = worst.get(name, ("", None))
         rows.append(
             Row(
                 name=name,
-                english=english,
                 meaning=meaning,
                 polaris_type=entry.get("polaris_type", ""),
                 iou=scores.get("iou"),
@@ -164,7 +163,7 @@ def collect(metrics: dict, assumptions: dict, rv_path: Path) -> dict:
     }
 
 
-def _n(v, spec="{:.3f}", missing="non misurato"):
+def _n(v, spec="{:.3f}", missing="not measured"):
     return spec.format(v) if isinstance(v, int | float) else missing
 
 
@@ -173,112 +172,115 @@ def render(c: dict) -> str:
     head = " | ".join(f"RIV {v}" for v in vessels)
     sep = "|".join(["---"] * len(vessels))
 
-    deck = [f"| Class | What it means to a bridge | {head} |", f"|---|---|{sep}|"]
+    summary = [f"| Class | What it means to a bridge | {head} |", f"|---|---|{sep}|"]
     detail = [
-        "| Classe | IoU misurata | pixel | quando sbaglia, la chiama | tipo POLARIS |",
+        "| Class | Measured IoU | pixels | when wrong, it calls it | POLARIS type |",
         "|---|---:|---:|---|---|",
     ]
     for r in c["rows"]:
         rivs = " | ".join(
             f"{r.riv.get(v, '—'):+d}" if isinstance(r.riv.get(v), int) else "—" for v in vessels
         )
-        deck.append(f"| **{r.english}** | {r.meaning} | {rivs} |")
+        summary.append(f"| **{r.name}** | {r.meaning} | {rivs} |")
         px = f"{r.support_px / 1e6:.0f} M" if isinstance(r.support_px, int) else "—"
         mis = (
-            f"{r.mistaken_for.lower()} nel {r.mistaken_pct:.0f}% dei casi"
+            f"{r.mistaken_for.lower()} in {r.mistaken_pct:.0f}% of cases"
             if r.mistaken_pct is not None
             else "—"
         )
         detail.append(f"| {r.name} | {_n(r.iou)} | {px} | {mis} | `{r.polaris_type}` |")
 
     perm = c["permissive_thick_as_water"]
-    return f"""# Le classi di ghiaccio, come stanno davvero
+    return f"""# The ice classes, as they actually perform
 
-> **Generato da `make report`.** Non modificare a mano: la fonte è
-> `artifacts/metrics.json`, `configs/assumptions.yaml` e `data/polaris_rv.csv`.
-> Chiude **A-11** di §98, che nei deck di giugno dichiarava cinque classi di cui una
-> — *Deformed Ice / Ridges* — non esiste in nessuna etichetta AI4Arctic.
+> **Written by `make report`.** Do not edit by hand: the sources are
+> `artifacts/metrics.json`, `configs/assumptions.yaml` and `data/polaris_rv.csv`.
+> Closes **A-11** in docs/decisions.md, *Early estimates vs. measurements*: the June 2026
+> prototype listed five classes, one of which — *Deformed Ice / Ridges* — does not exist
+> in any AI4Arctic label.
 
-Schema attivo: **{c["scheme"]}**. mIoU **{_n(c["miou"])}**, ghiaccio/acqua
-**{_n(c["binary"])}**, su **{c["n_scenes"]}** scene del test set ufficiale.
+Active scheme: **{c["scheme"]}**. mIoU **{_n(c["miou"])}**, ice/water
+**{_n(c["binary"])}**, on **{c["n_scenes"]}** scenes of the official test set.
 
-## Tabella per la slide
+## Summary table
 
-{chr(10).join(deck)}
+{chr(10).join(summary)}
 
-`RIO = C × RIV(tipo) + (10 − C) × RIV(acqua libera)` — IMO MSC.1/Circ.1519.
+`RIO = C × RIV(type) + (10 − C) × RIV(open water)` — IMO MSC.1/Circ.1519.
 
-Il RIV è la ragione per cui la tabella non può fermarsi al tipo: la stessa classe è
-navigazione normale a bassa concentrazione e vietata ad alta. È la lezione di D-031, ed è
-anche il motivo per cui la conversazione conviene spostarla dal *numero di classi*
-all'*implementare una circolare IMO*.
+The RIV is the reason the table cannot stop at the ice type: the same class is normal
+navigation at low concentration and forbidden at high concentration. That is the lesson of
+docs/decisions.md D-031, and it is also why the meaningful question is not the *number of
+classes* but *implementing an IMO circular*.
 
-## Quello che la slide non deve nascondere
+## What the summary table does not show
 
 {chr(10).join(detail)}
 
-**Le tre classi non sono ugualmente affidabili, e vale la pena dirlo per primi.**
+**The three classes are not equally reliable, and that is worth stating up front.**
 
-Ma la domanda giusta non è quanto sbaglia: è **da che parte**. Il ghiaccio sottile viene
-preso male, e quasi sempre viene chiamato **spesso** — cioè più pericoloso di quello che è.
-Costa una rotta più lunga e nient'altro.
+But the right question is not how often it is wrong: it is **in which direction**. Thin ice
+is poorly recognised, and it is almost always called **thick** — that is, more dangerous than
+it is. That costs a longer route and nothing else.
 
-L'errore che conta è l'opposto: **ghiaccio spesso chiamato acqua libera, {_n(perm, "{:.1f}%")}
-dei suoi pixel.** È l'unico che potrebbe mandare una nave dove non può andare, ed è il numero
-da pubblicare.
+The error that matters is the opposite one: **thick ice called open water, {_n(perm, "{:.1f}%")}
+of its pixels.** It is the only one that could send a ship where it may not go, and it is the
+number to publish.
 
-Sull'intera scena, la frazione di mappa in cui siamo **più permissivi** della carta
-dell'analista ha mediana **{_n(c["unsafe_median"], "{:.1%}")}** e caso peggiore
-**{_n(c["unsafe_max"], "{:.1%}")}** su {c["n_unsafe_scenes"]} scene.
+Over the whole scene, the fraction of the map where we are **more permissive** than the
+analyst's chart has median **{_n(c["unsafe_median"], "{:.1%}")}** and worst case
+**{_n(c["unsafe_max"], "{:.1%}")}** over {c["n_unsafe_scenes"]} scenes.
 
-**E il caso peggiore è nella demo, marcato.** Non è un dato che nascondiamo in una nota: è
-una delle scene che si possono scegliere sul palco. Mostrare da soli il proprio caso peggiore
-è la cosa che rende credibile tutto il resto — e toglie a chiunque la possibilità di trovarlo
-per primo.
+**And the worst case is in the demo, marked.** It is not a figure tucked away in a footnote:
+it is one of the scenes that can be selected. Showing your own worst case is what makes
+everything else credible — and it leaves nobody the chance to find it first.
 
-## Se chiedono «perché tre e non sei?»
+## Why three classes and not six?
 
-Perché sei è oltre il punto in cui il dato etichettato regge. Il modello a sei classi si è
-fermato a **mIoU 0,272** sbagliando con sicurezza (registrato in D-018; l'artefatto di quella
-valutazione non è più nel repo, la voce sì). A tre classi fa {_n(c["miou"])}, e sulla
-distinzione che decide la sicurezza — ghiaccio sì o no — fa **{_n(c["binary"])}**.
+Because six is past the point where the labelled data holds up. The six-class model stopped
+at **mIoU 0.272** while being confidently wrong (recorded in docs/decisions.md D-018; the
+artefact of that evaluation is no longer in the repository, the entry is). With three
+classes it scores {_n(c["miou"])}, and on the distinction that decides safety — ice or no
+ice — it scores **{_n(c["binary"])}**.
 
-Il ripiego a tre classi è previsto dalla SPEC §7.4 ed è documentato in D-020. **Attenzione:**
-questi numeri non vanno confrontati con la soglia 0,60, che era definita sulle sei classi SOD.
+The fall-back to three classes was planned from the start, for the case where the six SOD
+classes did not hold up, and is documented in docs/decisions.md D-020. **Caution:** these
+numbers must not be compared with the 0.60 mIoU acceptance threshold, which was defined on
+the six SOD classes.
 
-## E i ridge?
+## What about ridges?
 
-Non esistono come etichetta. AI4Arctic annota concentrazione (SIC), stadio di sviluppo (SOD) e
-dimensione dei banchi (FLOE): **nessuna delle tre codifica la deformazione**. Non è una classe
-che il modello sbaglia, è una che non può imparare.
+They do not exist as a label. AI4Arctic annotates concentration (SIC), stage of development
+(SOD) and floe size (FLOE): **none of the three encodes deformation**. It is not a class the
+model gets wrong, it is one it cannot learn.
 
-La risposta buona non è togliere la riga e tacere: è **dire che è il problema successivo**.
-«Nessun dataset pubblico etichetta la deformazione — è il prossimo problema, non un risultato
-nostro» mostra che sappiamo dov'è il limite, che è più convincente di una classe in più.
+The right response is not to drop the row and say nothing: it is to **state it as the next
+problem**. "No public dataset labels deformation — it is the next problem, not a result of
+ours" shows where the limit is, which is more convincing than one extra class.
 """
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Genera la tabella delle classi per il deck.")
+    ap = argparse.ArgumentParser(description="Write the ice-class table for the documentation.")
     ap.add_argument("--metrics", type=Path, default=METRICS)
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if not args.metrics.exists():
-        log.warning("%s assente: la tabella delle classi non viene scritta.", args.metrics)
+        log.warning("%s missing: the class table is not written.", args.metrics)
         return 0
     metrics = json.loads(args.metrics.read_text())
     assumptions = yaml.safe_load(ASSUMPTIONS.read_text()) if ASSUMPTIONS.exists() else {}
 
     c = collect(metrics, assumptions, RV_TABLE)
     if not c["rows"]:
-        log.warning("Nessuna classe in configs/assumptions.yaml: niente da scrivere.")
+        log.warning("No classes in configs/assumptions.yaml: nothing to write.")
         return 0
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render(c), encoding="utf-8")
     log.info(
-        "%s — %d classi, permissivo %s",
+        "%s — %d classes, permissive %s",
         args.out,
         len(c["rows"]),
         _n(c["permissive_thick_as_water"], "{:.1f}%"),

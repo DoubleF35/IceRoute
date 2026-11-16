@@ -1,16 +1,17 @@
 """Generate index.html: the internal status page for IceRoute.
 
 Every number on the page is read from an artifact on disk — ``metrics.json``,
-``data_stats.json``, the training CSV, ``DECISIONS.md``, git. Nothing is typed
-in by hand, so the page cannot drift from reality, and a value that has not been
-measured yet renders as "non ancora misurato" rather than as a plausible
-placeholder. That is the same rule the rest of the project runs on (SPEC §2.2),
-applied to the one artefact a human actually looks at.
+``data_stats.json``, the training CSV, ``docs/decisions.md``, git. Nothing is
+typed in by hand, so the page cannot drift from reality, and a value that has not
+been measured yet renders as "not measured yet" rather than as a plausible
+placeholder. That is the same rule the rest of the project runs on — a number
+that was not measured is never displayed — applied to the one artefact a human
+actually looks at.
 
 The page is **fully self-contained**: inline CSS, inline SVG, no fonts or
-scripts from a CDN. The demo laptop has to work with the network card switched
-off (SPEC §10.4), and a status page that goes blank offline would be the first
-thing to fail on 7 October.
+scripts from a CDN. The demo machine has to work with the network card switched
+off, and a status page that goes blank offline would be the first thing to fail
+in a live demo with the network off.
 
 Run with ``make dashboard``.
 """
@@ -31,9 +32,6 @@ from pathlib import Path
 import yaml
 
 log = logging.getLogger("dashboard")
-
-FREEZE = date(2026, 10, 1)
-PITCH = date(2026, 10, 7)
 
 # ---------------------------------------------------------------------------
 # Reading the artifacts
@@ -83,7 +81,7 @@ def _num(v: str):
 
 
 def parse_table(text: str, prefix: str) -> list[dict]:
-    """Rows of a DECISIONS.md markdown table whose first cell starts with ``prefix``."""
+    """Rows of a docs/decisions.md markdown table whose first cell starts with ``prefix``."""
     out = []
     for line in text.splitlines():
         if not line.startswith(f"| {prefix}-"):
@@ -102,11 +100,15 @@ def parse_table(text: str, prefix: str) -> list[dict]:
 
 
 def parse_decisions(text: str) -> list[dict]:
-    """The D-xxx entries: id, title and date."""
+    """The D-xxx entries: id, title and date.
+
+    The date line is ``**Date:**``; the older ``**Data:**`` spelling is still
+    accepted so a file written before the translation parses the same way.
+    """
     out = []
     for m in re.finditer(r"^## (D-\d+) — (.+?)$", text, re.MULTILINE):
         tail = text[m.end() : m.end() + 200]
-        dm = re.search(r"\*\*Data:\*\*\s*([\d-]+)", tail)
+        dm = re.search(r"\*\*(?:Date|Data):\*\*\s*([\d-]+)", tail)
         out.append({"id": m.group(1), "title": m.group(2), "date": dm.group(1) if dm else ""})
     return out
 
@@ -166,8 +168,8 @@ def download_status(repo: Path) -> dict:
     test_dir = repo / "data/raw/test"
     scenes = list(test_dir.glob("*_prep.nc")) if test_dir.exists() else []
     refs = list(test_dir.glob("*_prep_reference.nc")) if test_dir.exists() else []
-    out["test ufficiale"] = {"have": len(scenes), "total": 20}
-    out["etichette test"] = {"have": len(refs), "total": 20}
+    out["official test"] = {"have": len(scenes), "total": 20}
+    out["test labels"] = {"have": len(refs), "total": 20}
     return out
 
 
@@ -203,46 +205,46 @@ def gates(ctx: dict) -> list[Gate]:
     return [
         Gate(
             "Gate 0",
-            "Ambiente e ispezione",
+            "Environment and inspection",
             True,
-            "CUDA verificata con una matmul reale, nomi delle variabili letti dal dato",
+            "CUDA verified with a real matmul, variable names read from the data",
         ),
         Gate(
             "Gate 1",
-            "Pipeline dati",
+            "Data pipeline",
             bool(stats.get("n_patches")),
-            f"{_it(stats.get('n_patches', 0))} patch da {stats.get('n_scenes', 0)} scene"
+            f"{_num_fmt(stats.get('n_patches', 0))} patches from {stats.get('n_scenes', 0)} scenes"
             if stats
-            else "cache non costruita",
-            "" if scenes_ok else "download incompleto",
+            else "cache not built",
+            "" if scenes_ok else "download incomplete",
         ),
         Gate(
             "Gate 2",
-            "Modello e quantizzazione",
+            "Model and quantisation",
             bool(quant.get("size")) and bool(evaluation),
             _gate2_detail(best, quant, evaluation),
-            "manca la valutazione" if not evaluation else "",
+            "evaluation missing" if not evaluation else "",
         ),
         Gate(
             "Gate 3",
             "Routing POLARIS",
             bool(routes.get("scenes")),
-            f"{sum(1 for s in routes.get('scenes', []) if s.get('usable'))} scene instradate"
+            f"{sum(1 for s in routes.get('scenes', []) if s.get('usable'))} scenes routed"
             if routes
-            else "non ancora eseguito",
+            else "not run yet",
         ),
         Gate(
             "Gate 4",
-            "Demo e materiali",
+            "Demo and materials",
             False,
             _gate4_detail(ctx["demo"]),
             # Deliberately never green from files alone. The gate is "three
             # people who did not build it can use it, offline, after a
             # reboot" — and no artefact on disk can attest to that. Marking it
-            # done because precompute ran is exactly how a demo reaches a
-            # stage untested.
-            "resta la prova in condizioni reali: rete staccata, macchina "
-            "riavviata, tre persone esterne che la usano da sole",
+            # done because precompute ran is exactly how a demo reaches its
+            # first real user untested.
+            "the real-conditions test remains: network unplugged, machine "
+            "rebooted, three outside people using it on their own",
         ),
     ]
 
@@ -251,26 +253,24 @@ def _gate4_detail(demo: dict) -> str:
     bits = []
     if demo.get("n_scenes"):
         bits.append(
-            f"{demo['n_scenes']} scene precalcolate"
-            + (" + caso peggiore" if demo.get("has_worst_case") else "")
+            f"{demo['n_scenes']} precomputed scenes"
+            + (" + worst case" if demo.get("has_worst_case") else "")
         )
     if demo.get("n_figures"):
-        bits.append(f"{demo['n_figures']} figure")
-    bits.append(
-        "video di riserva registrato" if demo.get("has_video") else "video di riserva mancante"
-    )
-    return " · ".join(bits) if bits else "non iniziato"
+        bits.append(f"{demo['n_figures']} figures")
+    bits.append("backup video recorded" if demo.get("has_video") else "backup video missing")
+    return " · ".join(bits) if bits else "not started"
 
 
 def _gate2_detail(best, quant, evaluation) -> str:
     bits = []
     if best is not None:
-        bits.append(f"mIoU {_it(best, 3)} val")
+        bits.append(f"mIoU {_num_fmt(best, 3)} val")
     if quant.get("size"):
-        bits.append(f"INT8 {_it(quant['size']['int8_mb'], 2)} MB")
+        bits.append(f"INT8 {_num_fmt(quant['size']['int8_mb'], 2)} MB")
     if evaluation:
-        bits.append("valutato")
-    return " · ".join(bits) if bits else "training non concluso"
+        bits.append("evaluated")
+    return " · ".join(bits) if bits else "training not finished"
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ def line_chart(series: list[dict], width=680, height=240, pad=38) -> str:
     """
     pts = [p for s in series for p in s["points"]]
     if not pts:
-        return '<p class="muted">Nessun dato di training ancora.</p>'
+        return '<p class="muted">No training data yet.</p>'
 
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]
     x0, x1 = min(xs), max(xs) or 1
@@ -444,23 +444,23 @@ footer{margin-top:52px;padding-top:20px;border-top:1px solid #1d2633;
 """
 
 
-MISSING = "non ancora misurato"
+MISSING = "not measured yet"
 
 
-def _it(v, decimals: int = 0) -> str:
-    """Italian number formatting: dot for thousands, comma for decimals.
+def _num_fmt(v, decimals: int = 0) -> str:
+    """English number formatting: comma for thousands, dot for decimals.
 
-    The page is in Italian and sits next to DECISIONS.md; ``14,188 patch`` reads
-    as fourteen point one in that context.
+    The page is in English and sits next to docs/decisions.md; ``14.188 patches``
+    would read as fourteen point one in that context. The separators come from
+    the format spec itself: an earlier version swapped them by hand through a
+    placeholder character, and that once silently deleted every thousands
+    separator.
     """
-    # str.translate swaps both separators in one pass. Chained replace() needs a
-    # placeholder character, and a placeholder is one more thing that can go
-    # wrong — it already did once, silently deleting every thousands separator.
-    return f"{v:,.{decimals}f}".translate(str.maketrans({",": ".", ".": ","}))
+    return f"{v:,.{decimals}f}"
 
 
 def _fmt(v, decimals: int = 3, missing: str = MISSING) -> str:
-    return _it(v, decimals) if isinstance(v, int | float) else missing
+    return _num_fmt(v, decimals) if isinstance(v, int | float) else missing
 
 
 def route_figure(repo: Path, max_px: int = 1000) -> str:
@@ -468,7 +468,7 @@ def route_figure(repo: Path, max_px: int = 1000) -> str:
 
     Inlined rather than linked because this page has to survive being emailed
     or opened from a USB stick with the network off, which is also why it has
-    no external resources at all. The deck version is 300 DPI and far too heavy
+    no external resources at all. The print version is 300 DPI and far too heavy
     to paste into an HTML file, so it is downscaled here — the page wants a
     thumbnail of the argument, not the printable asset.
     """
@@ -478,7 +478,7 @@ def route_figure(repo: Path, max_px: int = 1000) -> str:
     path = repo / "artifacts/figures/02_useful.png"
     if not path.exists():
         return (
-            '<div class="note">Figura della rotta non generata: '
+            '<div class="note">Route figure not generated: '
             '<span class="mono">make report</span>.</div>'
         )
     from PIL import Image
@@ -490,8 +490,8 @@ def route_figure(repo: Path, max_px: int = 1000) -> str:
     img.save(buf, format="JPEG", quality=82, optimize=True)
     uri = base64.b64encode(buf.getvalue()).decode()
     return (
-        f'<img src="data:image/jpeg;base64,{uri}" alt="Rotta IceRoute contro '
-        f'rotta diretta" style="width:100%;border-radius:8px;display:block">'
+        f'<img src="data:image/jpeg;base64,{uri}" alt="IceRoute route against the '
+        f'direct route" style="width:100%;border-radius:8px;display:block">'
     )
 
 
@@ -501,47 +501,45 @@ def _route_note(r: dict) -> str:
     Deliberately makes no claim about time saved. On these scenes the direct
     route is forbidden, so there is no feasible voyage to be faster than, and
     a percentage would have to be invented against a baseline that does not
-    exist (D-026). "That route is illegal and this one is not" is both the
-    honest statement and the stronger one.
+    exist (docs/decisions.md D-026). "That route is illegal and this one is not"
+    is both the honest statement and the stronger one.
     """
     if not r:
         return (
-            '<h3>Nessun confronto disponibile</h3><div class="note">Serve '
-            '<span class="mono">make report</span>: la figura mostra la rotta '
-            "diretta contro quella calcolata, e senza scene non c'è confronto.</div>"
+            '<h3>No comparison available</h3><div class="note">Needs '
+            '<span class="mono">make report</span>: the figure shows the direct '
+            "route against the computed one, and without scenes there is no comparison.</div>"
         )
 
-    head = f"<h3>{html.escape(r['scene_id'][:15])} · nave {html.escape(r['ice_class'])}</h3>"
+    head = f"<h3>{html.escape(r['scene_id'][:15])} · vessel {html.escape(r['ice_class'])}</h3>"
     if r["blocked_by_ice"]:
-        claim = f"""<div class="big">{_it(r["n_no_go"])} celle vietate</div>
-<div class="note">La rotta diretta — la linea che seguirebbe una nave con la sola
-carta nautica — attraversa {_it(r["n_no_go"])} celle oltre il limite POLARIS per una
-nave {html.escape(r["ice_class"])}. Non è una rotta più lenta: è una rotta che quella
-nave <b>non può percorrere</b>. IceRoute ne trova una in {_fmt(r["hours"], 1)} h,
-riassunta in {r["n_waypoints"]} waypoint — gli unici dati che scendono a terra.</div>"""
+        claim = f"""<div class="big">{_num_fmt(r["n_no_go"])} forbidden cells</div>
+<div class="note">The direct route — the line a ship with only a nautical chart would
+follow — crosses {_num_fmt(r["n_no_go"])} cells beyond the POLARIS limit for a
+{html.escape(r["ice_class"])} vessel. It is not a slower route: it is a route that vessel
+<b>cannot sail</b>. IceRoute finds one in {_fmt(r["hours"], 1)} h,
+summarised in {r["n_waypoints"]} waypoints — the only data sent to the ground.</div>"""
     else:
         # The figure fell back to a scene whose direct route is legal. Saying
         # anything stronger here would be describing a picture that is not on
         # the page.
-        claim = """<div class="big"><span class="tag prov">confronto debole</span></div>
-<div class="note">Su questa scena la rotta diretta <b>è percorribile</b>: la figura
-mostra due tracce che in larga parte coincidono, il che non dimostra la tesi.
-Rigenerare con una scena in cui POLARIS vieta la linea retta.</div>"""
+        claim = """<div class="big"><span class="tag prov">weak comparison</span></div>
+<div class="note">On this scene the direct route <b>is passable</b>: the figure shows
+two tracks that largely coincide, which does not demonstrate the point.
+Regenerate with a scene where POLARIS forbids the straight line.</div>"""
 
     return f"""{head}{claim}
-<div class="note" style="margin-top:11px">Le due tracce si separano fino a
-{_fmt(r["separation_km"], 0)} km, il {_fmt(r["separation_pct"], 1)}% della diagonale
-dell'immagine. La scena è scelta su questo numero: un confronto in cui le due linee
-si sovrappongono non dimostra niente, per quante celle siano vietate sotto.</div>
-<div class="note" style="margin-top:11px">Nessuna percentuale di tempo risparmiato:
-contro una rotta non percorribile non esiste un tempo di riferimento da cui
-risparmiare (D-026).</div>"""
+<div class="note" style="margin-top:11px">The two tracks diverge by up to
+{_fmt(r["separation_km"], 0)} km, {_fmt(r["separation_pct"], 1)}% of the image
+diagonal. The scene is chosen on this number: a comparison in which the two lines
+overlap demonstrates nothing, however many forbidden cells lie underneath.</div>
+<div class="note" style="margin-top:11px">No percentage of time saved: against a
+route that cannot be sailed there is no reference time to save against
+(docs/decisions.md D-026).</div>"""
 
 
 def build_page(ctx: dict) -> str:
     today = ctx["today"]
-    to_freeze = (FREEZE - today).days
-    to_pitch = (PITCH - today).days
 
     stats, metrics = ctx["data_stats"], ctx["metrics"]
     quant = metrics.get("quantization", {})
@@ -550,6 +548,7 @@ def build_page(ctx: dict) -> str:
     best = ctx["best_miou"]
     dl = ctx["download"]
     g = ctx["git"]
+    n_green = sum(1 for gt in ctx["gates"] if gt.done)
 
     # -- headline cards ----------------------------------------------------
     # Two traps here, and the page fell into both.
@@ -557,60 +556,60 @@ def build_page(ctx: dict) -> str:
     # First, the headline must be the HELD-OUT number. Validation chose the
     # checkpoint, so it flatters it; the official test set did not.
     #
-    # Second, SPEC §7.4's threshold of 0,60 is about the SIX-class problem.
+    # Second, the 0.60 mIoU acceptance threshold is about the SIX-class problem.
     # Three classes is a strictly easier task, so tagging a three-class score
-    # "sotto 0,60" compares two different things and reads as a verdict on the
+    # "below 0.60" compares two different things and reads as a verdict on the
     # model. The tag only appears when the numbers are commensurable.
     n_cls = ctx["n_classes"]
     headline = ctx["test_miou"] if ctx["test_miou"] is not None else best
     if headline is not None and n_cls == 6:
         miou_tag = (
             f'<span class="tag {"ok" if headline >= 0.60 else "prov"}">'
-            f"{'sopra soglia' if headline >= 0.60 else 'sotto 0,60'}</span>"
+            f"{'above threshold' if headline >= 0.60 else 'below 0.60'}</span>"
         )
     elif n_cls:
-        miou_tag = f'<span class="tag prov">ripiego §7.4 a {n_cls} classi</span>'
+        miou_tag = f'<span class="tag prov">{n_cls}-class fallback (D-020)</span>'
     else:
         miou_tag = ""
 
     if ctx["test_miou"] is not None:
-        miou_note = f"su {ctx['eval_split'] or 'held-out'} · validazione {_fmt(best)} {miou_tag}"
-        miou_label = "mIoU sul test ufficiale"
+        miou_note = f"on {ctx['eval_split'] or 'held-out'} · validation {_fmt(best)} {miou_tag}"
+        miou_label = "mIoU on the official test set"
     else:
-        miou_note = f"solo validazione, nessun held-out {miou_tag}"
-        miou_label = "mIoU di validazione"
+        miou_note = f"validation only, no held-out score {miou_tag}"
+        miou_label = "Validation mIoU"
 
     int8 = size.get("int8_mb")
     ratio = ctx["compression"]
 
     cards = [
         (
-            "Parametri del modello",
-            _it(ctx["n_params"]) if ctx["n_params"] else "—",
-            "budget SPEC 2.000.000"
+            "Model parameters",
+            _num_fmt(ctx["n_params"]) if ctx["n_params"] else "—",
+            "budget &lt; 2,000,000 (D-005)"
             + (
-                ' <span class="tag ok">entro</span>'
+                ' <span class="tag ok">within</span>'
                 if ctx["n_params"] and ctx["n_params"] < 2_000_000
                 else ""
             ),
         ),
         (
-            "Modello INT8 misurato",
-            f"{_it(int8, 2)} MB" if int8 else MISSING,
+            "Measured INT8 model",
+            f"{_num_fmt(int8, 2)} MB" if int8 else MISSING,
             (
-                f"{_it(size.get('bytes_per_parameter_int8', 0), 2)} byte/parametro · "
-                "il deck dichiara 58 KB"
+                f"{_num_fmt(size.get('bytes_per_parameter_int8', 0), 2)} bytes/parameter · "
+                "early estimate was 58 KB (A-02)"
             )
             if int8
-            else "serve <span class='mono'>make quantize</span>",
+            else "needs <span class='mono'>make quantize</span>",
         ),
         (miou_label, _fmt(headline), miou_note),
         (
-            "Latenza per tile (1 thread)",
-            f"{_it(lat.get('int8', {}).get('median_ms_per_tile', 0))} ms"
+            "Latency per tile (1 thread)",
+            f"{_num_fmt(lat.get('int8', {}).get('median_ms_per_tile', 0))} ms"
             if lat.get("int8")
-            else "non ancora misurata",
-            "INT8 su CPU, mediana",
+            else "not measured yet",
+            "INT8 on CPU, median",
         ),
     ]
     cards_html = "".join(
@@ -623,7 +622,7 @@ def build_page(ctx: dict) -> str:
     # a backslash inside an f-string expression, and HTML attributes need quotes.
     gate_parts = []
     for gt in ctx["gates"]:
-        badge = '<span class="tag ok">verde</span>' if gt.done else ""
+        badge = '<span class="tag ok">green</span>' if gt.done else ""
         blocked = (
             '<span class="tag wait">' + html.escape(gt.blocking) + "</span>" if gt.blocking else ""
         )
@@ -645,14 +644,14 @@ def build_page(ctx: dict) -> str:
 
     # -- training ----------------------------------------------------------
     runs = ctx["runs"]
-    chart = '<p class="muted">Nessun training registrato.</p>'
+    chart = '<p class="muted">No training recorded.</p>'
     train_note = ""
     if runs:
         last = runs[-1]
         chart = line_chart(
             [
                 {
-                    "label": "mIoU validazione",
+                    "label": "validation mIoU",
                     "colour": "#5eb0ef",
                     "points": [
                         (r["epoch"], r["val_miou"])
@@ -661,7 +660,7 @@ def build_page(ctx: dict) -> str:
                     ],
                 },
                 {
-                    "label": "accuratezza ghiaccio/acqua",
+                    "label": "ice/water accuracy",
                     "colour": "#4ade9b",
                     "points": [
                         (r["epoch"], r["val_binary_accuracy"])
@@ -684,12 +683,12 @@ def build_page(ctx: dict) -> str:
             )
             if best_prev:
                 prev = (
-                    f" Il run precedente si era fermato a mIoU {_it(best_prev, 3)} "
-                    f"con la cache ridotta (vedi D-017)."
+                    f" The previous run had stopped at mIoU {_num_fmt(best_prev, 3)} "
+                    f"with the reduced cache (see D-017)."
                 )
         train_note = (
-            f'<p class="note">Run corrente: {len(last)} epoche registrate su '
-            f"{len(runs)} run totali nel log.{prev}</p>"
+            f'<p class="note">Current run: {len(last)} epochs recorded, out of '
+            f"{len(runs)} runs in the log.{prev}</p>"
         )
 
     # -- class distribution ------------------------------------------------
@@ -703,7 +702,7 @@ def build_page(ctx: dict) -> str:
             ]
         )
         if freq
-        else '<p class="muted">Cache non costruita.</p>'
+        else '<p class="muted">Cache not built.</p>'
     )
 
     # -- download ----------------------------------------------------------
@@ -719,19 +718,19 @@ def build_page(ctx: dict) -> str:
             ]
         )
         if dl
-        else '<p class="muted">Split non congelato.</p>'
+        else '<p class="muted">Split not frozen.</p>'
     )
 
-    # -- claims and provisional -------------------------------------------
+    # -- early estimates and provisional values ----------------------------
     def rows(items, closed_marker=None):
         out = []
         for it in items:
             detail = it["detail"]
             closed = closed_marker and closed_marker in detail
             tag = (
-                '<span class="tag ok">chiusa</span>'
+                '<span class="tag ok">closed</span>'
                 if closed
-                else '<span class="tag prov">aperta</span>'
+                else '<span class="tag prov">open</span>'
             )
             out.append(
                 f"<tr><td>{html.escape(it['id'])} {tag}</td>"
@@ -740,8 +739,8 @@ def build_page(ctx: dict) -> str:
             )
         return "".join(out)
 
-    claims_html = rows(ctx["claims"], "CHIUSA")
-    prov_html = rows(ctx["provisional"], "Chiusa")
+    estimates_html = rows(ctx["estimates"], "CLOSED")
+    prov_html = rows(ctx["provisional"], "Closed")
 
     decisions_html = "".join(
         f"<tr><td>{html.escape(d['id'])}</td><td>{html.escape(d['title'])}</td>"
@@ -758,119 +757,123 @@ def build_page(ctx: dict) -> str:
     route_img = route_figure(ctx["repo"])
     route_note = _route_note(ctx.get("route") or {})
 
-    comp_note = (
-        f"{_it(ratio['value'])}:1 <span class='tag prov'>limite superiore</span>"
-        if ratio
-        else MISSING
+    if not ratio:
+        comp_note = MISSING
+    elif ratio.get("provisional", True):
+        comp_note = f"{_num_fmt(ratio['value'])}:1 <span class='tag prov'>upper bound</span>"
+    else:
+        comp_note = f"{_num_fmt(ratio['value'])}:1"
+    comp_caption = (
+        "Measured on the ice chart, which is drawn as polygons and compresses far better "
+        "than a network's output. It has to be re-measured on the predicted mask: the code "
+        "refuses to return a quotable number until it is (D-016)."
+        if not ratio or ratio.get("provisional", True)
+        else "Measured on the masks the model actually predicts, against the PNG-compressed "
+        "SAR scene: the bytes the satellite would really send (D-016, D-028)."
     )
     if size.get("compression_ratio"):
-        model_comp = f"{_it(size['compression_ratio'], 2)}×"
+        model_comp = f"{_num_fmt(size['compression_ratio'], 2)}×"
         model_comp_note = (
-            f"fp32 {_it(size['fp32_mb'], 2)} MB → INT8 {_it(size['int8_mb'], 2)} MB. "
-            "Non è 4× perché grafo, scale QDQ e parametri GroupNorm restano in float32."
+            f"fp32 {_num_fmt(size['fp32_mb'], 2)} MB → INT8 {_num_fmt(size['int8_mb'], 2)} MB. "
+            "It is not 4× because the graph, the QDQ scales and the GroupNorm parameters "
+            "stay in float32."
         )
     else:
         model_comp = MISSING
         model_comp_note = (
-            "Serve <span class='mono'>make quantize</span>. Il rapporto atteso è sotto 4×: "
-            "grafo, scale QDQ e GroupNorm restano in float32."
+            "Needs <span class='mono'>make quantize</span>. The expected ratio is below 4×: "
+            "the graph, the QDQ scales and GroupNorm stay in float32."
         )
 
-    return f"""<title>IceRoute — stato del progetto</title>
+    return f"""<title>IceRoute — project status</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>{CSS}</style>
 <div class="wrap">
 <header>
   <div>
     <h1>IceRoute</h1>
-    <p class="sub">Segmentazione del ghiaccio marino a bordo e rotta ottimale
-    vincolata da POLARIS. Ogni numero in questa pagina è letto da un artefatto
-    su disco: quello che non è stato misurato lo dice.</p>
+    <p class="sub">On-board sea-ice segmentation and time-optimal routing
+    constrained by POLARIS. Every number on this page is read from an artefact
+    on disk: what has not been measured says so.</p>
   </div>
   <div class="count">
-    <b>{to_pitch}</b><small>giorni al pitch · {PITCH.strftime("%d/%m/%Y")}</small>
-    <div style="margin-top:13px" class="{"warn" if to_freeze < 8 else ""}">
-      <b style="font-size:23px">{to_freeze}</b>
-      <small>al feature freeze · {FREEZE.strftime("%d/%m")}</small>
-    </div>
+    <b>{n_green}/{len(ctx["gates"])}</b><small>gates green</small>
   </div>
 </header>
 
-<h2>Numeri misurati</h2>
+<h2>Measured numbers</h2>
 <div class="grid g4">{cards_html}</div>
 
-<h2>La rotta</h2>
+<h2>The route</h2>
 <div class="grid g2">
   <div class="card">{route_img}</div>
   <div class="card">{route_note}</div>
 </div>
 
-<h2>Gate</h2>
+<h2>Gates</h2>
 <div class="card">{gates_html}</div>
 
 <h2>Training</h2>
 <div class="grid g2">
   <div class="card">{chart}{train_note}</div>
   <div class="card">
-    <h3>Distribuzione delle classi sui pixel annotati</h3>{dist}
+    <h3>Class distribution over annotated pixels</h3>{dist}
     <div class="note" style="margin-top:11px">
-      {_it(stats.get("n_patches", 0))} patch da {stats.get("n_scenes", 0)} scene ·
-      margine in cache {_it(100 * stats.get("margin_fraction", 0))}%, portato al
-      {_it(100 * stats.get("margin_fraction_target", 0.4))}% dal campionamento pesato
+      {_num_fmt(stats.get("n_patches", 0))} patches from {stats.get("n_scenes", 0)} scenes ·
+      margin in cache {_num_fmt(100 * stats.get("margin_fraction", 0))}%, raised to
+      {_num_fmt(100 * stats.get("margin_fraction_target", 0.4))}% by weighted sampling
     </div>
   </div>
 </div>
 
-<h2>Dati scaricati</h2>
+<h2>Downloaded data</h2>
 <div class="card">{dl_rows}
-  <div class="note" style="margin-top:11px">Il set di test ufficiale AI4Arctic è
-  l'unica stima non distorta: le sue etichette stanno in file
-  <span class="mono">_prep_reference.nc</span> separati.</div>
+  <div class="note" style="margin-top:11px">The official AI4Arctic test set is
+  the only unbiased estimate: its labels live in separate
+  <span class="mono">_prep_reference.nc</span> files.</div>
 </div>
 
-<h2>Compressione del downlink</h2>
+<h2>Downlink compression</h2>
 <div class="grid g2">
-  <div class="card"><h3>Rapporto misurato</h3><div class="big">{comp_note}</div>
-  <div class="note">Misurato sull'ice chart, che è disegnata a poligoni e si comprime
-  molto meglio dell'uscita di una rete. Va rimisurato sulla maschera predetta: il
-  codice si rifiuta di restituire un numero citabile finché non lo è (D-016).</div></div>
-  <div class="card"><h3>Compressione del modello</h3>
+  <div class="card"><h3>Measured ratio</h3><div class="big">{comp_note}</div>
+  <div class="note">{comp_caption}</div></div>
+  <div class="card"><h3>Model compression</h3>
   <div class="big">{model_comp}</div>
   <div class="note">{model_comp_note}</div></div>
 </div>
 
-<h2>Affermazioni pubbliche da riconciliare</h2>
+<h2>Early estimates vs. measurements</h2>
 <div class="scroll"><table>
-<thead><tr><th>ID</th><th>Affermazione</th><th>Problema</th><th>Azione</th></tr></thead>
-<tbody>{claims_html}</tbody></table></div>
+<thead><tr><th>ID</th><th>Estimate</th><th>Finding</th><th>Resolution</th></tr></thead>
+<tbody>{estimates_html}</tbody></table></div>
 
-<h2>Voci provvisorie</h2>
+<h2>Provisional values</h2>
 <div class="scroll"><table>
-<thead><tr><th>ID</th><th>Cosa</th><th>Stato</th><th>Chiude quando</th></tr></thead>
+<thead><tr><th>ID</th><th>What</th><th>Status</th><th>Closes when</th></tr></thead>
 <tbody>{prov_html}</tbody></table></div>
 
-<h2>Stato del codice</h2>
+<h2>Code status</h2>
 <div class="grid g4">
-  <div class="card"><h3>Commit</h3><div class="big">{g.get("n_commits", 0)}</div>
+  <div class="card"><h3>Commits</h3><div class="big">{g.get("n_commits", 0)}</div>
     <div class="note">branch <span class="mono">{html.escape(g.get("branch", "?"))}</span></div></div>
-  <div class="card"><h3>Test</h3><div class="big">{ctx["n_tests"]}</div>
-    <div class="note">{_it(ctx["test_lines"])} righe di test</div></div>
-  <div class="card"><h3>Righe di codice</h3><div class="big">{_it(ctx["src_lines"])}</div>
+  <div class="card"><h3>Tests</h3><div class="big">{ctx["n_tests"]}</div>
+    <div class="note">{_num_fmt(ctx["test_lines"])} lines of tests</div></div>
+  <div class="card"><h3>Lines of code</h3><div class="big">{_num_fmt(ctx["src_lines"])}</div>
     <div class="note">src + scripts</div></div>
-  <div class="card"><h3>Decisioni registrate</h3><div class="big">{len(ctx["decisions"])}</div>
-    <div class="note">DECISIONS.md</div></div>
+  <div class="card"><h3>Recorded decisions</h3><div class="big">{len(ctx["decisions"])}</div>
+    <div class="note">docs/decisions.md</div></div>
 </div>
 
-<h2>Registro</h2>
-<details><summary>Decisioni tecniche ({len(ctx["decisions"])})</summary>
+<h2>Log</h2>
+<details><summary>Technical decisions ({len(ctx["decisions"])})</summary>
   <div class="inner"><table><tbody>{decisions_html}</tbody></table></div></details>
-<details style="margin-top:11px"><summary>Ultimi commit</summary>
+<details style="margin-top:11px"><summary>Latest commits</summary>
   <div class="inner"><table><tbody>{commits_html}</tbody></table></div></details>
 
 <footer>
-  Generata da <span class="mono">make dashboard</span> il
-  {today.strftime("%d/%m/%Y")}. Pagina autonoma: nessuna risorsa esterna, funziona
-  con la rete spenta. Space Eagle · Wave by Vento, OGR Torino.
+  Generated by <span class="mono">make dashboard</span> on
+  {today.isoformat()}. Self-contained page: no external resources, works
+  with the network off.
 </footer>
 </div>
 """
@@ -889,10 +892,10 @@ def selected_training_config(repo: Path) -> tuple[str, dict]:
 
     ``scripts/pick_model.py`` writes the winner to ``artifacts/best_config.txt``.
     Reading a fixed path instead is how this page spent days reporting the val
-    mIoU of a six-class run that had already been abandoned for the §7.4
-    fallback — every training run appends to its own CSV, so "the last log" and
-    "the deployed model" are different things the moment more than one config
-    exists.
+    mIoU of a six-class run that had already been abandoned for the three-class
+    fallback (docs/decisions.md D-020) — every training run appends to its own
+    CSV, so "the last log" and "the deployed model" are different things the
+    moment more than one config exists.
     """
     picked = repo / "artifacts/best_config.txt"
     name = picked.read_text().strip() if picked.exists() else "configs/train3.yaml"
@@ -936,7 +939,8 @@ def route_story(repo: Path, demo_index: dict) -> dict:
 
 
 def collect(repo: Path, today: date) -> dict:
-    decisions_text = (repo / "DECISIONS.md").read_text() if (repo / "DECISIONS.md").exists() else ""
+    decisions_path = repo / "docs/decisions.md"
+    decisions_text = decisions_path.read_text() if decisions_path.exists() else ""
     metrics = _json(repo / "artifacts/metrics.json")
     stats = _json(repo / "artifacts/data_stats.json")
     summary = _json(repo / "artifacts/train_summary.json")
@@ -992,7 +996,7 @@ def collect(repo: Path, today: date) -> dict:
         "n_tests": count_tests(repo),
         "test_lines": count_lines(repo, "tests"),
         "src_lines": count_lines(repo, "src", "scripts"),
-        "claims": parse_table(decisions_text, "A"),
+        "estimates": parse_table(decisions_text, "A"),
         "provisional": parse_table(decisions_text, "P"),
         "decisions": parse_decisions(decisions_text),
         # No literal fallback: a hardcoded parameter count is a number that
@@ -1007,10 +1011,10 @@ def collect(repo: Path, today: date) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Genera index.html con lo stato del progetto.")
+    ap = argparse.ArgumentParser(description="Write index.html with the project status.")
     ap.add_argument("--repo", type=Path, default=Path("."))
     ap.add_argument("--out", type=Path, default=Path("index.html"))
-    ap.add_argument("--today", default=None, help="ISO date, per test riproducibili")
+    ap.add_argument("--today", default=None, help="ISO date, for reproducible tests")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
@@ -1021,13 +1025,12 @@ def main(argv: list[str] | None = None) -> int:
 
     done = sum(1 for g in ctx["gates"] if g.done)
     log.info(
-        "%s scritta — %d/%d gate verdi, %d commit, %d test, %d giorni al pitch",
+        "%s written — %d/%d gates green, %d commits, %d tests",
         args.out,
         done,
         len(ctx["gates"]),
         ctx["git"].get("n_commits", 0),
         ctx["n_tests"],
-        (PITCH - today).days,
     )
     return 0
 
