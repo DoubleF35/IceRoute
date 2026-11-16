@@ -127,13 +127,13 @@ $PY -m iceroute.demo.precompute --train-config "$BEST_CFG" \
   && say "$(grep 'CAMBIA con la classe' "$LOG/precompute_final.log" | tail -1)" \
   || say "FALLITO precompute."
 
-$PY -m iceroute.pitch.metrics --train-config "$BEST_CFG" \
+$PY -m iceroute.report.metrics --train-config "$BEST_CFG" \
     > "$LOG/report_final.log" 2>&1 \
   && say "Downlink: $(grep -E 'Rapporto|:1' "$LOG/report_final.log" | tail -1)" \
   || say "FALLITE le misure di downlink."
 
-$PY -m iceroute.pitch.figures >> "$LOG/report_final.log" 2>&1 || say "FALLITE le figure."
-$PY -m iceroute.pitch.dashboard >> "$LOG/report_final.log" 2>&1 || say "FALLITA la dashboard."
+$PY -m iceroute.report.figures >> "$LOG/report_final.log" 2>&1 || say "FALLITE le figure."
+$PY -m iceroute.report.dashboard >> "$LOG/report_final.log" 2>&1 || say "FALLITA la dashboard."
 $PY -m pytest tests/ -q > "$LOG/tests_final.log" 2>&1 \
   && say "Test: $(tail -1 "$LOG/tests_final.log")" \
   || say "TEST FALLITI: vedi $LOG/tests_final.log"

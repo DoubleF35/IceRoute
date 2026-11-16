@@ -170,17 +170,17 @@ precompute:
 .PHONY: dashboard
 dashboard:
 	$(REQUIRE_VENV)
-	$(PY) -m iceroute.pitch.dashboard
+	$(PY) -m iceroute.report.dashboard
 	@echo "  Apri index.html nel browser."
 
 .PHONY: report
 report:
 	$(REQUIRE_VENV)
-	$(PY) -m iceroute.pitch.metrics
-	$(PY) -m iceroute.pitch.assumptions
-	$(PY) -m iceroute.pitch.classes
-	$(PY) -m iceroute.pitch.figures
-	$(PY) -m iceroute.pitch.dashboard
+	$(PY) -m iceroute.report.metrics
+	$(PY) -m iceroute.report.assumptions
+	$(PY) -m iceroute.report.classes
+	$(PY) -m iceroute.report.figures
+	$(PY) -m iceroute.report.dashboard
 	@$(MAKE) --no-print-directory demo-static
 
 # La demo congelata in un solo file. Non richiede Python, server o rete: è la
@@ -188,7 +188,7 @@ report:
 .PHONY: demo-static
 demo-static:
 	$(REQUIRE_VENV)
-	$(PY) -m iceroute.pitch.standalone
+	$(PY) -m iceroute.web.standalone
 
 # Modalità presentazione: una schermata per passo, guidata da tastiera o
 # telecomando. Entry point separato — non tocca `make demo`, che resta la UI
@@ -196,7 +196,7 @@ demo-static:
 .PHONY: console
 console:
 	$(REQUIRE_VENV)
-	$(PY) -m iceroute.pitch.console
+	$(PY) -m iceroute.web.console
 	@echo ""
 	@echo "  Doppio clic su console.html. Trascina il globo, rotella per lo zoom."
 	@echo ""
@@ -204,7 +204,7 @@ console:
 .PHONY: present
 present:
 	$(REQUIRE_VENV)
-	$(PY) -m iceroute.pitch.present
+	$(PY) -m iceroute.report.present
 	@echo ""
 	@echo "  Apri present.html nel browser e premi F per lo schermo intero."
 	@echo "  → spazio PagGiù avanti · ← PagSu indietro · C classe nave · T timer · ? aiuto"

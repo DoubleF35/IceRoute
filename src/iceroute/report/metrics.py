@@ -24,7 +24,7 @@ import yaml
 from iceroute.data.collapse import N_CLASSES
 from iceroute.data.loader import load_config, load_scene
 from iceroute.demo.precompute import resolve_labels
-from iceroute.pitch.compression import downlink_route, measure_scene, summarise, verdict
+from iceroute.report.compression import downlink_route, measure_scene, summarise, verdict
 
 DEPLOYED = Path("artifacts/best_config.txt")
 

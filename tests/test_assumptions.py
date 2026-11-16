@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from iceroute.pitch import assumptions as asm
+from iceroute.report import assumptions as asm
 
 SAMPLE = """\
 meta:

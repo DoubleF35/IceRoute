@@ -61,7 +61,7 @@ from pathlib import Path
 
 import yaml
 
-from iceroute.pitch import standalone as sa
+from iceroute.web import standalone as sa
 from iceroute.routing.geocode import POLAR_CRS
 
 log = logging.getLogger("console")

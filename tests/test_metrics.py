@@ -223,7 +223,7 @@ def test_the_deployed_config_comes_from_the_picker_not_a_default(tmp_path, monke
     instead of 439:1 with no measurement code having changed. It went unnoticed
     because report had not been re-run since the model switch.
     """
-    from iceroute.pitch import metrics as mx
+    from iceroute.report import metrics as mx
 
     picked = tmp_path / "configs/train3_lovasz.yaml"
     picked.parent.mkdir(parents=True)
@@ -236,7 +236,7 @@ def test_the_deployed_config_comes_from_the_picker_not_a_default(tmp_path, monke
 
 
 def test_a_missing_marker_falls_back_rather_than_crashing(tmp_path, monkeypatch):
-    from iceroute.pitch import metrics as mx
+    from iceroute.report import metrics as mx
 
     monkeypatch.setattr(mx, "DEPLOYED", tmp_path / "assente.txt")
     assert mx.deployed_config(Path("configs/train3.yaml")) == Path("configs/train3.yaml")
@@ -245,7 +245,7 @@ def test_a_missing_marker_falls_back_rather_than_crashing(tmp_path, monkeypatch)
 def test_a_marker_pointing_at_a_deleted_config_falls_back(tmp_path, monkeypatch):
     """A dangling pointer must not take the whole report down the morning of the
     pitch; it must degrade to the baseline and say so through the fallback."""
-    from iceroute.pitch import metrics as mx
+    from iceroute.report import metrics as mx
 
     marker = tmp_path / "best_config.txt"
     marker.write_text(str(tmp_path / "sparito.yaml") + "\n")

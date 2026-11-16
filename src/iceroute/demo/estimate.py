@@ -91,7 +91,7 @@ def payload(entry: dict, routes_dir: Path, metrics: dict, scene_id: str) -> Payl
     over — where it is missing, the panel shows the route alone and says the
     rest is unmeasured rather than filling it in.
     """
-    from iceroute.pitch.compression import downlink_route
+    from iceroute.report.compression import downlink_route
 
     gj_path = routes_dir / (entry.get("geojson") or "")
     if not gj_path.is_file():

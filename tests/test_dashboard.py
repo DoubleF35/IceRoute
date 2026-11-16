@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from iceroute.pitch.dashboard import (
+from iceroute.report.dashboard import (
     MISSING,
     _it,
     _md,

@@ -45,14 +45,14 @@ $PY -m iceroute.demo.precompute --train-config "$CFG" > "$LOG/precompute_final.l
   || say "FALLITO il precompute."
 
 step "5/7  Misure di downlink e verdetto sulle affermazioni"
-$PY -m iceroute.pitch.metrics --train-config "$CFG" > "$LOG/report_final.log" 2>&1 \
+$PY -m iceroute.report.metrics --train-config "$CFG" > "$LOG/report_final.log" 2>&1 \
   && say "$(grep -E 'compressione' "$LOG/report_final.log" | tail -1)" \
   || say "FALLITE le misure di downlink."
 
 step "6/7  Figure e dashboard"
-$PY -m iceroute.pitch.figures >> "$LOG/report_final.log" 2>&1 \
+$PY -m iceroute.report.figures >> "$LOG/report_final.log" 2>&1 \
   && say "figure ok" || say "FALLITE le figure."
-$PY -m iceroute.pitch.dashboard >> "$LOG/report_final.log" 2>&1 \
+$PY -m iceroute.report.dashboard >> "$LOG/report_final.log" 2>&1 \
   && say "$(tail -1 "$LOG/report_final.log")" || say "FALLITA la dashboard."
 
 step "7/7  Test"

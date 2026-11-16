@@ -471,7 +471,7 @@ def main(argv: list[str] | None = None) -> int:
 
     data_cfg = load_config(args.data_config)
     routing_cfg = yaml.safe_load(args.config.read_text())
-    from iceroute.pitch.metrics import deployed_config
+    from iceroute.report.metrics import deployed_config
     train_path = args.train_config or deployed_config()
     train_cfg = yaml.safe_load(train_path.read_text())
     log.info("Modello: %s", train_path)

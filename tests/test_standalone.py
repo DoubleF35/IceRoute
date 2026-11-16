@@ -13,7 +13,7 @@ import re
 
 import pytest
 
-from iceroute.pitch import standalone as sa
+from iceroute.web import standalone as sa
 
 
 def _entry(hours=24.0, min_rio=6.0, feasible=False, blocked=True):

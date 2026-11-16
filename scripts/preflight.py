@@ -280,7 +280,7 @@ def check_assumptions(repo: Path, rep: Report) -> None:
     already measured — the pitch quoting a number while the file behind it said
     the number was not yet known.
     """
-    from iceroute.pitch import assumptions as asm
+    from iceroute.report import assumptions as asm
 
     try:
         res = asm.run(repo, dry_run=True)

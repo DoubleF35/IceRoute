@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from iceroute.pitch.compression import (
+from iceroute.report.compression import (
     N_SAR_CHANNELS,
     SAR_BYTES_PER_PIXEL,
     CompressionResult,

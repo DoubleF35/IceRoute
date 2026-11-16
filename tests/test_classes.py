@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from iceroute.pitch import classes as cl
+from iceroute.report import classes as cl
 
 ASM = {
     "segmentation": {"scheme": "3 classi", "classes": {

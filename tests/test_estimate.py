@@ -20,7 +20,7 @@ from iceroute.demo.estimate import (
     payload,
     rescale_transit,
 )
-from iceroute.pitch.compression import downlink_route
+from iceroute.report.compression import downlink_route
 
 
 def _collection(n_baseline_points=1000):

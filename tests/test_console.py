@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from iceroute.pitch import console as co
+from iceroute.web import console as co
 
 # ---------------------------------------------------------------------------
 # Bearings and distances
