@@ -649,3 +649,17 @@ def test_take_duration_survives_an_hour_boundary(monkeypatch):
         datetime.strptime(g["t1"], "%Y%m%dT%H%M%S") - datetime.strptime(g["t0"], "%Y%m%dT%H%M%S")
     ).total_seconds()
     assert secs == 60
+
+
+def test_footprint_falls_back_to_the_cache_without_the_raw_scene(tmp_path):
+    """The published site is built without the dataset: the bundle's cached
+    footprint must be used, and nothing invented when there is none."""
+    raw = tmp_path / "raw" / "20180707T113313_cis_prep.nc"
+    cache = tmp_path / "cache"
+    assert co.footprint(raw, cache=cache) is None
+
+    cache.mkdir()
+    fp = {"ring": [[0.0, 70.0], [1.0, 70.0], [1.0, 71.0]], "pass": "descending"}
+    (cache / f"{raw.stem}_footprint.json").write_text(json.dumps(fp))
+    assert co.footprint(raw, cache=cache) == fp
+    assert co.footprint(raw) is None

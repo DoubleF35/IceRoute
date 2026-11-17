@@ -126,14 +126,27 @@ def _stamp(s: str) -> str:
     return f"{s[0:4]}-{s[4:6]}-{s[6:8]} {s[9:11]}:{s[11:13]}:{s[13:15]}Z"
 
 
-def footprint(raw: Path, *, step: int = 2) -> dict | None:
+def footprint(raw: Path, *, step: int = 2, cache: Path | None = None) -> dict | None:
     """The real swath outline and the real product identity, or nothing.
 
-    Returns ``None`` when the raw scene is not on this disk: the globe then
-    simply has one fewer footprint, which is better than a placed guess.
+    Read from the raw scene when it is on this disk, and written to ``cache``
+    so that the demo bundle carries it: the published site is built without the
+    40 GB dataset. Without either, returns ``None``: the globe then simply has
+    one fewer footprint, which is better than a placed guess.
     """
+    cached = None if cache is None else cache / f"{raw.stem}_footprint.json"
     if not raw.is_file():
+        if cached is not None and cached.is_file():
+            return json.loads(cached.read_text())
         return None
+    out = _footprint_from_raw(raw, step=step)
+    if cached is not None:
+        cache.mkdir(parents=True, exist_ok=True)
+        cached.write_text(json.dumps(out, separators=(",", ":")))
+    return out
+
+
+def _footprint_from_raw(raw: Path, *, step: int) -> dict:
     import xarray as xr
 
     with xr.open_dataset(raw) as ds:
@@ -697,7 +710,7 @@ def collect(
     missing_raw: list[str] = []
     for scene in ctx["scenes"]:
         src = by_id.get(scene["id"]) or {}
-        fp = footprint(raw_dir / scene["id"])
+        fp = footprint(raw_dir / scene["id"], cache=cache_dir)
         if fp is None:
             missing_raw.append(scene["id"])
         stats = inference_stats(src.get("files") or {})
